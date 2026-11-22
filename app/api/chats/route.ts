@@ -1,0 +1,91 @@
+import { chainsForSelection, formatChainLine } from "@/src/core";
+import { newGraphContextMessage, newStudyContextMessage, type GraphContextPick, type StudyContextDetails } from "@/src/core";
+import { compactionInFlight, createChat, getPluginHost, isPluginHostError, isTurnRunning, listChats, readSettingsRecord, stores, titleFromPrompt } from "@/src/server";
+import type { ChatListItem } from "@/src/core";
+
+/** The session picker's list: record-derived summaries (phase, pending
+ *  question) + live liveness — a running turn marks the session busy
+ *  (contracts.ts ChatListItem; the store can't see liveness, the route is
+ *  the merge point). Owner, minimal-color round: background jobs NO LONGER
+ *  count — the sidebar's Background agents section is their channel now
+ *  (a running spinner per row would double-signal them), so busy means
+ *  exactly "a teach turn is in flight". */
+export async function GET() {
+	const chats: ChatListItem[] = listChats().map((c) => ({
+		...c,
+		busy: isTurnRunning(c.id),
+		compacting: compactionInFlight(c.id),
+	}));
+	return Response.json({ chats });
+}
+
+export async function POST(req: Request) {
+	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; graphContext?: unknown; studyContext?: unknown };
+	// HarnessAcademico (ADR 0003): a study context — a unit, a passage or an
+	// attempt, by id — is resolved by the Estudio plugin, which composes the
+	// context message and records the conversation in its space and unit.
+	const studyContext = body.studyContext;
+	if (studyContext !== undefined && (typeof studyContext !== "object" || studyContext === null || Array.isArray(studyContext))) {
+		return Response.json({ error: "studyContext must be an object" }, { status: 400 });
+	}
+	const title = typeof body.title === "string" ? body.title : "";
+	// Practice sessions (owner, 2026-10-04): kind "practice" marks the
+	// record — the practice agent + its tools from turn 1, no extraction.
+	const kind = body.kind === "practice" ? ("practice" as const) : undefined;
+	const chat = createChat(titleFromPrompt(title || "Conversación sin título"), kind);
+	// PER-SESSION MODELS (owner, 2026-09-28): a session owns its model +
+	// thinking level from birth — stamped verbatim from the STRONG slot,
+	// the new-session default. From here the strong slot never reaches
+	// this session again: in-session picks write the session's own record
+	// (PUT /api/chats/:id/settings). No strong slot configured (fresh BYOK
+	// boot) → no stamp; the turn gate's 503 models_not_configured envelope
+	// refuses honestly until the setup flow fills the slot.
+	const strong = readSettingsRecord()?.models?.strong;
+	if (strong?.model) {
+		stores.chatStore.saveSettings(chat.id, {
+			model: { provider: strong.model.provider, id: strong.model.id },
+			thinkingLevel: strong.thinkingLevel,
+		});
+	}
+	// The session's map context (owner, 2026-10-04): the picked
+	// propositions ride the CREATION — message[0] is a graph-context
+	// marker (a separate custom message BEFORE the learner's first user
+	// message), carrying the picks plus the reasoning chains among them.
+	// The picks carry their own name/statement (what the learner saw at
+	// pick time); the chains derive from the CURRENT graph snapshot.
+	const rawPicks = (body.graphContext as { propositions?: unknown } | undefined)?.propositions;
+	const picks: GraphContextPick[] = Array.isArray(rawPicks)
+		? rawPicks
+				.filter(
+						(p): p is GraphContextPick =>
+							typeof p === "object" &&
+							p !== null &&
+							typeof (p as GraphContextPick).id === "string" &&
+							typeof (p as GraphContextPick).name === "string" &&
+							typeof (p as GraphContextPick).statement === "string",
+					)
+					.slice(0, 64)
+			: [];
+	if (picks.length > 0) {
+		const byId = new Map(stores.graphStore.readNodes().map((n) => [n.id, n]));
+		const pickedNodes = picks.map((p) => byId.get(p.id)).filter((n) => n !== undefined);
+		const chainLines = chainsForSelection(pickedNodes, stores.graphStore.readChains()).map((c) =>
+			formatChainLine(c, Object.fromEntries(byId)),
+		);
+		stores.chatStore.saveMessages(chat.id, [newGraphContextMessage(picks, chainLines)]);
+	}
+	if (studyContext) {
+		let resolved: { content: string; details: StudyContextDetails };
+		try {
+			const host = await getPluginHost();
+			resolved = (await host.call("estudio", "contexto-conversacion", { ...studyContext, chatId: chat.id })) as typeof resolved;
+		} catch (error) {
+			// No conversation without its context: the one just created goes.
+			stores.chatStore.deleteChat(chat.id);
+			const status = isPluginHostError(error) ? error.status : 400;
+			return Response.json({ error: error instanceof Error || isPluginHostError(error) ? error.message : "Study context refused" }, { status });
+		}
+		stores.chatStore.saveMessages(chat.id, [newStudyContextMessage(resolved.content, resolved.details)]);
+	}
+	return Response.json({ id: chat.id, title: chat.title });
+}

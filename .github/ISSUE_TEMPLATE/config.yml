@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question
+    url: https://github.com/dpalazon-dev/harness-academico/discussions/categories/q-a
+    about: Questions about using HarnessAcademico go to Discussions.
+  - name: Report a security vulnerability
+    url: https://github.com/dpalazon-dev/harness-academico/security/advisories/new
+    about: Please report security issues privately here, not as a public issue. See SECURITY.md.

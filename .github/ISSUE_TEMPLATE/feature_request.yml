@@ -1,0 +1,17 @@
+name: Feature request
+description: Suggest a new feature or an improvement.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas are welcome; you do not need a finished design or implementation plan. A request opens a discussion, not a commitment to build it. For open-ended ideas, [Discussions](https://github.com/dpalazon-dev/harness-academico/discussions) may be a better place.
+
+        **This report is public.** Do not include credentials or private information.
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to see?
+      description: Describe your idea and the study problem it would help you solve.
+    validations:
+      required: true
