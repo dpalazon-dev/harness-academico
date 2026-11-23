@@ -36,6 +36,19 @@ test("core packages load directly, default disabled, and never create data or ev
 	assert.equal(fs.existsSync(path.join(f.directory, "official")), false, "no core installation copy");
 });
 
+test("enabledByDefault starts listed core plugins enabled until an explicit choice is persisted", async t => {
+	const f = fixture(t); f.pkg("official", "core"); f.pkg("community", "community");
+	f.pkg("second", "core"); f.core.ids.push("second");
+	const deps = { ...f.deps, core: { ...f.core, enabledByDefault: ["official", "community"] } };
+	const host = createPluginHost(deps); t.after(() => host.dispose()); await host.initialize();
+	const state = (h: typeof host) => h.list().map(p => [p.id, p.enabled, p.status]);
+	assert.deepEqual(state(host), [["community", false, "disabled"], ["missing", false, "error"], ["official", true, "active"], ["second", false, "disabled"]], "only listed core IDs; never community");
+	assert.equal(fs.existsSync(path.join(f.root, "data", "plugins-state.json")), false, "a default is not written as a choice");
+	await host.setEnabled("official", false); await host.dispose();
+	const restarted = createPluginHost(deps); t.after(() => restarted.dispose()); await restarted.initialize();
+	assert.equal(restarted.list().find(p => p.id === "official")!.enabled, false, "turning it off is remembered");
+});
+
 test("core activation uses separate writable data, pinned assets, and persisted explicit choices", async t => {
 	const f = fixture(t); const code = f.pkg("official", "core"); f.pkg("community", "community");
 	const before = fs.readdirSync(code).map(name => [name, fs.readFileSync(path.join(code, name), "utf8")]);

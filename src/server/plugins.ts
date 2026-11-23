@@ -29,6 +29,9 @@ const core = {
 	directory: path.join(/* turbopackIgnore: true */ PATHS.root, "core-plugins"),
 	dataDirectory: path.join(/* turbopackIgnore: true */ PATHS.data, "core-plugin-data"),
 	ids: corePluginIds,
+	// HarnessAcademico: the study features are the app, so Estudio starts enabled
+	// on a fresh data folder. Turning it off in Settings is remembered.
+	enabledByDefault: ["estudio"],
 };
 const coreData = { directory: core.dataDirectory, ids: core.ids };
 type Host = ReturnType<typeof createPluginHost>;
