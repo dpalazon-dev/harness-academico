@@ -1,5 +1,5 @@
 "use strict";
-const { publicError } = require("./chatgpt.cjs");
+const { publicError, publicCode } = require("./chatgpt.cjs");
 
 /** Inherited Node child IPC, not a listening HTTP/socket token service. */
 function attachChatGPTChild(child, connection) {
@@ -15,7 +15,7 @@ function attachChatGPTChild(child, connection) {
 			else if (message.op === "lease" && typeof message.background === "boolean") value = await connection.lease(message.background, message);
 			else throw new Error("Invalid private operation");
 			send({ id: message.id, op: message.op, ok: true, value });
-		} catch (err) { send({ id: message.id, op: message.op, ok: false, stamp: connection.stamp(), error: publicError(err) }); }
+		} catch (err) { send({ id: message.id, op: message.op, ok: false, stamp: connection.stamp(), error: publicError(err), code: publicCode(err) }); }
 	};
 	child.on("message", listener);
 	return { send, dispose: () => child.removeListener("message", listener) };

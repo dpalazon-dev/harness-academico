@@ -77,6 +77,7 @@ import {
 } from "../core/input-events.ts";
 import { steerDelivered } from "../core/contracts.ts";
 import type {CallUsage} from "../core/contracts.ts";
+import { motivoDeError } from "../agent/error-de-conexion.ts";
 
 /**
  * One chat turn over the server-owned native record. Framework-free (plain
@@ -836,8 +837,8 @@ export async function handleChatInput(
 			// route through here: they ride the error-result path and reach the
 			// transcript directly (the retry context the model saw).
 			onError: (error) => {
-				if (conversation.provider === "chatgpt") return chatGPTStreamError(String(error));
-				if (isSubscriptionProvider(conversation.provider)) return nativeSubscriptionError(conversation.provider, String(error));
+				if (conversation.provider === "chatgpt") return chatGPTStreamError(motivoDeError(error));
+				if (isSubscriptionProvider(conversation.provider)) return nativeSubscriptionError(conversation.provider, motivoDeError(error));
 				console.error(`[chat ${chatId}] turn error:`, error);
 				return "Se produjo un error.";
 			},

@@ -547,10 +547,10 @@ export function GraphSection({
 			    switch below arrived: off ≠ no graph, off = the graph stops
 			    growing. The testid keeps the old name's shape (row-enabled) so
 			    this stays one rename, not a test re-pin. */}
-			<SettingsRow label="Extraction" hint="Off = the graph stops growing" testid="graph-row-enabled">
+			<SettingsRow label="Extracción del grafo" hint="Si la desactivas, el grafo deja de crecer" testid="graph-row-enabled">
 				<Toggle
 					checked={graph?.enabled ?? true}
-					label="extraction enabled"
+					label="extracción del grafo activada"
 					onChange={(on) =>
 						// Compose, never replace-whole (the section PUT is, but the
 					// row must not drop its sibling field — fixed with the budget
@@ -563,23 +563,23 @@ export function GraphSection({
 			    round): display-only. Off = the home shows the chains view
 			    instead of the canvas. The ledgers, the pipeline, everything
 			    data keeps working — that is the extraction switch above. */}
-			<SettingsRow label="Graph rendering" hint="Off = home shows the chains view" testid="graph-row-rendering">
+			<SettingsRow label="Dibujo del grafo" hint="Si lo desactivas, el inicio muestra la vista de cadenas" testid="graph-row-rendering">
 				<Toggle
 					checked={graph?.rendering ?? true}
-					label="graph rendering enabled"
+					label="dibujo del grafo activado"
 					onChange={(on) => onSectionChange({ ...graph, rendering: on })}
 				/>
 			</SettingsRow>
 			<SettingsRow
-				label="Extraction chunk budget"
-				hint={`${resolved.extractionChunkTokens} tok`}
+				label="Tamaño de cada tramo de extracción"
+				hint={`${resolved.extractionChunkTokens} tokens`}
 				testid="graph-row-chunk-tokens"
 			>
 				<CommitInput
 					type="number"
 					value={String(graph?.extractionChunkTokens ?? "")}
 					placeholder={String(resolved.extractionChunkTokens)}
-					ariaLabel="extraction chunk budget"
+					ariaLabel="tamaño de cada tramo de extracción"
 					testid="input-chunk-tokens"
 					onCommit={(v) => {
 						// Empty = factory default (the fix-wave discipline): absence is

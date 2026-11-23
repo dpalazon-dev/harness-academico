@@ -199,3 +199,21 @@ No toca el núcleo ni el plugin: todo es cliente (`components/estudio/voz.ts`, `
 | `components/estudio/barra-lateral.tsx`, `components/estudio/asa-barra.tsx`, `components/estudio/ancho-barra.ts` (nuevos) | El borde derecho de la barra desplegada es un asa (`role="separator"`): arrastrar cambia el ancho entre 200 y 480 px y lo recuerda en `localStorage` (`estudio:barra:ancho`); clic pliega o despliega, doble clic vuelve a 256 px, ← y → con el asa enfocada mueven 16 px. `ProveedorBarraLateral` pone el ancho en `--sidebar-width` y quita las transiciones mientras se arrastra; `components/ui/sidebar.tsx` no cambia | Petición de David del 23-nov-2026: la barra no se podía ensanchar ni estrechar | Propio del fork |
 | `src/core/keyboard.ts`, `components/keyboard-shortcuts.tsx`, `components/chat.tsx`, `docs/keyboard.md`, `components/estudio/navegar-mensajes.tsx` (nuevo) | Acciones nuevas `message-prev` (Alt+↑) y `message-next` (Alt+↓), reasignables; el despachador las reclama y solo las emite sin modal delante. El chat marca con `data-parada-mensaje` los mensajes de David y las respuestas del tutor y monta `NavegacionMensajes` (botones ↑ ↓ en el borde derecho y oyente de los dos eventos) junto a `SessionMessageNavigation` | Petición de David del 23-nov-2026: no se podía ir al mensaje anterior o al siguiente. Alt+↑/↓ estaban libres desde que el original retiró el ciclo de sesiones | Conservar al fusionar; si el original vuelve a usar Alt+↑/↓ o añade navegación de mensajes, revisar el choque y migrar a la suya |
 | `tests/ancho-barra-estudio.test.tsx`, `tests/navegar-mensajes-estudio.test.tsx` (nuevos), `tests/keyboard-toggle-sidebar.test.ts` | La prueba heredada que fijaba Alt+↑/↓ sin acción fija ahora `message-prev` y `message-next`. Límites y recuerdo del ancho, asa montada sobre linkedom; elección de parada, salto, registro de Alt+↑/↓ y despachador | Pruebas de las dos filas anteriores | Propio del fork |
+
+## Ajustes en español y errores de conexión con código (23-nov-2026)
+
+Lo pidió David después de la revisión de UI y UX: «Traduce al español los textos de Ajustes» y luego «Separa el código del error del texto y tradúcelos».
+
+- **Textos de Ajustes.** Están traducidos los del servidor propio (antes «Custom endpoint»), la conexión con ChatGPT, las suscripciones (Copilot y Grok) y las filas del grafo.
+  - El nombre visible del servidor propio es «Servidor propio (compatible con OpenAI)». `CUSTOM_PROVIDER.label` no cambia: es el nombre con que se registra en Pi.
+  - `ConnectionRow` elige su variante comparando con «Conectar».
+  - Al cambiar las etiquetas de los interruptores del grafo, cambian también sus `data-testid`, porque se derivan de la etiqueta.
+- **Código y texto, por separado.** Los errores de `electron/chatgpt.cjs` y de `electron/subscriptions.cjs` tienen un código estable (`publicCode`) y un texto en español (`publicError`). El IPC envía los dos (`code` y `error`).
+  - En el agente, `ErrorDeConexion` (`src/agent/error-de-conexion.ts`) guarda el código. `chatGPTStreamError` y `nativeSubscriptionError` clasifican por ese código y no por el texto, que ya no contiene «background», «expired» y otras palabras parecidas.
+  - Los errores del proveedor y los internos siguen en inglés y se clasifican como antes.
+  - Los mensajes que esos dos clasificadores escriben en el chat ahora están en español.
+- **El aviso de revocación** se reconocía comparando su texto. Ahora `ChatGPTStatus` lleva `errorCode` y el aviso es `revocation`; el texto se enseña tal cual llega.
+- **Sin traducir.**
+  - Los mensajes del modo web (`src/server/web-subscription-http.ts`, `components/settings/subscription-client.ts`). La interfaz los cambia por su error genérico.
+  - Los errores que devuelve la API del servidor propio (`src/server/custom-provider.ts`).
+  - Las preguntas que el SDK de Pi hace al iniciar sesión (`prompt.message`).
