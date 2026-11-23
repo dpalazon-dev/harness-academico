@@ -73,7 +73,7 @@ interface CustomStatus {
 
 async function readCustomStatus(inspectKey = false): Promise<CustomStatus> {
 	const response = await fetch(`/api/custom-provider${inspectKey ? "?authMode=apiKey" : ""}`);
-	if (!response.ok) throw new Error("Unable to load custom configuration.");
+	if (!response.ok) throw new Error("No se pudo cargar la configuración del servidor propio.");
 	const cp = await response.json() as Partial<CustomStatus>;
 	return { keyReuseRequired: Boolean(cp.keyReuseRequired), revision: response.headers.get("etag") ?? "", authMode: cp.authMode ?? "keyless", keySource: cp.keySource ?? "none", baseUrl: cp.baseUrl ?? "", models: cp.models ?? [], overrides: cp.overrides ?? {}, manualModels: cp.manualModels ?? [], keyPresent: Boolean(cp.keyPresent) };
 }
@@ -88,7 +88,8 @@ const TOOL_IDS = AUTH_KEYS.map((k) => k.id) as readonly string[];
 export const CUSTOM_PROVIDER_INFO: ProviderKeyInfo = {
 	id: CUSTOM_PROVIDER.id,
 	envVar: CUSTOM_PROVIDER.envVar,
-	label: CUSTOM_PROVIDER.label,
+	// El nombre que ve David; `CUSTOM_PROVIDER.label` sigue siendo el del registro en Pi.
+	label: "Servidor propio (compatible con OpenAI)",
 };
 
 /** The classification driving the table groups. Pure — exported for
@@ -461,7 +462,7 @@ export function KeysSection({
 	 *  deleteKey: fire, re-read, broadcast so the catalog narrows everywhere. */
 	async function disconnectCustom(revision: string): Promise<string | null> {
 		const res = await fetch("/api/custom-provider", { method: "DELETE", headers: { "content-type": "application/json", "if-match": revision }, body: JSON.stringify({}) }).catch(() => null);
-		if (!res?.ok) return res ? ((await res.json().catch(() => ({}))).error ?? "Disconnect failed.") : "Disconnect failed. Check your connection.";
+		if (!res?.ok) return res ? ((await res.json().catch(() => ({}))).error ?? "No se pudo desconectar.") : "No se pudo desconectar. Comprueba la conexión.";
 		discardCustomEditor();
 		await reload();
 		notifySettingsSaved("keys");
@@ -689,7 +690,7 @@ export function CustomEndpointSetup({ onSaved }: { onSaved: () => void | Promise
 		catch { setError(true); }
 	}
 	useEffect(() => { void reload(); }, []);
-	if (!status || error) return <div className="text-xs">{error ? "Unable to load custom configuration." : "Loading custom configuration…"}{error && <button className="anillo-foco" onClick={() => void reload()}>Retry</button>}</div>;
+	if (!status || error) return <div className="text-xs">{error ? "No se pudo cargar la configuración del servidor propio. " : "Cargando la configuración del servidor propio…"}{error && <button className="anillo-foco underline underline-offset-2" onClick={() => void reload()}>Reintentar</button>}</div>;
 	return <CustomEndpointEditor key={status.revision} setup revision0={status.revision} authMode0={status.authMode} keySource0={status.keySource} keyReuseRequired0={status.keyReuseRequired} baseUrl0={status.baseUrl} keyPresent={status.keyPresent} models={status.models} overrides={status.overrides} manualModels0={status.manualModels} onSaved={onSaved} onPinsSaved={reload} onReload={reload} onCancel={reload} />;
 }
 
@@ -704,7 +705,7 @@ function CustomEndpointRow({
 	onToggle: () => void;
 }) {
 	const count = status.models.length;
-	const line = `${status.baseUrl} · ${count} model${count === 1 ? "" : "s"} · ${status.authMode === "keyless" ? "keyless" : status.keyPresent ? "API key" : "API key missing"}`;
+	const line = `${status.baseUrl} · ${count} modelo${count === 1 ? "" : "s"} · ${status.authMode === "keyless" ? "sin clave" : status.keyPresent ? "clave de API" : "falta la clave de API"}`;
 	return (
 		<div data-testid="custom-endpoint-row">
 			<button
@@ -714,7 +715,7 @@ function CustomEndpointRow({
 				onClick={onToggle}
 				className="anillo-foco flex w-full items-center justify-between gap-3 rounded-sm px-1 py-1.5 text-left cursor-pointer transition-colors hover:bg-accent/50"
 			>
-				<span className="font-ui text-xs text-foreground">Custom endpoint</span>
+				<span className="font-ui text-xs text-foreground">{CUSTOM_PROVIDER_INFO.label}</span>
 				<span data-testid="custom-endpoint-status" className="max-w-[60%] truncate font-mono text-[11px] text-muted-foreground">
 					{line}
 				</span>
@@ -822,7 +823,7 @@ function CustomEndpointEditor({
 			setKeyPresent(status.keyPresent);
 			setKeyReuseRequired(status.keyReuseRequired);
 			if (status.keySource === "env") setKey("");
-		}).catch(() => { if (!cancelled) setError("Unable to inspect effective key. Reload configuration and retry."); })
+		}).catch(() => { if (!cancelled) setError("No se pudo comprobar la clave en uso. Vuelve a cargar la configuración y reinténtalo."); })
 			.finally(() => { if (!cancelled) setAuthLoading(false); });
 		return () => { cancelled = true; };
 	}, [authMode]);
@@ -858,7 +859,7 @@ function CustomEndpointEditor({
 		}).catch(() => null);
 		if (!res || !res.ok) {
 			const b = (await res?.json().catch(() => ({}))) as { error?: string } | undefined;
-			setPinsError(res ? (b?.error ?? `Save failed (${res.status})`) : "Save failed. Check your connection.");
+			setPinsError(res ? (b?.error ?? `No se pudieron guardar los límites (${res.status})`) : "No se pudieron guardar los límites. Comprueba la conexión.");
 			setPinsBusy(false);
 			return;
 		}
@@ -883,7 +884,7 @@ function CustomEndpointEditor({
 		}).catch(() => null);
 		if (!res || !res.ok) {
 			const b = (await res?.json().catch(() => ({}))) as { error?: string } | undefined;
-			setError(res ? (b?.error ?? `Connect failed (${res.status})`) : "Connect failed. Check your connection.");
+			setError(res ? (b?.error ?? `No se pudo conectar (${res.status})`) : "No se pudo conectar. Comprueba la conexión.");
 			setBusy(false);
 			return;
 		}
@@ -894,14 +895,14 @@ function CustomEndpointEditor({
 	return (
 		<div data-testid="custom-endpoint-editor" className="flex flex-col gap-2 rounded-sm px-1 py-1.5">
 			<div className="flex items-center gap-2">
-				<span className="shrink-0 font-ui text-xs text-foreground">Custom endpoint</span>
+				<span className="shrink-0 font-ui text-xs text-foreground">{CUSTOM_PROVIDER_INFO.label}</span>
 				<input
 					ref={baseUrlRef}
 					type="text"
 					value={baseUrl}
 					onChange={(e) => setBaseUrl(e.target.value)}
-					placeholder="Base URL, e.g. http://localhost:11434/v1"
-					aria-label="Custom endpoint base URL"
+					placeholder="URL base, p. ej., http://localhost:11434/v1"
+					aria-label="URL base del servidor propio"
 					data-testid="custom-baseurl-input"
 					disabled={busy}
 					autoFocus={active}
@@ -912,19 +913,19 @@ function CustomEndpointEditor({
 				type="text"
 				value={manualModels}
 				onChange={(e) => setManualModels(e.target.value)}
-				placeholder="Model IDs, comma-separated — optional, needed when the endpoint has no /models list"
-				aria-label="Custom endpoint model IDs"
+				placeholder="ID de los modelos, separados por comas: opcional; hace falta si el servidor no da la lista /models"
+				aria-label="ID de los modelos del servidor propio"
 				data-testid="custom-models-input"
 				disabled={busy}
 				className="h-7 min-w-0 rounded-sm border border-border bg-background px-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-muted-foreground/50"
 			/>
-			<label className="flex items-center gap-2 text-xs">Authentication
-				<select aria-label="Custom endpoint authentication" data-testid="custom-auth-mode" value={authMode} disabled={busy || pinsBusy} onChange={(e) => { setAuthMode(e.target.value as "keyless" | "apiKey"); setReuseKey(false); }}>
-					<option value="keyless">Keyless</option><option value="apiKey">API key</option>
+			<label className="flex items-center gap-2 text-xs">Autenticación
+				<select aria-label="Autenticación del servidor propio" data-testid="custom-auth-mode" value={authMode} disabled={busy || pinsBusy} onChange={(e) => { setAuthMode(e.target.value as "keyless" | "apiKey"); setReuseKey(false); }}>
+					<option value="keyless">Sin clave</option><option value="apiKey">Clave de API</option>
 				</select>
 			</label>
-			{authMode === "apiKey" && keySource === "env" && <p className="text-[11px] text-muted-foreground" data-testid="custom-env-owned">Environment supplies the effective key. Change the environment to replace it.</p>}
-			{authMode === "apiKey" && keyPresent && (changedTarget || keyReuseRequired) && <label className="text-[11px]"><input type="checkbox" data-testid="custom-reuse-key" checked={reuseKey} onChange={(e) => setReuseKey(e.target.checked)} /> Allow reuse of the effective existing key for this URL</label>}
+			{authMode === "apiKey" && keySource === "env" && <p className="text-[11px] text-muted-foreground" data-testid="custom-env-owned">La clave en uso viene de una variable de entorno. Para sustituirla, cambia esa variable.</p>}
+			{authMode === "apiKey" && keyPresent && (changedTarget || keyReuseRequired) && <label className="text-[11px]"><input type="checkbox" data-testid="custom-reuse-key" checked={reuseKey} onChange={(e) => setReuseKey(e.target.checked)} /> Usar con esta URL la clave que ya está en uso</label>}
 			<div className="flex items-center gap-2">
 				{authMode === "apiKey" && <input
 					type="password"
@@ -934,8 +935,8 @@ function CustomEndpointEditor({
 						setKeyTouched(true);
 						if (!e.target.value.trim()) setAuthMode("keyless");
 					}}
-					placeholder={keyPresent ? "Leave blank to keep effective key" : "API key"}
-					aria-label="Custom endpoint API key"
+					placeholder={keyPresent ? "Déjalo en blanco para mantener la clave en uso" : "Clave de API"}
+					aria-label="Clave de API del servidor propio"
 					data-testid="custom-key-input"
 					disabled={busy || pinsBusy || keySource === "env"}
 					className="h-7 min-w-0 flex-1 rounded-sm border border-border bg-background px-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-muted-foreground/50"
@@ -947,7 +948,7 @@ function CustomEndpointEditor({
 					data-testid="custom-save"
 					className="anillo-foco shrink-0 text-xs text-foreground underline-offset-2 hover:underline disabled:text-muted-foreground/40 disabled:no-underline"
 				>
-					{busy ? "Connecting…" : "Connect"}
+					{busy ? "Conectando…" : "Conectar"}
 				</button>
 				<button
 					type="button"
@@ -956,7 +957,7 @@ function CustomEndpointEditor({
 					data-testid="custom-cancel"
 					className="anillo-foco shrink-0 text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
 				>
-					Cancel
+					Cancelar
 				</button>
 				{/* Disconnect rides beside Connect, exactly the stored-key rows' Delete:
 				    quiet text, one click, no confirm — and only once there IS an
@@ -969,7 +970,7 @@ function CustomEndpointEditor({
 						data-testid="custom-delete"
 						className="anillo-foco shrink-0 text-xs text-muted-foreground/70 underline-offset-2 hover:text-error hover:underline"
 					>
-						Disconnect
+						Desconectar
 					</button>
 				)}
 			</div>
@@ -982,7 +983,7 @@ function CustomEndpointEditor({
 								<div key={m.id} className="flex items-center gap-2" data-testid={pinTestid("custom-pin-row", m.id)}>
 									<span className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground" title={m.id}>
 										{m.id}
-										<span className="block text-[10px] text-muted-foreground">Context: {d.context.trim() ? "user pin" : m.context ? `reported ${m.context}` : `fallback ${CUSTOM_MODEL_DEFAULT_CONTEXT_WINDOW}`} · Output: {d.maxTokens.trim() ? "user pin" : m.maxTokens ? `reported ${m.maxTokens}` : `fallback ${CUSTOM_MODEL_DEFAULT_MAX_TOKENS}`}</span>
+										<span className="block text-[10px] text-muted-foreground">Contexto: {d.context.trim() ? "fijado por ti" : m.context ? `${m.context}, según el servidor` : `${CUSTOM_MODEL_DEFAULT_CONTEXT_WINDOW}, por defecto`} · Salida: {d.maxTokens.trim() ? "fijada por ti" : m.maxTokens ? `${m.maxTokens}, según el servidor` : `${CUSTOM_MODEL_DEFAULT_MAX_TOKENS}, por defecto`}</span>
 									</span>
 									<input
 										type="text"
@@ -990,7 +991,7 @@ function CustomEndpointEditor({
 										value={d.context}
 										onChange={(e) => setDraft(m, { context: e.target.value })}
 										placeholder={String(m.context ?? CUSTOM_MODEL_DEFAULT_CONTEXT_WINDOW)}
-										aria-label={`${m.id} context window in tokens`}
+										aria-label={`${m.id}: ventana de contexto en tokens`}
 										data-testid={pinTestid("custom-pin-context", m.id)}
 										disabled={pinsBusy}
 										className="h-7 w-20 shrink-0 rounded-sm border border-border bg-background px-1.5 text-right font-mono text-[11px] text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-muted-foreground/50"
@@ -1001,7 +1002,7 @@ function CustomEndpointEditor({
 										value={d.maxTokens}
 										onChange={(e) => setDraft(m, { maxTokens: e.target.value })}
 										placeholder={String(m.maxTokens ?? CUSTOM_MODEL_DEFAULT_MAX_TOKENS)}
-										aria-label={`${m.id} max output tokens`}
+										aria-label={`${m.id}: máximo de tokens de salida`}
 										data-testid={pinTestid("custom-pin-maxtokens", m.id)}
 										disabled={pinsBusy}
 										className="h-7 w-20 shrink-0 rounded-sm border border-border bg-background px-1.5 text-right font-mono text-[11px] text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-muted-foreground/50"
@@ -1009,14 +1010,14 @@ function CustomEndpointEditor({
 									<select
 										value={d.reasoning}
 										onChange={(e) => setDraft(m, { reasoning: e.target.value as PinDraft["reasoning"] })}
-										aria-label={`${m.id} reasoning effort support`}
+										aria-label={`${m.id}: si admite esfuerzo de razonamiento`}
 										data-testid={pinTestid("custom-pin-reasoning", m.id)}
 										disabled={pinsBusy}
 										className="h-7 shrink-0 rounded-sm border border-border bg-background px-1 font-ui text-[11px] text-foreground outline-none focus:border-muted-foreground/50"
 									>
-										<option value="">Reasoning effort: Use reported</option>
-										<option value="on">Reasoning effort: Supported</option>
-										<option value="off">Reasoning effort: Not supported</option>
+										<option value="">Razonamiento: lo que diga el servidor</option>
+										<option value="on">Razonamiento: admitido</option>
+										<option value="off">Razonamiento: no admitido</option>
 									</select>
 								</div>
 							);
@@ -1035,16 +1036,16 @@ function CustomEndpointEditor({
 							data-testid="custom-pins-save"
 							className="anillo-foco ml-auto shrink-0 text-xs text-foreground underline-offset-2 hover:underline disabled:text-muted-foreground/40 disabled:no-underline"
 						>
-							{pinsBusy ? "Saving…" : "Save limits"}
+							{pinsBusy ? "Guardando…" : "Guardar límites"}
 						</button>
 					</div>
 				</div>
 			)}
 			<div className="flex flex-col gap-1 text-[11px] text-muted-foreground" data-testid="custom-help">
-				{!setup && models.length > 0 && <p data-testid="custom-budget-help">Budget pins do not resize backend context. Blank uses reported limits, then fallback (8192 context / 4096 output). Custom pricing is unknown.</p>}
-				<p data-testid="custom-reasoning-help">Reasoning support is a capability declaration. The effort picker’s Off may not disable a custom backend’s default thinking.</p>
+				{!setup && models.length > 0 && <p data-testid="custom-budget-help">Los límites que fijes no cambian el contexto real del servidor. En blanco se usan los que dice el servidor y, si no los da, los de por defecto (8192 de contexto y 4096 de salida). El precio de un servidor propio no se conoce.</p>}
+				<p data-testid="custom-reasoning-help">«Razonamiento: admitido» solo declara lo que el servidor sabe hacer. Elegir el esfuerzo «desactivado» puede no apagar el razonamiento que el servidor aplique por defecto.</p>
 			</div>
-			{(error || pinsError) && <button type="button" data-testid="custom-reload" onClick={() => void onReload()} className="anillo-foco text-left text-xs underline">Reload configuration</button>}
+			{(error || pinsError) && <button type="button" data-testid="custom-reload" onClick={() => void onReload()} className="anillo-foco text-left text-xs underline">Volver a cargar la configuración</button>}
 			{error && (
 				<p role="alert" data-testid="custom-error" className="text-xs text-error">
 					{error}

@@ -2,6 +2,7 @@ import type { Model } from "@earendil-works/pi-ai";
 import { onWebSubscriptionPacket, webSubscriptionRequest, webSubscriptionsEnabled } from "./subscription-runtime.ts";
 import type { ChatGPTStatus } from "../core/contracts/chatgpt.ts";
 import type { AdmissionScope, NoDispatchKind } from "./chatgpt-request-cycle.ts";
+import { errorDeRespuesta } from "./error-de-conexion.ts";
 export type { ChatGPTStatus } from "../core/contracts/chatgpt.ts";
 export interface Stamp { epoch: number; authorityRevision: number; revision: number }
 interface StatusValue extends Stamp { status: ChatGPTStatus }
@@ -28,7 +29,7 @@ function bridge(): BridgeState {
   const state: BridgeState = { status: unavailable(), stamp: { epoch: 0, authorityRevision: 0, revision: 0 }, models: [], catalogAccount: null, pending: new Map(), controllers: new Map(), listeners: new Set(), counter: 0, catalogRequest: 0 };
   global[key] = state;
   const receive = (raw: unknown) => {
-   const m = raw as { channel?: string; kind?: string; id?: string; op?: string; ok?: boolean; value?: unknown; stamp: Stamp; status: ChatGPTStatus; invalidate?: string; error?: string };
+   const m = raw as { channel?: string; kind?: string; id?: string; op?: string; ok?: boolean; value?: unknown; stamp: Stamp; status: ChatGPTStatus; invalidate?: string; error?: string; code?: string };
    if (m?.channel !== "lh:chatgpt") return;
    if (m.kind === "state" && validStamp(m.stamp) && m.stamp.revision >= state.stamp.revision) {
     acceptStatus(state, { ...m.stamp, status: m.status });
@@ -43,7 +44,7 @@ function bridge(): BridgeState {
     if (!call || call.op !== m.op) return;
     clearTimeout(call.timer); state.pending.delete(m.id);
     if (m.ok === true) call.resolve(m.value);
-    else call.reject(new Error(m.error ?? "ChatGPT connection failed."));
+    else call.reject(errorDeRespuesta(m.error, m.code, "ChatGPT connection failed."));
    }
   };
   process.on("message", (raw: unknown) => { if (desktopIPCConnected()) receive(raw); });

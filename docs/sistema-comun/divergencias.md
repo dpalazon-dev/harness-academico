@@ -193,3 +193,21 @@ No toca el núcleo ni el plugin: todo es cliente (`components/estudio/voz.ts`, `
 - **Lo que no tiene botón:** la marca de un hilo «atendido» y las peticiones en curso. El botón está en la tarjeta cerrada (primer mensaje del tutor) y en cada mensaje del tutor del hilo abierto.
 - **Conservar al fusionar:** las tres props `voz` y el `{voz && <EscucharCuaderno voz={voz} />}` entre los hijos de `ModoProactivo`.
 - **Verificado en la app** (panel del navegador, Chromium con las voces de Windows): lista de voces, elección de Helena, `start`, `cancel` + `error: interrupted` al detener, recuerdo del interruptor al recargar, lectura de un comentario nuevo con una llamada real del modelo, y que escribir y Escape la detienen. No verificado: que se oiga y se entienda (solo David).
+
+## Ajustes en español y errores de conexión con código (23-nov-2026)
+
+Lo pidió David después de la revisión de UI y UX: «Traduce al español los textos de Ajustes» y luego «Separa el código del error del texto y tradúcelos».
+
+- **Textos de Ajustes.** Están traducidos los del servidor propio (antes «Custom endpoint»), la conexión con ChatGPT, las suscripciones (Copilot y Grok) y las filas del grafo.
+  - El nombre visible del servidor propio es «Servidor propio (compatible con OpenAI)». `CUSTOM_PROVIDER.label` no cambia: es el nombre con que se registra en Pi.
+  - `ConnectionRow` elige su variante comparando con «Conectar».
+  - Al cambiar las etiquetas de los interruptores del grafo, cambian también sus `data-testid`, porque se derivan de la etiqueta.
+- **Código y texto, por separado.** Los errores de `electron/chatgpt.cjs` y de `electron/subscriptions.cjs` tienen un código estable (`publicCode`) y un texto en español (`publicError`). El IPC envía los dos (`code` y `error`).
+  - En el agente, `ErrorDeConexion` (`src/agent/error-de-conexion.ts`) guarda el código. `chatGPTStreamError` y `nativeSubscriptionError` clasifican por ese código y no por el texto, que ya no contiene «background», «expired» y otras palabras parecidas.
+  - Los errores del proveedor y los internos siguen en inglés y se clasifican como antes.
+  - Los mensajes que esos dos clasificadores escriben en el chat ahora están en español.
+- **El aviso de revocación** se reconocía comparando su texto. Ahora `ChatGPTStatus` lleva `errorCode` y el aviso es `revocation`; el texto se enseña tal cual llega.
+- **Sin traducir.**
+  - Los mensajes del modo web (`src/server/web-subscription-http.ts`, `components/settings/subscription-client.ts`). La interfaz los cambia por su error genérico.
+  - Los errores que devuelve la API del servidor propio (`src/server/custom-provider.ts`).
+  - Las preguntas que el SDK de Pi hace al iniciar sesión (`prompt.message`).
