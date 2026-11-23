@@ -95,7 +95,7 @@ export function SettingsMenuTrigger({
 		{...props}
 		disabled={disabled}
 		className={cn(
-			"flex h-7 items-center gap-1 rounded-sm border border-border bg-background px-1.5 font-ui text-xs text-foreground transition-colors",
+			"anillo-foco flex h-7 items-center gap-1 rounded-sm border border-border bg-background px-1.5 font-ui text-xs text-foreground transition-colors",
 			disabled || unavailable ? "cursor-not-allowed" : "hover:border-muted-foreground/50",
 			className,
 		)}
@@ -137,7 +137,7 @@ export function Toggle({
 			data-testid={`toggle-${label.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
 			onClick={() => onChange(!checked)}
 			className={cn(
-				"relative h-4.5 w-8 shrink-0 rounded-full border border-border transition-colors",
+				"anillo-foco relative h-4.5 w-8 shrink-0 rounded-full border border-border transition-colors",
 				// Owner (2026-09-20): on is a gray track with a WHITE disc (a full-white
 				// track was too loud); off stays the muted track. Theme wave: the on
 				// track is the theme accent (Default's accent IS that gray).

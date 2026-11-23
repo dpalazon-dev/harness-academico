@@ -291,8 +291,8 @@ export function ChatGPTUIProvider({ children }: { children: React.ReactNode }) {
 					<span>{BACKGROUND_LABEL}<span className="mt-1 block leading-relaxed text-muted-foreground">{CHATGPT_BACKGROUND_HINT}</span></span>
 				</div>
 				<div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-					<a href="https://openai.com/policies/privacy-policy/" target="_blank" rel="noreferrer" className="underline underline-offset-2">OpenAI privacy</a>
-					<a href="https://chatgpt.com/settings/usage" target="_blank" rel="noreferrer" className="underline underline-offset-2">Manage usage</a>
+					<a href="https://openai.com/policies/privacy-policy/" target="_blank" rel="noreferrer" className="anillo-foco underline underline-offset-2">OpenAI privacy</a>
+					<a href="https://chatgpt.com/settings/usage" target="_blank" rel="noreferrer" className="anillo-foco underline underline-offset-2">Manage usage</a>
 				</div>
 				{!status.available && <p className="mt-3 text-xs text-muted-foreground">ChatGPT sign-in is available only in the desktop app. API-key connections remain available here.</p>}
 				{status.pending && <p role="status" className="mt-3 text-xs text-muted-foreground">Waiting for browser sign-in…</p>}
@@ -342,7 +342,7 @@ export function ChatGPTConnection({ labelClassName }: { setup?: boolean; labelCl
 			</select>}
 		</ConnectionRow>
 		{ui.inlineError && <p role="alert" className="text-xs text-error">{ui.inlineError}</p>}
-		{ui.warning && <div role="alert" data-testid="chatgpt-revocation-warning" className="rounded-sm border border-border px-3 py-2 text-xs text-muted-foreground">{ui.warning}<button type="button" className="ml-2 cursor-pointer underline underline-offset-2" onClick={ui.dismissWarning}>Dismiss</button></div>}
+		{ui.warning && <div role="alert" data-testid="chatgpt-revocation-warning" className="rounded-sm border border-border px-3 py-2 text-xs text-muted-foreground">{ui.warning}<button type="button" className="anillo-foco ml-2 cursor-pointer underline underline-offset-2" onClick={ui.dismissWarning}>Dismiss</button></div>}
 	</div>;
 }
 

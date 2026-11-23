@@ -221,7 +221,7 @@ export function PaginaUnidadEstudio({ unidad: u, espacios = null, ahora = new Da
 								<a
 									href={rutaLector(f.documentoId, { unidad: u.id })}
 									onClick={(e) => { e.preventDefault(); acciones.navegar(rutaLector(f.documentoId!, { unidad: u.id })); }}
-									className="flex flex-1 items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-accent"
+									className="anillo-foco flex flex-1 items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-accent"
 								>{datos}</a>
 							) : <div className="flex flex-1 items-center gap-3 px-2 py-2">{datos}</div>}
 						</div>
@@ -239,7 +239,7 @@ export function PaginaUnidadEstudio({ unidad: u, espacios = null, ahora = new Da
 								<a
 									href={rutaCuaderno(c.id)}
 									onClick={(e) => { e.preventDefault(); acciones.navegar(rutaCuaderno(c.id)); }}
-									className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent"
+									className="anillo-foco flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent"
 								>
 									<NotebookPenIcon className="size-4 shrink-0 text-muted-foreground" />
 									<span className="flex-1 truncate text-sm">{c.titulo}</span>
@@ -284,7 +284,7 @@ export function PaginaUnidadEstudio({ unidad: u, espacios = null, ahora = new Da
 			<Bloque titulo="Intentos">
 				{u.intentos.length === 0 ? <p className="text-sm text-muted-foreground">Sin intentos todavía.</p> : u.intentos.map(i => (
 					<div key={i.id} className="flex items-center gap-3 rounded-lg px-2 py-1 text-sm hover:bg-accent/50">
-						<button type="button" onClick={() => acciones.navegar(rutaIntento(i.id))} className="flex flex-1 items-baseline gap-3 py-0.5 text-left">
+						<button type="button" onClick={() => acciones.navegar(rutaIntento(i.id))} className="anillo-foco flex flex-1 items-baseline gap-3 py-0.5 text-left">
 							<span className="w-16 shrink-0 tabular-nums text-muted-foreground">{corta(new Date(i.fecha))}</span>
 							<span className="flex-1">
 								{TAREA[i.tarea]} · <span className="text-muted-foreground">{i.estado === "graded" && i.fidelidad !== null ? FIDELIDAD[i.fidelidad] : ESTADO_INTENTO[i.estado as keyof typeof ESTADO_INTENTO] ?? "Valorado"}</span>
@@ -300,7 +300,7 @@ export function PaginaUnidadEstudio({ unidad: u, espacios = null, ahora = new Da
 
 			<Bloque titulo="Conversaciones">
 				{u.conversaciones.length === 0 ? <p className="text-sm text-muted-foreground">Ninguna conversación sobre esta unidad todavía.</p> : u.conversaciones.map(c => (
-					<button key={c.id} type="button" onClick={() => acciones.navegar(`/chat/${c.id}`)} className="flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left text-sm hover:bg-accent" data-chat-id={c.id}>
+					<button key={c.id} type="button" onClick={() => acciones.navegar(`/chat/${c.id}`)} className="anillo-foco flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left text-sm hover:bg-accent" data-chat-id={c.id}>
 						<MessageSquareIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
 						<span className="min-w-0 flex-1">
 							<span className="block truncate">{c.title}</span>

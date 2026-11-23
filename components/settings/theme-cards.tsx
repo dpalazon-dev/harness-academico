@@ -139,7 +139,7 @@ export function ThemeCards({
 					type="button"
 					data-testid="theme-export"
 					onClick={() => downloadJson(`${active.id}.json`, exportThemeFile(active, appearance))}
-					className="flex h-7 shrink-0 items-center gap-2 rounded-sm border border-border bg-background px-2 font-ui text-xs text-foreground transition-colors hover:border-muted-foreground/50"
+					className="anillo-foco flex h-7 shrink-0 items-center gap-2 rounded-sm border border-border bg-background px-2 font-ui text-xs text-foreground transition-colors hover:border-muted-foreground/50"
 				>
 					<DownloadIcon className="size-3.5" />
 					Exportar JSON
@@ -156,7 +156,7 @@ export function ThemeCards({
 								aria-pressed={selected}
 								onClick={() => onSelect(theme.id)}
 								className={cn(
-									"flex w-full flex-col gap-2.5 rounded-lg border border-border bg-background p-3 text-left transition-colors",
+									"anillo-foco flex w-full flex-col gap-2.5 rounded-lg border border-border bg-background p-3 text-left transition-colors",
 									selected ? SELECTED_FRAME : "hover:border-muted-foreground/50",
 								)}
 							>
@@ -177,7 +177,7 @@ export function ThemeCards({
 									aria-label={`Quitar ${theme.name}`}
 									data-testid={`theme-remove-${theme.id}`}
 									onClick={() => void remove(theme)}
-									className="absolute right-3 bottom-3 flex size-5 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-error"
+									className="anillo-foco absolute right-3 bottom-3 flex size-5 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-error"
 								>
 									<Trash2Icon className="size-3.5" />
 								</button>
@@ -190,7 +190,7 @@ export function ThemeCards({
 					data-testid="theme-import"
 					disabled={busy}
 					onClick={() => fileRef.current?.click()}
-					className="flex min-h-27 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-muted-foreground/50 p-3 text-center font-ui text-xs text-muted-foreground transition-colors hover:text-foreground"
+					className="anillo-foco flex min-h-27 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-muted-foreground/50 p-3 text-center font-ui text-xs text-muted-foreground transition-colors hover:text-foreground"
 				>
 					<UploadIcon className="size-4" />
 					<span>Importar JSON</span>

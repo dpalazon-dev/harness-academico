@@ -228,7 +228,7 @@ function KeyTableRow({
 						onClick={() => void save()}
 						disabled={busy || !value.trim()}
 						data-testid={`${testid}-save`}
-						className="shrink-0 text-xs text-foreground underline-offset-2 hover:underline disabled:text-muted-foreground/40 disabled:no-underline"
+						className="anillo-foco shrink-0 text-xs text-foreground underline-offset-2 hover:underline disabled:text-muted-foreground/40 disabled:no-underline"
 					>
 						Guardar
 					</button>
@@ -237,7 +237,7 @@ function KeyTableRow({
 						onClick={onCancel}
 						disabled={busy}
 						data-testid={`${testid}-cancel`}
-						className="shrink-0 text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
+						className="anillo-foco shrink-0 text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
 					>
 						Cancelar
 					</button>
@@ -247,7 +247,7 @@ function KeyTableRow({
 							onClick={() => void onDelete()}
 							disabled={busy}
 							data-testid={`${testid}-delete`}
-							className="shrink-0 text-xs text-muted-foreground/70 underline-offset-2 hover:text-error hover:underline"
+							className="anillo-foco shrink-0 text-xs text-muted-foreground/70 underline-offset-2 hover:text-error hover:underline"
 						>
 							Borrar
 						</button>
@@ -269,7 +269,7 @@ function KeyTableRow({
 				aria-expanded={expanded}
 				data-testid={`${testid}-row`}
 				onClick={() => !envOwned && onToggle()}
-				className={`flex w-full items-center justify-between gap-3 rounded-sm px-1 py-1.5 text-left ${
+				className={`anillo-foco flex w-full items-center justify-between gap-3 rounded-sm px-1 py-1.5 text-left ${
 					envOwned ? "cursor-default" : "cursor-pointer transition-colors hover:bg-accent/50"
 				}`}
 			>
@@ -281,7 +281,7 @@ function KeyTableRow({
 							target="_blank"
 							rel="noreferrer"
 							onClick={(e) => e.stopPropagation()}
-							className="text-[10px] text-muted-foreground/60 underline-offset-2 hover:text-foreground hover:underline"
+							className="anillo-foco text-[10px] text-muted-foreground/60 underline-offset-2 hover:text-foreground hover:underline"
 						>
 							clave ↗
 						</a>
@@ -333,7 +333,7 @@ function AddProviderRow({
 				aria-expanded={open}
 				data-testid="add-provider"
 				onClick={() => setOpen((v) => !v)}
-				className="flex w-full items-center justify-between gap-3 rounded-sm px-1 py-1.5 text-left font-ui text-xs text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+				className="anillo-foco flex w-full items-center justify-between gap-3 rounded-sm px-1 py-1.5 text-left font-ui text-xs text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
 			>
 				<span>+ Añadir un proveedor</span>
 				{addable.length > 0 && <span className="font-mono text-[11px]">{addable.length}</span>}
@@ -606,7 +606,7 @@ export function KeysSection({
 							href="https://console.deepgram.com/"
 							target="_blank"
 							rel="noreferrer"
-							className="underline underline-offset-2 hover:text-foreground"
+							className="anillo-foco underline underline-offset-2 hover:text-foreground"
 						>clave de API de Deepgram</a> con el rol Member o superior y añádela arriba.
 					</p>
 				</>}
@@ -658,7 +658,7 @@ function AddProviderEditor({
 				onClick={() => value.trim() && onSave(value)}
 				disabled={!value.trim()}
 				data-testid={`key-${provider.id}-save`}
-				className="shrink-0 text-xs text-foreground underline-offset-2 hover:underline disabled:text-muted-foreground/40 disabled:no-underline"
+				className="anillo-foco shrink-0 text-xs text-foreground underline-offset-2 hover:underline disabled:text-muted-foreground/40 disabled:no-underline"
 			>
 				Guardar
 			</button>
@@ -666,7 +666,7 @@ function AddProviderEditor({
 				type="button"
 				onClick={onCancel}
 				data-testid={`key-${provider.id}-cancel`}
-				className="shrink-0 text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
+				className="anillo-foco shrink-0 text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
 			>
 				Cancelar
 			</button>
@@ -689,7 +689,7 @@ export function CustomEndpointSetup({ onSaved }: { onSaved: () => void | Promise
 		catch { setError(true); }
 	}
 	useEffect(() => { void reload(); }, []);
-	if (!status || error) return <div className="text-xs">{error ? "Unable to load custom configuration." : "Loading custom configuration…"}{error && <button onClick={() => void reload()}>Retry</button>}</div>;
+	if (!status || error) return <div className="text-xs">{error ? "Unable to load custom configuration." : "Loading custom configuration…"}{error && <button className="anillo-foco" onClick={() => void reload()}>Retry</button>}</div>;
 	return <CustomEndpointEditor key={status.revision} setup revision0={status.revision} authMode0={status.authMode} keySource0={status.keySource} keyReuseRequired0={status.keyReuseRequired} baseUrl0={status.baseUrl} keyPresent={status.keyPresent} models={status.models} overrides={status.overrides} manualModels0={status.manualModels} onSaved={onSaved} onPinsSaved={reload} onReload={reload} onCancel={reload} />;
 }
 
@@ -712,7 +712,7 @@ function CustomEndpointRow({
 				data-testid="custom-endpoint-row-btn"
 				aria-expanded={expanded}
 				onClick={onToggle}
-				className="flex w-full items-center justify-between gap-3 rounded-sm px-1 py-1.5 text-left cursor-pointer transition-colors hover:bg-accent/50"
+				className="anillo-foco flex w-full items-center justify-between gap-3 rounded-sm px-1 py-1.5 text-left cursor-pointer transition-colors hover:bg-accent/50"
 			>
 				<span className="font-ui text-xs text-foreground">Custom endpoint</span>
 				<span data-testid="custom-endpoint-status" className="max-w-[60%] truncate font-mono text-[11px] text-muted-foreground">
@@ -945,7 +945,7 @@ function CustomEndpointEditor({
 					onClick={() => void save()}
 					disabled={busy || pinsBusy || !canConnect}
 					data-testid="custom-save"
-					className="shrink-0 text-xs text-foreground underline-offset-2 hover:underline disabled:text-muted-foreground/40 disabled:no-underline"
+					className="anillo-foco shrink-0 text-xs text-foreground underline-offset-2 hover:underline disabled:text-muted-foreground/40 disabled:no-underline"
 				>
 					{busy ? "Connecting…" : "Connect"}
 				</button>
@@ -954,7 +954,7 @@ function CustomEndpointEditor({
 					onClick={onCancel}
 					disabled={busy}
 					data-testid="custom-cancel"
-					className="shrink-0 text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
+					className="anillo-foco shrink-0 text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
 				>
 					Cancel
 				</button>
@@ -967,7 +967,7 @@ function CustomEndpointEditor({
 						onClick={async () => { setBusy(true); const err = await onDelete(revision); if (err) setError(err); setBusy(false); }}
 						disabled={busy || pinsBusy}
 						data-testid="custom-delete"
-						className="shrink-0 text-xs text-muted-foreground/70 underline-offset-2 hover:text-error hover:underline"
+						className="anillo-foco shrink-0 text-xs text-muted-foreground/70 underline-offset-2 hover:text-error hover:underline"
 					>
 						Disconnect
 					</button>
@@ -1033,7 +1033,7 @@ function CustomEndpointEditor({
 							onClick={() => void savePins()}
 							disabled={pinsBusy || !dirty}
 							data-testid="custom-pins-save"
-							className="ml-auto shrink-0 text-xs text-foreground underline-offset-2 hover:underline disabled:text-muted-foreground/40 disabled:no-underline"
+							className="anillo-foco ml-auto shrink-0 text-xs text-foreground underline-offset-2 hover:underline disabled:text-muted-foreground/40 disabled:no-underline"
 						>
 							{pinsBusy ? "Saving…" : "Save limits"}
 						</button>
@@ -1044,7 +1044,7 @@ function CustomEndpointEditor({
 				{!setup && models.length > 0 && <p data-testid="custom-budget-help">Budget pins do not resize backend context. Blank uses reported limits, then fallback (8192 context / 4096 output). Custom pricing is unknown.</p>}
 				<p data-testid="custom-reasoning-help">Reasoning support is a capability declaration. The effort picker’s Off may not disable a custom backend’s default thinking.</p>
 			</div>
-			{(error || pinsError) && <button type="button" data-testid="custom-reload" onClick={() => void onReload()} className="text-left text-xs underline">Reload configuration</button>}
+			{(error || pinsError) && <button type="button" data-testid="custom-reload" onClick={() => void onReload()} className="anillo-foco text-left text-xs underline">Reload configuration</button>}
 			{error && (
 				<p role="alert" data-testid="custom-error" className="text-xs text-error">
 					{error}
