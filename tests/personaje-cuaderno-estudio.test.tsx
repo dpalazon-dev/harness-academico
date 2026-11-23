@@ -70,7 +70,7 @@ describe("la cabecera con personaje, pintada", () => {
 	it("sin la lista de personajes la cabecera es la de antes", () => {
 		const html = editor(CUADERNO, null);
 		assert.doesNotMatch(html, /data-personaje/);
-		assert.match(html, /Propósito del cuaderno/);
+		assert.match(html, /data-modo-interruptor/, "el modo sigue en la cabecera");
 	});
 });
 

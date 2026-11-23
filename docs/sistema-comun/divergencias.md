@@ -193,3 +193,16 @@ No toca el núcleo ni el plugin: todo es cliente (`components/estudio/voz.ts`, `
 - **Lo que no tiene botón:** la marca de un hilo «atendido» y las peticiones en curso. El botón está en la tarjeta cerrada (primer mensaje del tutor) y en cada mensaje del tutor del hilo abierto.
 - **Conservar al fusionar:** las tres props `voz` y el `{voz && <EscucharCuaderno voz={voz} />}` entre los hijos de `ModoProactivo`.
 - **Verificado en la app** (panel del navegador, Chromium con las voces de Windows): lista de voces, elección de Helena, `start`, `cancel` + `error: interrupted` al detener, recuerdo del interruptor al recargar, lectura de un comentario nuevo con una llamada real del modelo, y que escribir y Escape la detienen. No verificado: que se oiga y se entienda (solo David).
+
+## Cuadernos: cabecera con lo esencial (23-nov-2026)
+
+Lo decidió David tras la revisión de UI y UX: «Solo lo esencial», y lo demás a Propiedades y a «⋯». No toca el núcleo ni el plugin.
+
+- **Cabecera.** Solo quedan «Cuadernos», el estado del guardado, el interruptor del modo, el personaje que comenta solo y «⋯». Antes eran hasta ocho controles, y cuatro tenían la misma forma de punto con palabra. «Leyendo…» y los avisos (tope, fallos, sin modelo y los de la voz) siguen allí; los avisos bajan a su propio renglón.
+- **Propiedades** se abre desde «⋯» («Propiedades…») y no desde un icono propio. Tiene una sección **Tutor** con tres cosas:
+  - el propósito, con sus propuestas siempre a la vista;
+  - las lecturas por su cuenta, el antiguo «3 de 20 hoy», con el tope editable;
+  - la tinta, con una línea que dice a quién afecta: solo a los personajes de tinta «Acento», como el Profesor.
+- **«Solo escucha» deja de ofrecerse** como propuesta, porque repetía el interruptor del modo. Un cuaderno que la tenga guardada sigue igual: el plugin no cambia, y Propiedades lo dice y explica cómo quitarlo. La constante `PROPUESTAS_PROPOSITO` se conserva; la interfaz usa `PROPUESTAS_A_LA_VISTA`.
+- **Escuchar** pasa a ser la casilla «Leer en voz alta los comentarios» del menú «⋯» (`OpcionEscuchar`). Desaparece `EscucharCuaderno`. Al fusionar, en lugar de la nota del 12j que dice que se conserve `{voz && <EscucharCuaderno voz={voz} />}`, ahora van `AvisoEscuchar` en la cabecera y `OpcionEscuchar` en «⋯».
+- **Pruebas.** Radix no pinta un menú abierto sobre linkedom, así que la casilla de voz no tiene prueba montada: las pruebas del gancho usan un interruptor de prueba con la misma lógica, y las del editor encienden la voz con la clave de `localStorage`. Falta comprobar en la app que la casilla enciende y apaga la voz, y que abrir Propiedades desde «⋯» no deja el cuerpo de la página sin eventos de puntero, un fallo conocido de Radix al abrir un panel desde un menú.
