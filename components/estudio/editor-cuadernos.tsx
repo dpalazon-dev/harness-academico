@@ -1124,7 +1124,6 @@ export function EditorCuaderno({ id, nuevo = false }: { id: string; nuevo?: bool
 			const t = setTimeout(() => setReloj(n => n + 1), decision.enMs + 20);
 			return () => clearTimeout(t);
 		}
-	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [cuaderno, estadoProactivo, leyendo, falloProactivo, reloj]);
 
 	const refrescarEstado = () => llamarEstudio<EstadoProactivo>("estado-proactivo").then(setEstadoProactivo, () => {});
