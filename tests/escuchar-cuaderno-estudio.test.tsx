@@ -1,5 +1,5 @@
 /**
- * «Escuchar» en el cuaderno (ticket 12j): el interruptor de la cabecera, el botón de cada comentario y el gancho que decide
+ * «Escuchar» en el cuaderno (ticket 12j): los avisos de la cabecera, el botón de cada comentario y el gancho que decide
  * qué se lee. El gancho se monta sobre linkedom con un doble de `speechSynthesis` en el global (el cliente externo).
  * Lo que no se comprueba aquí, porque no hay oídos: que lo que suena sea inteligible.
  */
@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot, type Root } from "react-dom/client";
 import { parseHTML } from "linkedom";
-import { BotonEscuchar, EscucharCuaderno } from "../components/estudio/escuchar-cuaderno.tsx";
+import { AvisoEscuchar, BotonEscuchar } from "../components/estudio/escuchar-cuaderno.tsx";
 import { mensajesDelTutor, nuevosDelTutor, useEscuchar, type VozVista } from "../components/estudio/escuchar.ts";
 import { parar } from "../components/estudio/voz.ts";
 import type { Comentario } from "../components/estudio/cuadernos.ts";
@@ -40,27 +40,11 @@ describe("qué mensajes del tutor hay y cuáles son nuevos", () => {
 
 const vista = (extra: Partial<VozVista> = {}): VozVista => ({ disponible: true, activo: false, leyendo: null, aviso: null, alternar() {}, leer() {}, parar() {}, ...extra });
 
-describe("el interruptor de la cabecera", () => {
-	it("es un interruptor con nombre en español y su estado anunciado, apagado por defecto", () => {
-		const html = renderToStaticMarkup(<EscucharCuaderno voz={vista()} />);
-		assert.match(html, /role="switch"/);
-		assert.match(html, /aria-checked="false"/);
-		assert.match(html, /data-escuchar-interruptor/);
-		assert.match(html, />Escuchar</);
-		assert.doesNotMatch(html, /disabled/);
-		assert.match(renderToStaticMarkup(<EscucharCuaderno voz={vista({ activo: true })} />), /aria-checked="true"/);
-	});
-
-	it("sin síntesis de voz está desactivado y lo dice", () => {
-		const html = renderToStaticMarkup(<EscucharCuaderno voz={vista({ disponible: false })} />);
-		assert.match(html, /aria-disabled="true"/);
-		assert.match(html, /Sin voz en este equipo/);
-	});
-
-	it("el aviso de que no hay voz en español sale como estado discreto, y el fallo también", () => {
-		assert.match(renderToStaticMarkup(<EscucharCuaderno voz={vista({ activo: true, aviso: "sin-espanol" })} />), /role="status"[^>]*>Sin voz en español: se usa la predeterminada\./);
-		assert.match(renderToStaticMarkup(<EscucharCuaderno voz={vista({ activo: true, aviso: "fallo" })} />), /No se pudo leer en voz alta\./);
-		assert.doesNotMatch(renderToStaticMarkup(<EscucharCuaderno voz={vista({ activo: true })} />), /role="status"/);
+describe("los avisos de la voz en la cabecera", () => {
+	it("el aviso de que no hay voz en español sale como estado discreto, y el fallo también; sin aviso no pinta nada", () => {
+		assert.match(renderToStaticMarkup(<AvisoEscuchar voz={vista({ activo: true, aviso: "sin-espanol" })} />), /role="status"[^>]*>Sin voz en español: se usa la predeterminada\./);
+		assert.match(renderToStaticMarkup(<AvisoEscuchar voz={vista({ activo: true, aviso: "fallo" })} />), /No se pudo leer en voz alta\./);
+		assert.equal(renderToStaticMarkup(<AvisoEscuchar voz={vista({ activo: true })} />), "");
 	});
 });
 
@@ -108,13 +92,18 @@ let restore: (() => void) | null = null;
 let almacen = new Map<string, string>();
 let vozActual: VozVista | null = null;
 
-/** Un componente mínimo: el gancho con el interruptor y un botón por mensaje del tutor. */
+/** Un componente mínimo: el gancho, un interruptor que hace lo que la casilla «Leer en voz alta» del menú «⋯» (Radix no pinta
+ * el menú abierto sobre linkedom) y un botón por mensaje del tutor. */
 function Prueba({ cuaderno }: { cuaderno: { id: string; comments?: Comentario[] } | null }) {
 	const v = useEscuchar(cuaderno);
 	vozActual = v;
 	return (
 		<div>
-			<EscucharCuaderno voz={v} />
+			<button
+				type="button" role="switch" data-escuchar-interruptor aria-checked={v.disponible && v.activo} aria-disabled={v.disponible ? undefined : true}
+				onClick={() => { if (v.disponible) v.alternar(); }}
+			/>
+			<AvisoEscuchar voz={v} />
 			{mensajesDelTutor(cuaderno?.comments).map(m => <BotonEscuchar key={m.id} mensajeId={m.id} texto={m.texto} firma="Tutor" voz={v} />)}
 		</div>
 	);

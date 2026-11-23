@@ -27,10 +27,10 @@ import { camposDe, useRecorridoCampos } from "./recorrido-campos";
 import { rutaPracticar } from "./intento";
 import { rutaLector, type DetalleDocumento, type DocumentoEstudio } from "./documentos";
 import { RUTA_CUADERNOS, crearCuaderno, descargar, nuevoBloque, practicable, recuento, rutaCuaderno, type AnclaComentario, type BloqueCuaderno, type Cuaderno, type EstadoProactivo, type LecturaProactiva, type ModoCuaderno, type Tinta, type TipoComentario } from "./cuadernos";
-import { ModoProactivo } from "./modo-proactivo";
-import { EscucharCuaderno } from "./escuchar-cuaderno";
+import { ModoProactivo, TopeDiario } from "./modo-proactivo";
+import { AvisoEscuchar, OpcionEscuchar } from "./escuchar-cuaderno";
 import { useEscuchar, type VozVista } from "./escuchar";
-import { PropositoCuaderno, type CambioProposito } from "./proposito-cuaderno";
+import { PropositoCuaderno, TintaCuaderno, type CambioProposito } from "./proposito-cuaderno";
 import { PersonajeCuaderno, type CambioPersonaje } from "./personaje-cuaderno";
 import { firmaDe, personajeDeCuaderno, tintaDeComentario, todos, type ListaPersonajes, type Personaje } from "./personajes";
 import { colorDeTinta } from "./tintas";
@@ -436,19 +436,34 @@ export function EditorCuadernoEstudio({ cuaderno: c, unidades, documentos, guard
 		<div ref={raiz} className="@container/pagina mx-auto w-full max-w-[64rem] px-12 pb-24 pt-14" data-notebook-id={c.id} style={{ "--tinta-margen": colorDeTinta(c.tinta) } as React.CSSProperties}>
 			<div className={COLUMNAS_PAGINA}>
 			<div className={COLUMNA_TEXTO}>
-			<div className="flex items-center gap-1 text-sm">
-				<a href={RUTA_CUADERNOS} onClick={(e) => { e.preventDefault(); acciones.navegar(RUTA_CUADERNOS); }} className="anillo-foco mr-2 rounded-sm text-muted-foreground hover:text-foreground">Cuadernos</a>
+			{/* La cabecera solo enseña lo esencial (revisión del 23-nov-2026): volver, el guardado, el modo del tutor y quién comenta, y
+			 * «⋯». Lo demás (unidad, fuente, propósito, tinta y tope) está en Propiedades, y la voz es una casilla de «⋯». */}
+			<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+				<a href={RUTA_CUADERNOS} onClick={(e) => { e.preventDefault(); acciones.navegar(RUTA_CUADERNOS); }} className="anillo-foco rounded-sm text-muted-foreground hover:text-foreground">Cuadernos</a>
 				<span
 					role="status"
 					data-estado={guardado.tipo}
-					className={cn("ml-auto mr-2 text-xs", guardado.tipo === "error" ? "text-destructive" : "text-muted-foreground")}
+					className={cn("ml-auto text-xs", guardado.tipo === "error" ? "text-destructive" : "text-muted-foreground")}
 				>{textoGuardado}</span>
-				<Button size="icon-sm" variant="ghost" aria-label="Propiedades del cuaderno" title="Propiedades" onClick={() => setPropiedades(true)} className="text-muted-foreground"><SlidersHorizontalIcon /></Button>
+				{proactivo && acciones.cambiarModo && acciones.fijarTope && (
+					<ModoProactivo
+						modo={c.modo ?? "proactivo"} aviso={c.aviso} estado={proactivo.estado} leyendo={proactivo.leyendo} error={proactivo.error}
+						cambiarModo={acciones.cambiarModo} fijarTope={acciones.fijarTope}
+					>
+						{personajes && acciones.elegirPersona && acciones.guardarPersonaje && acciones.borrarPersonaje && (
+							<PersonajeCuaderno lista={personajes} actual={personajeDeCuaderno(c, personajes)} elegir={acciones.elegirPersona} guardar={acciones.guardarPersonaje} borrar={acciones.borrarPersonaje} />
+						)}
+					</ModoProactivo>
+				)}
+				{voz && <AvisoEscuchar voz={voz} />}
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
-						<Button size="icon-sm" variant="ghost" aria-label="Más acciones" title="Más acciones" className="text-muted-foreground"><MoreHorizontalIcon /></Button>
+						<Button size="icon-sm" variant="ghost" aria-label="Más acciones" title="Más acciones" data-mas-acciones className="text-muted-foreground"><MoreHorizontalIcon /></Button>
 					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end" className="font-sans">
+					<DropdownMenuContent align="end" className="w-72 font-sans">
+						<DropdownMenuItem data-abrir-propiedades onSelect={() => setPropiedades(true)}><SlidersHorizontalIcon />Propiedades…</DropdownMenuItem>
+						{voz && <OpcionEscuchar voz={voz} />}
+						<DropdownMenuSeparator />
 						<DropdownMenuItem disabled={ocupado} onSelect={acciones.exportarMarkdown}>Exportar a Markdown</DropdownMenuItem>
 						<DropdownMenuItem disabled={ocupado} onSelect={acciones.exportarAnki}>Exportar preguntas a Anki</DropdownMenuItem>
 						<DropdownMenuSeparator />
@@ -456,20 +471,6 @@ export function EditorCuadernoEstudio({ cuaderno: c, unidades, documentos, guard
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</div>
-			{proactivo && acciones.cambiarModo && acciones.fijarTope && (
-				<div className="mt-3">
-					<ModoProactivo
-						modo={c.modo ?? "proactivo"} aviso={c.aviso} estado={proactivo.estado} leyendo={proactivo.leyendo} error={proactivo.error}
-						cambiarModo={acciones.cambiarModo} fijarTope={acciones.fijarTope}
-					>
-						{voz && <EscucharCuaderno voz={voz} />}
-						{personajes && acciones.elegirPersona && acciones.guardarPersonaje && acciones.borrarPersonaje && (
-							<PersonajeCuaderno lista={personajes} actual={personajeDeCuaderno(c, personajes)} elegir={acciones.elegirPersona} guardar={acciones.guardarPersonaje} borrar={acciones.borrarPersonaje} />
-						)}
-						{acciones.fijarProposito && <PropositoCuaderno proposito={c.proposito} tinta={c.tinta} fijar={acciones.fijarProposito} />}
-					</ModoProactivo>
-				</div>
-			)}
 
 			<input
 				ref={titulo}
@@ -540,10 +541,24 @@ export function EditorCuadernoEstudio({ cuaderno: c, unidades, documentos, guard
 				<SheetContent side="right" className="gap-0 font-prose sm:max-w-sm" data-testid="propiedades-cuaderno">
 					<SheetHeader>
 						<SheetTitle>Propiedades</SheetTitle>
-						<SheetDescription>Con qué se relaciona este cuaderno.</SheetDescription>
+						<SheetDescription>Con qué se relaciona este cuaderno y cómo te acompaña el tutor.</SheetDescription>
 					</SheetHeader>
-					<div className="px-4">
+					<div className="grid gap-8 overflow-y-auto px-4 pb-6">
 						<PropiedadesCuaderno cuaderno={c} unidades={unidades} documentos={documentos} ocupado={ocupado} cambiar={cambiar} navegar={acciones.navegar} />
+						{(acciones.fijarProposito || (proactivo?.estado && acciones.fijarTope)) && (
+							<section aria-labelledby="propiedades-tutor" data-propiedades-tutor className="grid gap-6 border-t border-border pt-6">
+								<h3 id="propiedades-tutor" className="font-sans text-sm font-medium text-foreground">Tutor</h3>
+								{acciones.fijarProposito && <PropositoCuaderno proposito={c.proposito} fijar={acciones.fijarProposito} />}
+								{proactivo?.estado && acciones.fijarTope && (
+									<div className="grid gap-1.5">
+										<span className={etiqueta}>Lecturas por su cuenta</span>
+										<TopeDiario estado={proactivo.estado} fijarTope={acciones.fijarTope} />
+										<span className="text-sm text-muted-foreground">Cuántas veces al día puede leer y comentar sin que se lo pidas, contando todos tus cuadernos.</span>
+									</div>
+								)}
+								{acciones.fijarProposito && <TintaCuaderno tinta={c.tinta} fijar={acciones.fijarProposito} />}
+							</section>
+						)}
 					</div>
 				</SheetContent>
 			</Sheet>

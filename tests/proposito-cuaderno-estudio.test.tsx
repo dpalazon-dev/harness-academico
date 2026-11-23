@@ -10,8 +10,7 @@ import { afterEach, describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot, type Root } from "react-dom/client";
 import { parseHTML } from "linkedom";
-import { ModoProactivo } from "../components/estudio/modo-proactivo.tsx";
-import { PropositoCuaderno, type CambioProposito } from "../components/estudio/proposito-cuaderno.tsx";
+import { PROPUESTAS_A_LA_VISTA, PropositoCuaderno, TintaCuaderno, type CambioProposito } from "../components/estudio/proposito-cuaderno.tsx";
 import { EditorCuadernoEstudio } from "../components/estudio/editor-cuadernos.tsx";
 import { colorDeTinta } from "../components/estudio/tintas.ts";
 import { PROPUESTAS_PROPOSITO, SOLO_ESCUCHA, type Cuaderno } from "../components/estudio/cuadernos.ts";
@@ -34,37 +33,54 @@ const editor = (c: Cuaderno, extra: Partial<React.ComponentProps<typeof EditorCu
 );
 const escapar = (s: string) => s.replace(/[()%]/g, "\\$&");
 
-describe("la cabecera del cuaderno con propósito, pintada", () => {
-	it("sin propósito es una línea discreta: el campo vacío con su invitación y ninguna propuesta a la vista", () => {
+describe("la cabecera del cuaderno, sin propósito ni tinta", () => {
+	it("la cabecera solo enseña lo esencial: el modo, «⋯» y el guardado; propósito, tinta y tope están en Propiedades", () => {
 		const html = editor(CUADERNO);
-		assert.match(html, /<input[^>]*aria-label="Propósito del cuaderno"[^>]*placeholder="Para qué es este cuaderno…"/);
-		assert.doesNotMatch(html, /Pregúntame antes del examen/, "las propuestas salen al escribir, no ensucian la página");
-		assert.doesNotMatch(html, /data-escucha/);
-		assert.match(html, /aria-label="Tinta de los comentarios: Acento"/);
+		assert.match(html, /data-modo-interruptor/);
+		assert.match(html, /data-mas-acciones/);
+		assert.doesNotMatch(html, /Propósito del cuaderno/);
+		assert.doesNotMatch(html, /Tinta de los comentarios/);
+		assert.doesNotMatch(html, /data-tope/);
+		assert.doesNotMatch(html, /data-escuchar-interruptor/, "la voz es una casilla del menú «⋯»");
+		assert.doesNotMatch(html, /aria-label="Propiedades del cuaderno"/, "Propiedades se abre desde «⋯»");
 		assert.match(html, /aria-label="Página"/);
 		assert.equal((html.match(/data-block-id=/g) ?? []).length, 1, "la página sigue limpia: solo el hueco para escribir");
 	});
 
-	it("con propósito lo muestra en el campo y no pinta propuestas", () => {
-		const html = editor({ ...CUADERNO, proposito: "Preparar el examen de grafos" });
-		assert.match(html, /value="Preparar el examen de grafos"/);
-		assert.doesNotMatch(html, /data-propuesta/);
-	});
-
-	it("«Solo escucha» dice qué hace y es coherente con el interruptor: apagado y «Cuando se lo pido»", () => {
+	it("con «Solo escucha» guardado, la cabecera es coherente: apagado y «Cuando se lo pido», sin contador", () => {
 		const html = editor({ ...CUADERNO, proposito: SOLO_ESCUCHA, modo: "a-peticion" });
-		assert.match(html, /value="Solo escucha"/);
 		assert.match(html, /role="switch"[^>]*aria-checked="false"/);
 		assert.match(html, />Cuando se lo pido</);
-		assert.match(html, /data-escucha[^>]*>Solo escucha: el tutor no comenta por su cuenta; contesta cuando se lo pides\./);
-		assert.doesNotMatch(html, />3 de 40 hoy</, "sin contador de lecturas propias");
+		assert.doesNotMatch(html, /3 de 40/);
+	});
+});
+
+describe("el propósito y la tinta en Propiedades, pintados", () => {
+	it("sin propósito: el campo vacío con su etiqueta y las propuestas a la vista, sin «Solo escucha»", () => {
+		const html = renderToStaticMarkup(<PropositoCuaderno fijar={nada} />);
+		assert.match(html, />Para qué</);
+		assert.match(html, /<input[^>]*aria-label="Propósito del cuaderno"[^>]*placeholder="Para qué es este cuaderno…"/);
+		assert.match(html, /<input[^>]*maxLength="200"/i);
+		assert.match(html, /Pregúntame antes del examen/);
+		assert.doesNotMatch(html, />Solo escucha</);
+		assert.doesNotMatch(html, /data-escucha/);
 	});
 
-	it("sin la acción de propósito la cabecera es la de antes (sin campo)", () => {
-		const html = renderToStaticMarkup(
-			<EditorCuadernoEstudio cuaderno={CUADERNO} unidades={[]} documentos={[]} guardado={{ tipo: "guardado" }} ocupado={false} proactivo={VISTA} acciones={ACCIONES} />,
-		);
-		assert.doesNotMatch(html, /Propósito del cuaderno/);
+	it("con propósito lo muestra en el campo", () => {
+		assert.match(renderToStaticMarkup(<PropositoCuaderno proposito="Preparar el examen de grafos" fijar={nada} />), /value="Preparar el examen de grafos"/);
+	});
+
+	it("un cuaderno que guardó «Solo escucha» lo cuenta y dice cómo quitarlo", () => {
+		const html = renderToStaticMarkup(<PropositoCuaderno proposito={SOLO_ESCUCHA} fijar={nada} />);
+		assert.match(html, /value="Solo escucha"/);
+		assert.match(html, /data-escucha[^>]*>Solo escucha: el tutor no comenta por su cuenta; contesta cuando se lo pides\. Escribe otro propósito para quitarlo\./);
+	});
+
+	it("la tinta dice cuál es y a quién afecta", () => {
+		const html = renderToStaticMarkup(<TintaCuaderno fijar={nada} />);
+		assert.match(html, /aria-label="Tinta de los comentarios: Acento"/);
+		assert.match(html, /El color de los comentarios del Profesor y de tus personajes con tinta «Acento»/);
+		assert.match(renderToStaticMarkup(<TintaCuaderno tinta="verde" fijar={nada} />), /aria-label="Tinta de los comentarios: Verde"/);
 	});
 });
 
@@ -119,30 +135,29 @@ async function pintar(props: Partial<React.ComponentProps<typeof PropositoCuader
 	const evento = (tipo: string, extra: Record<string, unknown> = {}) =>
 		Object.assign(new f.dom.window.Event(tipo, { bubbles: true, cancelable: true }), { key: "", detail: 1, button: 0, ...extra });
 	const clic = async (el: Element) => { await act(async () => { el.dispatchEvent(evento("click")); }); };
-	const enfocar = async (el: Element) => { await act(async () => { el.dispatchEvent(evento("focusin")); }); };
 	const escribir = async (el: Element, valor: string) => {
 		await act(async () => {
+			// El campo tiene el foco al escribir: React sigue el cambio desde el `focusin` (ver divergencias, pruebas DOM).
+			el.dispatchEvent(evento("focusin"));
 			(el as unknown as { value: string }).value = valor;
 			el.dispatchEvent(evento("input"));
 		});
 	};
 	const tecla = async (el: Element, key: string) => { await act(async () => { el.dispatchEvent(evento("keydown", { key })); }); };
-	return { ...f, cambios, q, clic, enfocar, escribir, tecla, evento };
+	return { ...f, cambios, q, clic, escribir, tecla, evento };
 }
 
 describe("el propósito, montado", () => {
-	it("al enfocar el campo salen las cuatro propuestas, en su orden, y «Solo escucha» la última", async () => {
+	it("las propuestas están a la vista, en su orden, sin «Solo escucha», que repetía el interruptor del modo", async () => {
 		const f = await pintar();
-		assert.equal(f.q("[data-propuestas]"), null);
-		await f.enfocar(f.q("input")!);
 		const botones = [...f.dom.document.querySelectorAll("[data-propuesta]")].map(b => b.textContent);
-		assert.deepEqual(botones, ["Pregúntame antes del examen", "Busca mis errores", "Conéctalo con lo que ya sé", "Solo escucha"]);
-		assert.deepEqual(botones, [...PROPUESTAS_PROPOSITO]);
+		assert.deepEqual(botones, ["Pregúntame antes del examen", "Busca mis errores", "Conéctalo con lo que ya sé"]);
+		assert.deepEqual(botones, [...PROPUESTAS_A_LA_VISTA]);
+		assert.deepEqual(PROPUESTAS_A_LA_VISTA, PROPUESTAS_PROPOSITO.filter(p => p !== SOLO_ESCUCHA));
 	});
 
 	it("elegir una propuesta rellena la línea y la guarda; David puede seguir editándola", async () => {
 		const f = await pintar();
-		await f.enfocar(f.q("input")!);
 		await f.clic(f.dom.document.querySelectorAll("[data-propuesta]")[1]!);
 		assert.deepEqual(f.cambios, [{ proposito: "Busca mis errores" }]);
 		const campo = f.q<HTMLInputElement>("input")!;
@@ -174,27 +189,10 @@ describe("el propósito, montado", () => {
 		assert.deepEqual(f.cambios, [{ proposito: null }]);
 	});
 
-	it("el campo tiene su tope de longitud", () => {
-		assert.match(editor(CUADERNO), /<input[^>]*maxLength="200"/i);
-	});
-
 	it("con «Solo escucha» elegido, la nota lo cuenta y cambiar de propósito es escribir otro o elegir otra propuesta", async () => {
 		const f = await pintar({ proposito: SOLO_ESCUCHA });
 		assert.match(f.q("[data-escucha]")!.textContent!, /^Solo escucha: el tutor no comenta por su cuenta/);
-		await f.enfocar(f.q("input")!);
 		await f.clic(f.dom.document.querySelectorAll("[data-propuesta]")[0]!);
 		assert.deepEqual(f.cambios, [{ proposito: "Pregúntame antes del examen" }]);
-	});
-});
-
-describe("ModoProactivo con la línea del propósito", () => {
-	it("el campo del propósito va en la misma línea que el interruptor, y el aviso sigue debajo", () => {
-		const html = renderToStaticMarkup(
-			<ModoProactivo modo="a-peticion" aviso="tope" estado={{ ...ESTADO, usadas: 40 }} cambiarModo={nada} fijarTope={nada}>
-				<PropositoCuaderno fijar={nada} />
-			</ModoProactivo>,
-		);
-		assert.ok(html.indexOf("data-modo-interruptor") < html.indexOf("Propósito del cuaderno"));
-		assert.ok(html.indexOf("Propósito del cuaderno") < html.indexOf("data-aviso"));
 	});
 });

@@ -154,9 +154,9 @@ describe("EditorCuadernoEstudio", () => {
 		assert.equal((html.match(/aria-label="Acciones del bloque"/g) ?? []).length, 3);
 	});
 
-	it("la cabecera ofrece Propiedades y «Más acciones»; sus contenidos no están a la vista hasta abrirlos", () => {
+	it("la cabecera ofrece «Más acciones», desde donde se abren Propiedades; sus contenidos no están a la vista hasta abrirlos", () => {
 		const html = editor();
-		assert.match(html, /<button[^>]*aria-label="Propiedades del cuaderno"/);
+		assert.doesNotMatch(html, /aria-label="Propiedades del cuaderno"/, "Propiedades se abre desde «⋯»");
 		assert.match(html, /<button[^>]*aria-label="Más acciones"/);
 		assert.doesNotMatch(html, /Exportar a Markdown|Con qué se relaciona este cuaderno/);
 	});
@@ -252,7 +252,7 @@ describe("el margen del cuaderno (ticket 12b)", () => {
 		const maquetacion = (html: string) => [
 			html.match(/<div[^>]*@container\/pagina[^>]*>/)?.[0],
 			html.match(/<div class="[^"]*@min-\[53rem\]\/pagina:grid[^"]*">/)?.[0],
-			html.match(/<div class="[^"]*max-w-\[36rem\][^"]*"><div class="flex items-center/)?.[0],
+			html.match(/<div class="[^"]*max-w-\[36rem\][^"]*"><div class="flex flex-wrap items-center/)?.[0],
 		];
 		const sin = maquetacion(editor({ cuaderno: PAGINA }));
 		const con = maquetacion(conComentarios([comentario("c1", anclaDe("n1", NOTA, "vector denso"))]));
