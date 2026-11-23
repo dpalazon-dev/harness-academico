@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { PluginBackendContext } from 'learnharness-plugin-api';
+import type { PluginBackendContext, PluginToolContext } from 'learnharness-plugin-api';
+import { aportacion } from './aporta.ts';
 import { PROBE_INSTRUCTIONS, STUDY_INSTRUCTIONS, TEACH_INSTRUCTIONS } from './instructions.ts';
 import { createOperations } from './operations.ts';
 import { createLecturas } from './armazon.ts';
@@ -112,6 +113,11 @@ export async function activate(ctx: PluginBackendContext): Promise<() => Promise
       ...(Number.isSafeInteger(r.k) ? { k: r.k as number } : {}),
     });
   };
+
+  const herramientas = (context: PluginToolContext) => createStudyTools(ops, context, assertActive, kb, searchInput, () => areas.forChat(context.chatId), {
+    registrar: (unitId, chatId) => ciclo.registrarCierreBloque({ unitId }, chatId),
+    unidad: () => study.getConversation(context.chatId)?.unitId ?? null,
+  });
 
   const unregister = [
     ctx.handle('espacios', () => { assertActive(); return areas.view(); }),
@@ -240,16 +246,15 @@ export async function activate(ctx: PluginBackendContext): Promise<() => Promise
     ctx.handle('contexto-conversacion', write(contexto)),
     ctx.handle('conversaciones', () => { assertActive(); return filasConversaciones(sessions.list(filter()), study, () => ops.plans(null)); }),
     ctx.handle('resumir-conversacion', writeAsync(input => sessions.summarizeNow(id(fields(input, ['chatId'], 'input').chatId, 'input.chatId')))),
+    // Ajustes › Estudio: lo que el plugin aporta al tutor, en español (aporta.ts).
+    ctx.handle('aporta', () => aportacion(herramientas({ chatId: '', agent: 'teacher' }))),
     ctx.registerInstructions({ agents: ['prober', 'teacher'], text: STUDY_INSTRUCTIONS }),
     ctx.registerInstructions({ agents: ['prober'], text: PROBE_INSTRUCTIONS }),
     ctx.registerInstructions({ agents: ['teacher'], text: TEACH_INSTRUCTIONS }),
     ctx.registerInstructions({ agents: ['prober', 'teacher'], text: context => sessions.briefingFor(context) }),
     ctx.registerTools({
       agents: ['prober', 'teacher'],
-      create: context => createStudyTools(ops, context, assertActive, kb, searchInput, () => areas.forChat(context.chatId), {
-        registrar: (unitId, chatId) => ciclo.registrarCierreBloque({ unitId }, chatId),
-        unidad: () => study.getConversation(context.chatId)?.unitId ?? null,
-      }).map(tool => {
+      create: context => herramientas(context).map(tool => {
         const execute = tool.execute;
         return { ...tool, execute: async (...args: Parameters<typeof execute>) => { const result = await execute(...args); changed(); return result; } };
       }),
