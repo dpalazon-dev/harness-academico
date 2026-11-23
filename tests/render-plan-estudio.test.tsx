@@ -54,7 +54,14 @@ describe("PaginaPlanEstudio", () => {
 		assert.match(html, /<input type="date"[^>]*aria-label="Fecha de «Examen parcial»"[^>]*value="2027-01-20"/);
 	});
 
-	it("el primero no sube y el último no baja", () => {
+	it("es un tablero con una columna por tipo, en el orden del plan dentro de cada una", () => {
+		const html = pagina({ elementos: [PLAN.elementos[2]!, PLAN.elementos[0]!, PLAN.elementos[3]!, PLAN.elementos[1]!] });
+		assert.deepEqual([...html.matchAll(/data-columna="([^"]+)"/g)].map(m => m[1]), ["tema", "tarea", "hito"]);
+		assert.match(html, /data-columna="tema"[\s\S]*Regresión lineal[\s\S]*Árboles de decisión[\s\S]*data-columna="tarea"[\s\S]*Leer el capítulo 3[\s\S]*data-columna="hito"[\s\S]*Examen parcial/);
+		assert.match(pagina({ elementos: [PLAN.elementos[0]!] }), /aria-label="Hitos"[^>]*><li[^>]*>Ninguno</);
+	});
+
+	it("el primero de su columna no sube y el último no baja", () => {
 		const html = pagina();
 		assert.match(html, /aria-label="Subir «Regresión lineal»" disabled=""/);
 		assert.match(html, /aria-label="Bajar «Examen parcial»" disabled=""/);

@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * La página de un plan (spec `.scratch/planes`): un objetivo con una lista plana de temas, tareas e hitos. David lo
+ * La página de un plan (spec `.scratch/planes`): un objetivo con su lista de temas, tareas e hitos, pintada como tablero
+ * de tres columnas, una por tipo (variante C de la maqueta, elegida por David el 23-nov-2026). David lo
  * edita directamente (añadir, renombrar, marcar, mover, quitar, fecha de un hito); un plan que propuso el tutor se
  * acepta o se descarta entero, y los cambios que el tutor propone a uno aceptado se aplican o se rechazan aquí.
  * «Trabajar» convierte un tema en unidad, con su título; un tema con unidad la abre.
@@ -87,15 +88,27 @@ export function PaginaPlanEstudio({ plan: p, espacios = null, ocupado, error, ac
 				</ul>
 			)}
 
-			<ol className="mt-8 divide-y divide-border border-y border-border" aria-label="Elementos del plan">
-				{p.elementos.length === 0 && <li className="py-4 text-sm text-muted-foreground">El plan aún no tiene elementos. Añade el primero abajo o pídeselo al tutor.</li>}
-				{p.elementos.map((e, i) => (
-					<FilaElemento
-						key={e.id} elemento={e} primero={i === 0} ultimo={i === p.elementos.length - 1} indice={i}
-						ocupado={ocupado} propuesto={propuesto} acciones={acciones}
-					/>
-				))}
-			</ol>
+			{p.elementos.length === 0 && <p className="mt-8 text-sm text-muted-foreground">El plan aún no tiene elementos. Añade el primero abajo o pídeselo al tutor.</p>}
+			<div className="mt-8 grid gap-3 sm:grid-cols-3" data-testid="tablero-plan">
+				{(Object.keys(TIPO_ELEMENTO) as TipoElemento[]).map(tipo => {
+					// Cada columna guarda el orden del plan; subir y bajar la cambian por su vecina del mismo tipo.
+					const columna = p.elementos.map((e, indice) => ({ e, indice })).filter(x => x.e.tipo === tipo);
+					return (
+						<section key={tipo} className="rounded-xl border border-border bg-card p-2" data-columna={tipo}>
+							<h2 className="mb-2 px-1 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{COLUMNA[tipo]}</h2>
+							<ol className="space-y-2" aria-label={COLUMNA[tipo]}>
+								{columna.length === 0 && <li className="px-1 text-xs text-muted-foreground">Ninguno</li>}
+								{columna.map(({ e, indice }, i) => (
+									<TarjetaElemento
+										key={e.id} elemento={e} indice={indice} anterior={columna[i - 1]?.indice ?? null} siguiente={columna[i + 1]?.indice ?? null}
+										ocupado={ocupado} propuesto={propuesto} acciones={acciones}
+									/>
+								))}
+							</ol>
+						</section>
+					);
+				})}
+			</div>
 
 			<NuevoElemento ocupado={ocupado} anadir={(op) => acciones.cambiar(op)} />
 
@@ -141,15 +154,19 @@ function Objetivo({ objetivo, ocupado, guardar }: { objetivo: string; ocupado: b
 	);
 }
 
-function FilaElemento({ elemento: e, indice, primero, ultimo, ocupado, propuesto, acciones }: {
-	elemento: ElementoPlan; indice: number; primero: boolean; ultimo: boolean; ocupado: boolean; propuesto: boolean; acciones: AccionesPlan;
+const COLUMNA: Record<TipoElemento, string> = { tema: "Temas", tarea: "Tareas", hito: "Hitos" };
+
+/** Un elemento como tarjeta de su columna. `anterior` y `siguiente` son los índices del plan de sus vecinas del mismo
+ * tipo, o null en un extremo de la columna. */
+function TarjetaElemento({ elemento: e, anterior, siguiente, ocupado, propuesto, acciones }: {
+	elemento: ElementoPlan; indice: number; anterior: number | null; siguiente: number | null; ocupado: boolean; propuesto: boolean; acciones: AccionesPlan;
 }) {
 	const { nombre, icono: Icono } = TIPO_ELEMENTO[e.tipo];
 	const [titulo, setTitulo] = useState(e.titulo);
 	useEffect(() => setTitulo(e.titulo), [e.titulo]);
 	const renombrar = () => { const t = titulo.trim(); if (t && t !== e.titulo) acciones.cambiar({ op: "edit", elementoId: e.id, titulo: t }); else setTitulo(e.titulo); };
 	return (
-		<li className="group flex flex-wrap items-center gap-2 py-2" data-elemento={e.tipo}>
+		<li className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-border bg-background px-2 py-1.5" data-elemento={e.tipo}>
 			<input
 				type="checkbox"
 				checked={e.hecho}
@@ -166,7 +183,7 @@ function FilaElemento({ elemento: e, indice, primero, ultimo, ocupado, propuesto
 				onChange={(ev) => setTitulo(ev.target.value)}
 				onBlur={renombrar}
 				onKeyDown={(ev) => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); if (ev.key === "Escape") setTitulo(e.titulo); }}
-				className={cn("min-w-0 flex-1 bg-transparent text-sm outline-none", e.hecho && "text-muted-foreground line-through")}
+				className={cn("min-w-0 flex-1 basis-24 bg-transparent text-sm outline-none", e.hecho && "text-muted-foreground line-through")}
 			/>
 			{e.tipo === "hito" && (
 				<input
@@ -188,11 +205,11 @@ function FilaElemento({ elemento: e, indice, primero, ultimo, ocupado, propuesto
 					Trabajar
 				</Button>
 			))}
-			<span className="flex items-center">
-				<Button size="icon" variant="ghost" className="size-7" aria-label={`Subir «${e.titulo}»`} disabled={ocupado || primero}
-					onClick={() => acciones.cambiar({ op: "move", elementoId: e.id, index: indice - 1 })}><ArrowUpIcon className="size-4" /></Button>
-				<Button size="icon" variant="ghost" className="size-7" aria-label={`Bajar «${e.titulo}»`} disabled={ocupado || ultimo}
-					onClick={() => acciones.cambiar({ op: "move", elementoId: e.id, index: indice + 1 })}><ArrowDownIcon className="size-4" /></Button>
+			<span className="ml-auto flex items-center">
+				<Button size="icon" variant="ghost" className="size-7" aria-label={`Subir «${e.titulo}»`} disabled={ocupado || anterior === null}
+					onClick={() => acciones.cambiar({ op: "move", elementoId: e.id, index: anterior! })}><ArrowUpIcon className="size-4" /></Button>
+				<Button size="icon" variant="ghost" className="size-7" aria-label={`Bajar «${e.titulo}»`} disabled={ocupado || siguiente === null}
+					onClick={() => acciones.cambiar({ op: "move", elementoId: e.id, index: siguiente! })}><ArrowDownIcon className="size-4" /></Button>
 				<Button size="icon" variant="ghost" className="size-7" aria-label={`Quitar «${e.titulo}»`} disabled={ocupado}
 					onClick={() => acciones.cambiar({ op: "remove", elementoId: e.id })}><XIcon className="size-4" /></Button>
 			</span>
