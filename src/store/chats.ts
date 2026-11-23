@@ -245,6 +245,17 @@ function forkChat(sourceId: string, messages: LhMessage[], messageId: string): C
 	return { ...record, version: CURRENT_CHAT_VERSION };
 }
 
+/** HarnessAcademico: los mensajes fijados de la conversación (ids de la vista). */
+function setPinnedMessages(id: string, messageIds: string[]): ChatRecord {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	const unicos = [...new Set(messageIds)];
+	if (unicos.length > 0) record.pinnedMessages = unicos;
+	else delete record.pinnedMessages;
+	writeChat(record);
+	return record;
+}
+
 /** Delete the session record file entirely (session-deletion wave 6,
  *  owner 2026-09-22). False when the id is unknown — the route turns that
  *  into a 404. The record's graph traces and jobs are the route's
@@ -300,4 +311,5 @@ export const chatStore: ChatStore = {
 	updateSideChats,
 	setChatFlags,
 	forkChat,
+	setPinnedMessages,
 };

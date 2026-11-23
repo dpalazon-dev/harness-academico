@@ -330,9 +330,11 @@ describe("render smoke tests", () => {
 		assert.ok(!yourRow.slice(0, 400).includes("bg-card") && !yourRow.slice(0, 400).includes("bg-accent"), "no band inside the card");
 		// THE RAIL GROUPS (owner correction): the label sits INSIDE the rail —
 		// ownership readable from the rail alone, collapsed or expanded.
-		const railAt = html.indexOf("border-l-[calc(3ch-14px)]");
+		// HarnessAcademico (guía de diseño): sin raya izquierda; la fila agrupa etiqueta y texto.
+		const rowAt = html.indexOf('data-testid="your-thinking"');
 		const trigAt = html.indexOf("your-thinking-trigger");
-		assert.ok(railAt !== -1 && railAt < trigAt, "the rail opens before the label (same quote)");
+		assert.ok(rowAt !== -1 && rowAt < trigAt, "the row opens before the label (same quote)");
+		assert.ok(!html.includes("border-l-[calc(3ch-14px)]"), "no left rail");
 		assert.ok(!html.includes("brightness isn&#x27;t distance"), "the text is hidden until expanded");
 		assert.ok(!html.includes("Note:"), "no longer a muted 'Note:' footnote");
 		// The thinking sits ABOVE the verdict's explanation — the dialogue of

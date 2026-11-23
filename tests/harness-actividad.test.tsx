@@ -3,49 +3,31 @@ import React from "react";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { agruparActividad, cabeceraActividad, nombreHerramienta } from "../components/actividad.ts";
-import { ActividadTurno } from "../components/actividad-turno.tsx";
+import { nombreHerramienta } from "../components/actividad.ts";
+import { ToolCallCard } from "../components/artifacts/tool-call-card.tsx";
 import { ColaMensajes, colaLista, encolar, quitar, textoDeCola } from "../components/cola-mensajes.tsx";
 
-type P = { type: string; state?: string; errorText?: string };
-const silenciosa = (p: P) => !["tool-quiz", "tool-demo"].includes(p.type);
-const tipos = (segs: ReturnType<typeof agruparActividad<P>>) =>
-	segs.map(s => (s.tipo === "actividad" ? `[${s.partes.map(x => x.parte.type).join(",")}]` : s.parte.type));
+const tarjeta = (state: string, extra: Record<string, unknown> = {}) =>
+	renderToStaticMarkup(<ToolCallCard part={{ type: "tool-estudio_estado", state, toolCallId: "t1", input: {}, ...extra } as never} />);
 
-describe("harness — agrupar la actividad de un turno", () => {
-	it("pliega herramientas silenciosas seguidas, con los pasos que caen entre ellas", () => {
-		const partes: P[] = [
-			{ type: "step-start" }, { type: "tool-read" }, { type: "step-start" }, { type: "tool-grep" },
-			{ type: "step-start" }, { type: "text" },
-		];
-		assert.deepEqual(tipos(agruparActividad(partes, silenciosa)), ["step-start", "[tool-read,step-start,tool-grep]", "step-start", "text"]);
-	});
-	it("deja fuera del bloque lo que el estudiante tiene que ver", () => {
-		const partes: P[] = [{ type: "tool-read" }, { type: "tool-quiz" }, { type: "tool-ls" }, { type: "tool-demo" }];
-		assert.deepEqual(tipos(agruparActividad(partes, silenciosa)), ["[tool-read]", "tool-quiz", "[tool-ls]", "tool-demo"]);
-	});
-	it("sin herramientas no cambia nada", () => {
-		const partes: P[] = [{ type: "step-start" }, { type: "reasoning" }, { type: "text" }];
-		assert.deepEqual(tipos(agruparActividad(partes, silenciosa)), ["step-start", "reasoning", "text"]);
-	});
+describe("harness — herramientas en líneas con su estado", () => {
 	it("nombra en español, también las herramientas desconocidas", () => {
 		assert.equal(nombreHerramienta("estudio_estado").enCurso, "Consultando tu plan");
 		assert.equal(nombreHerramienta("read").hecho, "Leer archivo");
 		assert.equal(nombreHerramienta("mi_plugin__hacer_cosa").hecho, "Hacer cosa");
 	});
-	it("la cabecera dice el paso en curso mientras el turno vive y resume al terminar", () => {
-		const partes: P[] = [{ type: "tool-read", state: "output-available" }, { type: "tool-read", state: "output-available" }, { type: "tool-estudio_estado", state: "input-available" }];
-		assert.deepEqual(cabeceraActividad(partes, true), { enCurso: true, texto: "Consultando tu plan…", pasos: 3 });
-		// Turno terminado (p. ej. detenido): nunca queda un gerundio colgado.
-		assert.deepEqual(cabeceraActividad(partes, false), { enCurso: false, texto: "Leer archivo ×2 · Consultar tu plan", pasos: 3 });
+	it("hecha: tick y el nombre en infinitivo", () => {
+		const html = tarjeta("output-available", { output: "ok" });
+		assert.match(html, /data-estado-herramienta="hecha"/);
+		assert.match(html, /Consultar tu plan/);
 	});
-	it("el bloque se pinta plegado, con resumen y recuento", () => {
-		const html = renderToStaticMarkup(
-			<ActividadTurno partes={[{ type: "tool-read", state: "output-available" }]} turnoVivo={false}><span>dentro</span></ActividadTurno>,
-		);
-		assert.match(html, /Leer archivo/);
-		assert.match(html, /1 paso/);
-		assert.doesNotMatch(html, /dentro/);
+	it("en marcha: giro y el paso en gerundio", () => {
+		const html = tarjeta("input-available");
+		assert.match(html, /data-estado-herramienta="en-marcha"/);
+		assert.match(html, /Consultando tu plan…/);
+	});
+	it("fallida: aviso", () => {
+		assert.match(tarjeta("output-error", { errorText: "no" }), /data-estado-herramienta="fallida"/);
 	});
 });
 
@@ -74,9 +56,20 @@ describe("harness — cola de mensajes", () => {
 
 describe("harness — aviso de rama", () => {
 	it("dice de qué conversación salió y enlaza al original", async () => {
-		const { AvisoRama } = await import("../components/bifurcar-mensaje.tsx");
+		const { AvisoRama } = await import("../components/acciones-mensaje.tsx");
 		const html = renderToStaticMarkup(<AvisoRama forkedFrom={{ chatId: "chat_a", title: "Regla de la cadena" }} />);
 		assert.match(html, /Bifurcada de «Regla de la cadena»/);
 		assert.match(html, /href="\/chat\/chat_a"/);
+	});
+});
+
+describe("harness — mensajes fijados", () => {
+	it("la lista enseña una ficha por mensaje y nada si está vacía", async () => {
+		const { FijadosConversacion, textoDeMensaje } = await import("../components/acciones-mensaje.tsx");
+		assert.equal(renderToStaticMarkup(<FijadosConversacion mensajes={[]} onIr={() => {}} />), "");
+		const html = renderToStaticMarkup(<FijadosConversacion mensajes={[{ id: "a1", texto: "Porque cada función escala" }]} onIr={() => {}} />);
+		assert.match(html, /Fijados:/);
+		assert.match(html, /Porque cada función escala/);
+		assert.equal(textoDeMensaje([{ type: "reasoning", text: "x" }, { type: "text", text: "Uno" }, { type: "text", text: "Dos" }]), "Uno\n\nDos");
 	});
 });

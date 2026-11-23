@@ -103,6 +103,9 @@ export interface ChatStore {
 	 *  original), sus ajustes, su tipo, su árbol y sus imágenes, y la marca
 	 *  forkedFrom. Sin uso, hilos al margen ni extracciones. */
 	forkChat(sourceId: string, messages: LhMessage[], messageId: string): ChatRecord;
+	/** HarnessAcademico: guarda los mensajes fijados. Silencioso y sin tocar
+	 *  updatedAt: no cambia la lista ni es actividad. Una lista vacía borra el campo. */
+	setPinnedMessages(id: string, messageIds: string[]): ChatRecord;
 }
 
 // ─── GraphStore — the append-only evidence ledgers (data/graph) ──────────────

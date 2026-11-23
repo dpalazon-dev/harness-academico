@@ -5,7 +5,7 @@
  * every color override stays exactly as it was.
  */
 
-import { isBuiltinThemeId } from "@/src/core";
+import { FACTORY_THEME_ID, isBuiltinThemeId } from "@/src/core";
 import { readSettingsRecord, themeStore, writeSettingsRecord } from "@/src/server";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export async function DELETE(_request: Request, ctx: { params: Promise<{ id: str
 	themeStore.deleteTheme(id);
 	const record = readSettingsRecord();
 	if (record?.appearance?.theme === id) {
-		writeSettingsRecord({ ...record, appearance: { ...record.appearance, theme: "default" } });
+		writeSettingsRecord({ ...record, appearance: { ...record.appearance, theme: FACTORY_THEME_ID } }); // HarnessAcademico: tema de fábrica
 	}
 	return Response.json({ theme });
 }

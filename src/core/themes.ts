@@ -198,6 +198,14 @@ export const BUILTIN_THEMES: readonly Theme[] = [
 		accent: "#4f8a46", bold: "#4f8a46", italic: "#8a5cb5", code: "#b8623b",
 		error: "#c0533f", success: "#4f8a46", warning: "#b8862c",
 	}),
+	// HarnessAcademico (guía de diseño, estilo «papel tranquilo» elegido por David
+	// el 23-nov-2026): el tema por defecto de la app. Venía como archivo
+	// importable en docs/sistema-comun/temas/papel.json.
+	builtin("Papel", "light", {
+		background: "#f7f3ea", surface: "#efe9dc", border: "#dcd3c1", text: "#2e2923", textMuted: "#6f665a",
+		accent: "#4a6a8c", bold: "#2c4a66", italic: "#5f5470", code: "#8a5536",
+		error: "#a8463b", success: "#426b46", warning: "#835d1a",
+	}),
 	builtin("NvChad Onedark", "dark", {
 		background: "#1e222a", surface: "#282c34", border: "#42464e", text: "#abb2bf", textMuted: "#565c64",
 		accent: "#61afef", bold: "#c882e7", italic: "#a3b8ef", code: "#e7c787",
@@ -208,6 +216,11 @@ export const BUILTIN_THEMES: readonly Theme[] = [
 /** The app's original dark palette, and the fallback for a missing id. */
 export const DEFAULT_THEME: Theme = BUILTIN_THEMES[0]!;
 
+/** HarnessAcademico (guía de diseño): el tema de fábrica es «Papel»; Default
+ *  sigue siendo la paleta oscura original (y la de los literales de globals.css). */
+export const FACTORY_THEME_ID = "papel";
+export const FACTORY_THEME: Theme = BUILTIN_THEMES.find((t) => t.id === FACTORY_THEME_ID)!;
+
 /** Preset ids are reserved: imports never take them, DELETE refuses them. */
 export function isBuiltinThemeId(id: string): boolean {
 	return BUILTIN_THEMES.some((t) => t.id === id);
@@ -216,8 +229,8 @@ export function isBuiltinThemeId(id: string): boolean {
 /** The active theme: the record's id among builtins and customs, or
  *  Default when the id is absent or its file is gone. */
 export function resolveTheme(id: string | null | undefined, customs: readonly Theme[] = []): Theme {
-	if (!id) return DEFAULT_THEME;
-	return BUILTIN_THEMES.find((t) => t.id === id) ?? customs.find((t) => t.id === id) ?? DEFAULT_THEME;
+	if (!id) return FACTORY_THEME;
+	return BUILTIN_THEMES.find((t) => t.id === id) ?? customs.find((t) => t.id === id) ?? FACTORY_THEME;
 }
 
 /** The single place the two override homes merge onto the theme: the

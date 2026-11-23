@@ -77,7 +77,8 @@
 	   change one, change both. (owner, typography round 4: snapped from
 	   the reskin's hand-tuned 16.5 to the ladder's 16.) */
 	--lh-prose-size: 16px;
-	--lh-prose-leading: 1.5;
+	/* HarnessAcademico (estilo «papel tranquilo»): interlineado amplio para leer. */
+	--lh-prose-leading: 1.7;
 	/* Markdown heading weight (appearance settings; 900 = the Black cut). */
 	--lh-heading-weight: 900;
 }
@@ -104,7 +105,8 @@
 	   (Source Sans 3 by default). The loading-face variables attach in
 	   app/layout.tsx. Keep the sans alias pointed at the RUNTIME prose token,
 	   not the loading face, so font-sans also honors Appearance changes. */
-	--font-ui: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
+	/* HarnessAcademico: la interfaz en Atkinson Hyperlegible Next (guía de diseño); la monoespaciada, solo para código. */
+	--font-ui: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
 	--font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
 	--font-sans: var(--font-prose);
 	/* The modular type ladder — each size carries its own line-height.
@@ -604,7 +606,7 @@ body {
    independently, whether titles use serif or the reading family. Non-inline
    utilities read these vars; Source Sans 3 remains the default/loading face. */
 @theme {
-	--font-prose: var(--font-sans3), ui-sans-serif, system-ui, sans-serif;
+	--font-prose: var(--font-atkinson), var(--font-sans3), ui-sans-serif, system-ui, sans-serif;
 	--font-title: "lh-cmu", serif;
 }
 

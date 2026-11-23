@@ -48,7 +48,7 @@ import { usePorDecidir } from "./por-decidir";
 import { RUTA_BIBLIOTECA } from "./documentos";
 import { RUTA_CUADERNOS } from "./cuadernos";
 import { recordarPlegadas, seccionesPlegadas, type IdSeccion } from "./secciones";
-import { anidarRamas, ETIQUETA_ESTADO, repartir, SIN_META, useMetaConversaciones, type MetaConversacion } from "./estado-conversaciones";
+import { anidarRamas, ETIQUETA_ESTADO, LINEA_ACTIVA, repartir, SIN_META, useMetaConversaciones, type MetaConversacion } from "./estado-conversaciones";
 
 export interface Espacio {
 	id: string;
@@ -139,7 +139,7 @@ export function BarraLateralEstudio({
 	const reparto = conversaciones ? repartir(conversaciones, meta, busqueda) : null;
 	const grupos = reparto ? agruparConversaciones(reparto.resto, filtros, { ahora, plan, todos }) : [];
 	/** Una fila de conversación: en Fijadas, en su grupo o en Archivadas; `nivel` sangra las ramas bajo su origen. */
-	const fila = (c: ConversacionLista, nivel = 0) => (
+	const fila = (c: ConversacionLista, nivel = 0, activa = false) => (
 									<SidebarMenuItem key={c.id} style={nivel > 0 ? { paddingLeft: `${nivel * 12}px` } : undefined} data-nivel-rama={nivel || undefined}>
 										{renombrando === c.id ? (
 											<RenameRow
@@ -171,10 +171,10 @@ export function BarraLateralEstudio({
 												data-conversacion={c.id}
 												data-actividad={c.origen}
 												title={c.unidad ? `${ETIQUETA_ACTIVIDAD[c.origen]} · ${c.unidad.titulo}` : ETIQUETA_ACTIVIDAD[c.origen]}
-												className="text-muted-foreground data-[active=true]:text-sidebar-accent-foreground"
+												className={cn("text-muted-foreground data-[active=true]:text-sidebar-accent-foreground", activa && "h-auto py-1.5")}
 											>
 												<IconoEstado estado={meta(c.id).estado} origen={c.origen} />
-												<span className="truncate"><span className="sr-only">{ETIQUETA_ACTIVIDAD[c.origen]}{meta(c.id).estado !== "terminada" ? ` (${ETIQUETA_ESTADO[meta(c.id).estado]})` : ""}: </span>{c.title}</span>
+												<span className="grid min-w-0"><span className="truncate"><span className="sr-only">{ETIQUETA_ACTIVIDAD[c.origen]}{meta(c.id).estado !== "terminada" ? ` (${ETIQUETA_ESTADO[meta(c.id).estado]})` : ""}: </span>{c.title}</span>{activa && meta(c.id).estado !== "terminada" && <span aria-hidden className="truncate text-xs text-muted-foreground">{LINEA_ACTIVA[meta(c.id).estado as Exclude<MetaConversacion["estado"], "terminada">]}</span>}</span>
 											</SidebarMenuButton>
 											<DropdownMenu open={menu === c.id} onOpenChange={(abierto) => setMenu(abierto ? c.id : null)}>
 												<DropdownMenuTrigger asChild>
@@ -386,17 +386,23 @@ export function BarraLateralEstudio({
 							placeholder="Buscar conversaciones"
 							aria-label="Buscar conversaciones por título"
 							data-testid="buscar-conversaciones"
-							className="h-7 w-full rounded-md border border-sidebar-border bg-background px-2 text-xs text-sidebar-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lh-accent)]"
+							className="h-7 w-full rounded-md border border-sidebar-border bg-background px-2 text-xs text-sidebar-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 						/>
 					</div>
 					<SelectoresConversaciones filtros={filtros} todos={todos} onCambiar={acciones.cambiarFiltros} />
+					{reparto && reparto.activas.length > 0 && (
+						<div className="mb-2" data-testid="conversaciones-activas">
+							<p className="truncate px-2 pb-1 pt-2 text-xs text-muted-foreground">Activas</p>
+							<SidebarMenu>{reparto.activas.map(c => fila(c, 0, true))}</SidebarMenu>
+						</div>
+					)}
 					{reparto && reparto.fijadas.length > 0 && (
 						<div className="mb-2" data-testid="conversaciones-fijadas">
 							<p className="truncate px-2 pb-1 pt-2 text-xs text-muted-foreground">Fijadas</p>
 							<SidebarMenu>{anidarRamas(reparto.fijadas, meta).map(({ conversacion: c, nivel }) => fila(c, nivel))}</SidebarMenu>
 						</div>
 					)}
-					{grupos.length === 0 && reparto?.fijadas.length === 0 && <p className="px-2 pt-1 text-xs text-muted-foreground">{busqueda.trim() ? "Ninguna conversación con ese título." : "Ninguna conversación con estos filtros."}</p>}
+					{grupos.length === 0 && reparto?.fijadas.length === 0 && reparto?.activas.length === 0 && <p className="px-2 pt-1 text-xs text-muted-foreground">{busqueda.trim() ? "Ninguna conversación con ese título." : "Ninguna conversación con estos filtros."}</p>}
 					{grupos.map(g => (
 						<div key={g.clave} className="mb-2">
 							<p data-grupo-conversaciones={g.etiqueta} title={g.etiqueta} className="truncate px-2 pb-1 pt-2 text-[11px] text-muted-foreground/80">
@@ -413,7 +419,7 @@ export function BarraLateralEstudio({
 								type="button"
 								aria-expanded={verArchivadas || busqueda.trim() !== ""}
 								onClick={() => setVerArchivadas(v => !v)}
-								className="w-full rounded-md px-2 pb-1 pt-2 text-left text-xs text-muted-foreground underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lh-accent)]"
+								className="w-full rounded-md px-2 pb-1 pt-2 text-left text-xs text-muted-foreground underline-offset-2 hover:underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 							>
 								Archivadas ({reparto.archivadas.length})
 							</button>

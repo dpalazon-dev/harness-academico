@@ -1,8 +1,8 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
+import { Check, ChevronRight, Loader2, TriangleAlert } from "lucide-react";
 import type { ArtifactPartProps } from "@/src/core";
-import { nombreHerramienta } from "@/components/actividad";
+import { enMarcha, nombreHerramienta } from "@/components/actividad";
 
 /**
  * The generic tool-call card (sources v1, 2026-09-19): a quiet, collapsed
@@ -75,9 +75,18 @@ export function ToolCallCard({ part }: ArtifactPartProps) {
 			className="group my-1 w-full max-w-2xl select-none"
 		>
 			<summary className="flex cursor-pointer list-none items-center gap-2 text-xs text-muted-foreground [&::-webkit-details-marker]:hidden">
-				{/* HarnessAcademico: nombre en español (components/actividad.ts), sin mayúsculas. */}
+				{/* HarnessAcademico (harness conversacional, diseño 2A con el tick de 2C):
+				    una línea por herramienta con su estado: ✓ hecha, giro mientras corre, aviso si falló.
+				    Nombre en español (components/actividad.ts), sin mayúsculas. */}
+				{failed ? (
+					<TriangleAlert data-estado-herramienta="fallida" aria-label="Falló" className="size-3 shrink-0 text-error" />
+				) : enMarcha(p) ? (
+					<Loader2 data-estado-herramienta="en-marcha" aria-label="En marcha" className="size-3 shrink-0 animate-spin" />
+				) : (
+					<Check data-estado-herramienta="hecha" aria-label="Hecho" className="size-3 shrink-0 text-success" />
+				)}
 				<span className={`font-medium ${failed ? "text-error" : "text-foreground"}`}>
-					{nombreHerramienta(tool).hecho}
+					{enMarcha(p) && !failed ? `${nombreHerramienta(tool).enCurso}…` : nombreHerramienta(tool).hecho}
 				</span>
 				{arg && <span className="truncate">{arg}</span>}
 				<ChevronRight className="size-3 shrink-0 opacity-50 transition-transform group-open:rotate-90" />

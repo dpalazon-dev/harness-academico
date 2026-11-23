@@ -38,6 +38,7 @@ export default async function ChatPage({
 			initiallyCompacting={compactionInFlight(chat.id)}
 			// HarnessAcademico (harness conversacional): aviso «Bifurcada de…» en las ramas.
 			forkedFrom={chat.forkedFrom}
+			initialPinnedMessages={chat.pinnedMessages}
 		/>
 	);
 }

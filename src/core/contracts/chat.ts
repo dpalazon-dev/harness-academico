@@ -53,6 +53,8 @@ export interface ChatRecord {
 	archived?: boolean;
 	/** HarnessAcademico: la conversación es una rama de otra, bifurcada desde una respuesta del tutor. */
 	forkedFrom?: ChatFork;
+	/** HarnessAcademico: mensajes fijados para volver a ellos (ids de la vista), en orden de fijado. */
+	pinnedMessages?: string[];
 	/** Schema version. Absence denotes version 1; writes stamp the current
 	 * supported version. Reads refuse records stamped newer than this build
 	 * so a downgraded app cannot rewrite an unsupported record. */

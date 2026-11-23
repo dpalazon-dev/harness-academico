@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { after, beforeEach, it } from "node:test";
-import { BUILTIN_THEMES, DEFAULT_THEME, effectiveColors, resolveTheme, sanitizeThemeFile, THEME_COLOR_KEYS } from "../src/core/themes.ts";
+import { BUILTIN_THEMES, FACTORY_THEME, effectiveColors, resolveTheme, sanitizeThemeFile, THEME_COLOR_KEYS } from "../src/core/themes.ts";
 
 const require = createRequire(import.meta.url);
 const { PRESET_APPEARANCE, COLOR_KEYS, normalizeAppearance, themeSourceFor, serverDataDir, readAppearance, chromeColors } = require("../electron/appearance-chrome.cjs");
@@ -36,20 +36,22 @@ it("selected custom files resolve before a renderer; missing or malformed files 
 	}
 	fs.unlinkSync(path.join(data, "themes", "custom-paper.json"));
 	record({ theme: "custom-paper", background: "#abc" });
-	assert.deepEqual(readAppearance(data), { mode: "dark", background: "#abc" });
+	// HarnessAcademico: sin archivo, el tema de fábrica (Papel, claro).
+	assert.deepEqual(readAppearance(data), { mode: FACTORY_THEME.mode, background: "#abc" });
 	for (const theme of ["../outside", "__proto__", "constructor", "unknown"]) {
 		record({ theme });
-		assert.deepEqual(readAppearance(data), { mode: "dark", background: DEFAULT_THEME.colors.background });
+		assert.deepEqual(readAppearance(data), { mode: FACTORY_THEME.mode, background: FACTORY_THEME.colors.background });
 	}
 });
 
 it("absent and corrupt records fall back; renderer reports are normalized", () => {
-	assert.deepEqual(readAppearance(data), { mode: "dark", background: "#141414" });
+	// HarnessAcademico: la vuelta atrás es el tema de fábrica, Papel.
+	assert.deepEqual(readAppearance(data), { mode: "light", background: "#f7f3ea" });
 	fs.writeFileSync(path.join(data, "settings.json"), "{");
-	assert.deepEqual(readAppearance(data), { mode: "dark", background: "#141414" });
+	assert.deepEqual(readAppearance(data), { mode: "light", background: "#f7f3ea" });
 	for (const theme of [null, [], {}, { toString: null }, 123, true]) {
 		record({ theme });
-		assert.deepEqual(readAppearance(data), { mode: "dark", background: "#141414" });
+		assert.deepEqual(readAppearance(data), { mode: "light", background: "#f7f3ea" });
 	}
 	assert.deepEqual(normalizeAppearance({ mode: "light", background: "#fff" }), { mode: "light", background: "#fff" });
 	assert.deepEqual(normalizeAppearance({ mode: "system", background: "white" }), { mode: "dark", background: null });

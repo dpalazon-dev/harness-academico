@@ -548,11 +548,12 @@ export const FACTORY_SETTINGS: FactorySettings = {
 	general: { autoUpdate: true },
 	dictation: { language: "en" },
 	appearance: {
-		theme: "default",
+		// HarnessAcademico (guía de diseño): «papel tranquilo» y prosa a 17 px por defecto.
+		theme: "papel",
 		background: null, // null = the active theme's background
 		colors: {}, // no overrides: every color is the theme's
-		fontFamily: null, // Source Sans 3
-		proseFontSize: 16,
+		fontFamily: null, // Atkinson Hyperlegible Next (HarnessAcademico)
+		proseFontSize: 17,
 		codeLigatures: false,
 		sessionNameSerif: true,
 		titleFont: null, // Computer Modern (or the reading font, toggle off)

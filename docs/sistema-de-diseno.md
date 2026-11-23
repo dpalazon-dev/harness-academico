@@ -2,11 +2,13 @@
 
 Reglas de interfaz de HarnessAcademico. Valen para todo el código nuevo y para el que se toque. El código heredado de LearnHarness se adapta cuando se modifica por otro motivo, salvo lo que esta guía cambia en los tokens (afecta a toda la app desde el primer día).
 
-Decisiones visuales elegidas por David el 23-nov-2026 sobre una maqueta con variantes: texto mínimo de 12 px subiendo el token, foco con contorno del acento (y fondo con barra en las listas), interruptor con pista, control segmentado para elegir entre pocas opciones, primario neutro, y estados en bloque en las páginas y en una línea en la barra lateral.
+Decisiones de David del 23-nov-2026, elegidas sobre maquetas con variantes (`maquetas/` en la carpeta del proyecto): estilo «papel tranquilo», tipografía Atkinson Hyperlegible Next con ecuaciones en KaTeX, ningún borde a la izquierda, texto mínimo de 12 px subiendo el token, foco con halo suave, interruptor con pista, control segmentado para elegir entre pocas opciones, primario neutro, y estados de error y vacío explicativos.
 
 ## Referente
 
-Una herramienta de pensamiento tranquila, del tipo de Linear o Notion: superficies planas, un color de texto fuerte y uno apagado, bordes finos, sin sombras salvo en lo que flota (menús, diálogos), movimiento corto y solo cuando explica un cambio. La página es del contenido (la prosa del tutor, las notas de David); los controles se retiran a la periferia y aparecen cuando hacen falta.
+**Papel tranquilo**, del tipo de Notion: claro y cálido por defecto (tema «Papel»), sin líneas entre zonas (la barra lateral, la cabecera y el contenido se separan por un fondo apenas distinto), mucho aire y una columna de lectura estrecha con letra grande. Superficies planas, un color de texto fuerte y uno apagado, sin sombras salvo en lo que flota (menús, diálogos), movimiento corto y solo cuando explica un cambio. La página es del contenido (la prosa del tutor, las notas de David); los controles se retiran a la periferia y aparecen cuando hacen falta, como las acciones de un mensaje al pasar el ratón.
+
+**Ningún borde a la izquierda.** Ni en citas, ni en mensajes, ni en comentarios del margen, ni para marcar la fila activa. Lo que antes se marcaba con una raya lateral se marca con un fondo suave (`bg-card` o `bg-muted`) y esquinas redondeadas. Las únicas líneas verticales permitidas son estructurales: separadores de columnas de una tabla y el borde de un panel lateral (`Sheet`, el hilo al margen).
 
 En la práctica:
 - Antes de añadir un control a una cabecera, pregúntate si cabe en un menú «⋯» o en un popover. La cabecera de Cuadernos con ocho controles es el contraejemplo.
@@ -31,6 +33,7 @@ No se migra a otra librería de componentes. Lo que falte se añade a `component
 
 | Función | Pieza | Estado en `components/ui/` | Notas |
 |---|---|---|---|
+| Acciones de un mensaje | Botones `ghost` `icon-sm` con `Hint`, visibles al pasar el ratón o con el foco | `components/acciones-mensaje.tsx` | Como Claude Code: solo iconos (Copiar, Bifurcar desde aquí, Fijar) con su nombre al pasar |
 | Acción | `Button` | Existe | Variantes en «Jerarquía de botones». Nunca un `<button>` nativo con clases propias |
 | Acción solo con icono | `Button size="icon-sm"` (o `icon-xs`) + `Hint` | Existen | El `Hint` lleva el nombre y el atajo. `aria-label` obligatorio |
 | Encender o apagar algo con efecto inmediato | `Switch` + texto visible | **A crear** (Radix Switch) | Sustituye a `Toggle` de `components/settings/controls.tsx` y a las píldoras con punto de Cuadernos (`modo-proactivo.tsx`, `escuchar-cuaderno.tsx`). La etiqueta va al lado, nunca solo en `title` |
@@ -69,7 +72,9 @@ Regla de los cinco minutos: si vas a escribir un control que no está en esta ta
 - **Escala**: la de `@theme inline` en `globals.css`. Nada de `text-[11px]`, `text-[13px]` ni `text-[0.8125rem]`. Los títulos de página usan `text-3xl` (32 px), no `text-4xl`, que está fuera de la escala.
 - **Mínimo 12 px.** `--text-xs` pasa de 11 a 12 px (decisión 1A). Quedan prohibidos 9, 10 y 11 px en cualquier sitio, incluidos los rótulos en mayúsculas.
 - **Dos colores de texto**: `foreground` y `muted-foreground`. **Sin opacidad añadida** sobre `muted-foreground` (`/40`, `/50`, `/70`, `/80`): si algo tiene que pesar menos, se quita o se pliega. Excepción única: el `placeholder` de un campo usa `muted-foreground` sin más.
-- **Familias**: JetBrains Mono (`font-ui`) en el cromo; la fuente de lectura (`font-sans`, Source Sans 3 por defecto) en la prosa, los campos (`lh-input`) y los textos largos de la interfaz; `font-title` en el título de cada página. No se mezclan dentro de un mismo control.
+- **Familias**: **Atkinson Hyperlegible Next** en toda la app, interfaz (`font-ui`) y prosa (`font-sans`, `lh-input`). Hecha por el Braille Institute para baja visión: no confunde I/l/1 ni O/0; licencia OFL, empaquetada con `next/font` (funciona sin conexión). JetBrains Mono (`font-mono`) solo para código. `font-title` en el título de cada página. Source Sans 3 sigue elegible en Ajustes › Apariencia. Base: un estudio con 16 fuentes ([Wallace et al., 2022](https://jeffhuang.com/papers/Readability_TOCHI22.pdf)) vio que cada persona lee hasta un 35 % más rápido con «su» fuente; por eso la fuente de lectura se puede cambiar.
+- **Prosa**: 17 px con interlineado 1,7, en una columna de unos 46 rem (≈ 65–75 caracteres por línea), alineada a la izquierda ([WCAG 1.4.8](https://www.w3.org/WAI/WCAG22/Understanding/visual-presentation)).
+- **Ecuaciones**: siempre renderizadas con KaTeX (`$…$` en línea y `$$…$$` en bloque, plugin de matemáticas de streamdown). Nunca se enseña LaTeX en crudo ni una fórmula como código. KaTeX conserva su letra matemática con cualquier fuente de lectura.
 - **Rótulos de sección** (el «eyebrow» en mayúsculas): `text-xs uppercase tracking-wide text-muted-foreground`, nada más. Se usa poco; un título de sección en `text-sm font-medium` suele bastar.
 - Mayúscula solo al principio de frase y en nombres propios («Crear plan», no «Crear Plan»).
 
@@ -82,9 +87,9 @@ Regla de los cinco minutos: si vas a escribir un control que no está en esta ta
 
 ## Foco visible
 
-- Todo control interactivo muestra el foco de teclado con **un contorno de 2 px del acento del tema, separado 2 px** (decisión 2B): `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lh-accent)]`. Se aplica una sola vez en la base de cada pieza de `components/ui/` (Button, Input, Textarea, Switch, Select, ToggleGroup…), no en cada uso.
+- Todo control interactivo muestra el foco de teclado con **el halo suave de shadcn**: `focus-visible:ring-[3px] focus-visible:ring-ring/50` (lo que ya traen `Button` e `Input`). Se aplica una sola vez en la base de cada pieza de `components/ui/` (Button, Input, Textarea, Switch, Select, ToggleGroup…), no en cada uso.
 - La regla global de `globals.css` que quita el contorno (`*:focus-visible { outline: none }`) se sustituye: el contorno sigue sin verse con el ratón (`:focus-visible` ya lo distingue) y vuelve con el teclado.
-- **Filas de lista** (barra lateral, paleta, menús): fondo `accent` y barra interior de 3 px a la izquierda (decisión 2C), sin contorno.
+- **Filas de lista** (barra lateral, paleta, menús): fondo `accent` con el foco, sin barra lateral ni contorno.
 - El foco nunca se pierde: al cerrar un popover, un diálogo o un menú, vuelve al control que lo abrió (Radix lo hace si se usa la pieza).
 - Todo lo que se hace con el ratón se puede hacer con el teclado, y los atajos se ven en `Hint` o en Ajustes › Teclado, no solo en `title`.
 
@@ -95,8 +100,8 @@ Cada lectura asíncrona distingue **cuatro estados**: cargando, error, vacío y 
 | Estado | En páginas (decisión 6A) | En la barra lateral, menús y filas (decisión 6B) |
 |---|---|---|
 | Cargando | `Skeleton` con la forma de lo que viene, tras 300 ms (antes, nada) | Indicador pequeño con texto: «Leyendo el plan…» |
-| Error | `Alert` en el sitio del contenido: qué falló, en una frase, y el botón «Reintentar». `role="alert"` | Una línea en `--lh-error` con «Reintentar» como `link` |
-| Vacío | Título breve, una frase de qué hacer y, si cabe, el primario de la pantalla («Crear plan») | Una frase con el enlace de la acción |
+| Error | `Alert` en el sitio del contenido, **explicativo**: título con qué no se pudo hacer y sobre qué («No hemos podido cargar el plan de «Cálculo»»), una frase con la causa real en lenguaje llano y que no se ha perdido nada, y qué hacer (pasos breves) con el botón «Reintentar». El texto cambia según la causa (Estudio no responde, archivo dañado, espacio archivado, sin modelo configurado), cada una con su acción. `role="alert"` | Una línea en `--lh-error` con «Reintentar» como `link` |
+| Vacío | Título con el objeto y el sitio («Cálculo» todavía no tiene plan), una frase que explica qué es con un ejemplo («Un plan es tu objetivo en este espacio, por ejemplo «Aprobar Cálculo I en junio», dividido en unidades…») y el primario de la pantalla («Crear plan»), con la alternativa al lado («Pedírselo al tutor») | Una frase con el enlace de la acción |
 | Acción en curso | El botón que la lanzó muestra un indicador y queda deshabilitado; el resto de la pantalla sigue usable | Igual |
 | Guardado automático | Estado visible: «Guardado», «Guardando…», «No se pudo guardar: …» con «Reintentar». Si falla, se avisa al salir | — |
 

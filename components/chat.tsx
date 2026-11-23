@@ -67,12 +67,9 @@ import { PlanBlock, PlanPopup, latestTree } from "@/components/plan-block";
 import { PlanMarginalia, planExists } from "@/components/plan-window";
 import { MermaidOverlay, SessionMermaidContext, type SessionImage } from "@/components/session-overlay";
 import { AbortTurnDialog, type AbortMode } from "@/components/abort-turn-dialog";
-// Harness conversacional (HarnessAcademico): bloque de actividad, cola de mensajes y bifurcar.
-import { agruparActividad } from "@/components/actividad";
-import { ActividadTurno } from "@/components/actividad-turno";
-import { AvisoRama, BifurcarMensaje } from "@/components/bifurcar-mensaje";
+// Harness conversacional (HarnessAcademico): cola de mensajes, acciones del mensaje y bifurcar.
+import { AccionesMensaje, AvisoRama, FijadosConversacion, textoDeMensaje } from "@/components/acciones-mensaje";
 import { ColaMensajes, colaLista, encolar, quitar, textoDeCola, type MensajeEnCola } from "@/components/cola-mensajes";
-import { esHerramientaSilenciosa } from "@/components/herramienta-silenciosa";
 import { ArrowRightIcon, DumbbellIcon, MessageCircleQuestionIcon, WaypointsIcon } from "lucide-react";
 import type { PlanBlockData } from "@/src/core";
 import { QuestionDock } from "@/components/question-dock";
@@ -141,7 +138,8 @@ import { currentUserThinkingOpen, setAllUserThinkingOpen } from "@/components/th
  * deliberately narrower (~46rem centered) per the reference. Same ELEMENT,
  * same place — width polish only.
  */
-const COLUMN = "mx-auto w-full max-w-none px-6";
+// HarnessAcademico (estilo «papel tranquilo»): columna de lectura del ancho de la caja de texto.
+const COLUMN = "mx-auto w-full max-w-[46rem] px-6";
 const DOCK = "mx-auto w-full max-w-[46rem] px-4";
 // The DOCK container's fixed width (46rem) and the plan marginalia's
 // geometry (owner, plan-placement round): the bare diagram sits in the
@@ -291,6 +289,7 @@ export function Chat({
 	initiallyCompacting = false,
 	initialConfigured = false,
 	forkedFrom,
+	initialPinnedMessages,
 	kind = "teach",
 }: {
 	chatId: string;
@@ -298,6 +297,8 @@ export function Chat({
 	initialMessages: LhMessage[];
 	/** Harness conversacional: la conversación es una rama de otra. */
 	forkedFrom?: { chatId: string; title: string };
+	/** Harness conversacional: mensajes fijados (ids de la vista). */
+	initialPinnedMessages?: string[];
 	/** Memory-only settlement notice supplied on reopening. */
 	initialError?: string;
 	/** The session kind (practice sessions, owner 2026-10-04): practice
@@ -336,8 +337,7 @@ export function Chat({
 	const sessionFindScopeRef = useRef<HTMLDivElement | null>(null);
 	const pathname = usePathname();
 	const surfaceTarget = usePageSurfaceBoundary({ active: pathname === `/chat/${encodeURIComponent(chatId)}`, viewKey: chatId, bodyRef: sessionFindScopeRef });
-	const { manager: pluginManager, snapshot: pluginSnapshot } = usePlugins();
-	const conRenderizador = useMemo(() => new Set(pluginSnapshot.toolRenderers.map(entry => entry.renderer.toolName)), [pluginSnapshot.toolRenderers]);
+	const { manager: pluginManager } = usePlugins();
 	const [, submissionChanged] = useState(0);
 	const [preparationError, setPreparationError] = useState<string>();
 	const [submissionRunner] = useState(() => new PluginSubmissionRunner(() => submissionChanged(n => n + 1)));
@@ -713,6 +713,19 @@ export function Chat({
 	}, []);
 	// Harness conversacional (diseño 3A): mensajes escritos mientras el tutor responde.
 	const [cola, setCola] = useState<MensajeEnCola[]>([]);
+	// Harness conversacional (diseño 3A): mensajes fijados, guardados en el registro.
+	const [fijados, setFijados] = useState<string[]>(initialPinnedMessages ?? []);
+	const fijar = useCallback((messageId: string, fijado: boolean) => {
+		setFijados(prev => {
+			const next = fijado ? [...prev.filter(id => id !== messageId), messageId] : prev.filter(id => id !== messageId);
+			void fetch(`/api/chats/${encodeURIComponent(chatId)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pinnedMessages: next }) }).catch(() => {});
+			return next;
+		});
+	}, [chatId]);
+	const irAMensaje = useCallback((messageId: string) => {
+		const el = document.querySelector(`[data-mensaje-id="${CSS.escape(messageId)}"]`);
+		if (el instanceof HTMLElement) el.scrollIntoView({ block: "start", behavior: "smooth" });
+	}, []);
 	const enviandoCola = useRef(false);
 	const recordComposerText = useCallback((v: string) => {
 		textRef.current = v; composerEditRevision.current++;
@@ -1818,6 +1831,10 @@ ${m.texto}` : m.texto);
 					<ConversationContent className="min-h-full gap-0 p-0">
 						<div data-session-find-root="" className={`${COLUMN} flex flex-1 flex-col gap-4 pt-4`}>
 							{forkedFrom && <AvisoRama forkedFrom={forkedFrom} />}
+							<FijadosConversacion
+								mensajes={fijados.flatMap(id => { const fm = messages.find(x => x.id === id); return fm ? [{ id, texto: textoDeMensaje(fm.parts as never).slice(0, 120) }] : []; })}
+								onIr={irAMensaje}
+							/>
 							{messages.length === 0 && !busy && (
 								<ConversationEmptyState
 									title="Conversación nueva"
@@ -1932,7 +1949,8 @@ ${m.texto}` : m.texto);
 										    inset (the band is the authorship mark against the agent's
 										    transparent prose). The "You" label stays — one register
 										    with the thinking labels. */
-										className="my-2 w-full border-l-[calc(3ch-14px)] border-muted-foreground/30 bg-card py-1 pl-[14px] pr-4 font-ui text-xs"
+										data-mensaje-id={m.id}
+										className="group/mensaje my-2 w-full rounded-lg bg-card px-4 py-2 font-ui text-xs"
 									>
 												{/* The rail GROUPS (owner round 4, 2026-10-05): the YOU heading
 												    sits INSIDE the rail, same mono-xs register and same 1ch
@@ -1942,20 +1960,12 @@ ${m.texto}` : m.texto);
 													<PathText text={m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")} />
 												</div>
 												<SubmittedImages images={m.parts.filter((part) => part.type === "image").map(part => ({ type: "image" as const, data: part.data as string, mimeType: part.mimeType as string }))} />
+												<AccionesMensaje chatId={chatId} messageId={m.id} texto={textoDeMensaje(m.parts as never)} bifurcable={false} fijado={fijados.includes(m.id)} onFijar={fijar} />
 											</div>
 									) : (
-									<Message from="assistant" className="group/mensaje max-w-full">
+									<Message from="assistant" className="group/mensaje max-w-full" data-mensaje-id={m.id}>
 									<MessageContent className="w-full">
-											{agruparActividad(m.parts, (part) => esHerramientaSilenciosa(part, conRenderizador)).map((seg) => {
-												// Harness conversacional (diseño 2B): las herramientas silenciosas seguidas, plegadas en un bloque.
-												if (seg.tipo === "actividad") {
-													return (
-														<ActividadTurno key={`actividad-${seg.partes[0]?.indice ?? 0}`} partes={seg.partes.map(x => x.parte)} turnoVivo={busy && mi === messages.length - 1}>
-															{seg.partes.filter(x => x.parte.type.startsWith("tool-")).map(x => <ToolPartRenderer key={x.indice} part={x.parte} />)}
-														</ActividadTurno>
-													);
-												}
-												const part = seg.parte, pi = seg.indice;
+											{m.parts.map((part, pi) => {
 												if (part.pluginProblem) return <ProblemCard key={pi} part={{ ...part, state: part.state ?? "input-available", toolCallId: part.toolCallId ?? "" }} />;
 												if (part.pluginQuestion) return <PluginQuestionPart key={pi} part={part} chatId={chatId} />;
 												const isLastPart = mi === messages.length - 1 && pi === m.parts.length - 1;
@@ -2045,8 +2055,11 @@ ${m.texto}` : m.texto);
 											})}
 										</MessageContent>
 										{m.role === "assistant" && renderSideEntry(sideEntries.get(m.id)?.get(m.parts.length))}
-										{/* Harness conversacional (diseño 4A): la última respuesta de un turno en marcha aún no está entera. */}
-										{m.role === "assistant" && !(busy && mi === messages.length - 1) && <BifurcarMensaje chatId={chatId} messageId={m.id} />}
+										{/* Harness conversacional (diseño 3A): copiar, bifurcar y fijar al pasar el ratón; la última
+										    respuesta de un turno en marcha aún no está entera. */}
+										{m.role === "assistant" && !(busy && mi === messages.length - 1) && (
+											<AccionesMensaje chatId={chatId} messageId={m.id} texto={textoDeMensaje(m.parts as never)} bifurcable fijado={fijados.includes(m.id)} onFijar={fijar} />
+										)}
 									</Message>
 									)}
 								</Fragment>

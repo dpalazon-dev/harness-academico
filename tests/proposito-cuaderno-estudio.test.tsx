@@ -81,7 +81,8 @@ describe("la tinta pinta los comentarios del cuaderno", () => {
 	it("el subrayado y el filo de la tarjeta leen la variable de la tinta, no un color fijo", () => {
 		const html = conComentario({ tinta: "verde" });
 		assert.match(html, /shadow-\[0_2px_0_0_var\(--tinta-margen\)\]/, "subrayado de la frase");
-		assert.match(html, /<article[^>]*border-left-color:var\(--tinta-margen/, "filo de la tarjeta");
+		// Guía de diseño: sin raya izquierda; la tinta tiñe el fondo de la tarjeta.
+		assert.match(html, /<article[^>]*background-color:color-mix\(in oklab, var\(--tinta-margen/, "fondo teñido de la tarjeta");
 		assert.doesNotMatch(html, /--tinta-margen:var\(--tinta-margen/, "sin variable que se refiera a sí misma");
 	});
 });

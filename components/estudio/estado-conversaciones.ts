@@ -40,6 +40,12 @@ export function metaDe(fila: FilaNucleo): MetaConversacion {
 
 export const SIN_META: MetaConversacion = { estado: "terminada", fijada: false, archivada: false, bifurcadaDe: null };
 
+/** La segunda línea de una fila en «Activas». */
+export const LINEA_ACTIVA: Record<Exclude<EstadoConversacion, "terminada">, string> = {
+	trabajando: "El tutor está trabajando…",
+	"te-espera": "Te ha hecho una pregunta",
+};
+
 export const ETIQUETA_ESTADO: Record<EstadoConversacion, string> = {
 	trabajando: "El tutor está trabajando",
 	"te-espera": "El tutor espera tu respuesta",
@@ -57,24 +63,26 @@ export function coincide(titulo: string, busqueda: string): boolean {
 }
 
 /**
- * Reparte las conversaciones: fijadas arriba, archivadas aparte y el resto
- * para los grupos de siempre. La búsqueda filtra las tres; con búsqueda, las
- * archivadas también aparecen (si buscas algo, lo quieres encontrar).
+ * Reparte las conversaciones (diseño 1C): arriba las activas (el tutor
+ * trabaja o te espera), luego las fijadas, el resto para los grupos de
+ * siempre y las archivadas aparte. La búsqueda filtra todas; con búsqueda,
+ * las archivadas también aparecen (si buscas algo, lo quieres encontrar).
  */
 export function repartir<C extends { id: string; title: string }>(
 	conversaciones: readonly C[],
 	meta: (id: string) => MetaConversacion,
 	busqueda: string,
-): { fijadas: C[]; resto: C[]; archivadas: C[] } {
-	const fijadas: C[] = [], resto: C[] = [], archivadas: C[] = [];
+): { activas: C[]; fijadas: C[]; resto: C[]; archivadas: C[] } {
+	const activas: C[] = [], fijadas: C[] = [], resto: C[] = [], archivadas: C[] = [];
 	for (const c of conversaciones) {
 		if (!coincide(c.title, busqueda)) continue;
 		const m = meta(c.id);
 		if (m.archivada) archivadas.push(c);
+		else if (m.estado !== "terminada") activas.push(c);
 		else if (m.fijada) fijadas.push(c);
 		else resto.push(c);
 	}
-	return { fijadas, resto, archivadas };
+	return { activas, fijadas, resto, archivadas };
 }
 
 /**

@@ -93,6 +93,19 @@ describe("harness — fijar y archivar", () => {
 	});
 });
 
+describe("harness — mensajes fijados", () => {
+	it("guarda la lista sin duplicados, sin tocar updatedAt, y la vacía borra el campo", async () => {
+		const antes = chatStore.getChat(original)!.updatedAt;
+		const put = (body: unknown) => registroRuta.PUT(new Request("http://test", { ...json(body), method: "PUT" }), params(original));
+		assert.deepEqual(await (await put({ pinnedMessages: ["a1", "a2", "a1"] })).json(), { pinnedMessages: ["a1", "a2"] });
+		assert.deepEqual(chatStore.getChat(original)!.pinnedMessages, ["a1", "a2"]);
+		assert.equal((await put({ pinnedMessages: "a1" })).status, 400);
+		await put({ pinnedMessages: [] });
+		assert.equal("pinnedMessages" in chatStore.getChat(original)!, false);
+		assert.equal(chatStore.getChat(original)!.updatedAt, antes);
+	});
+});
+
 describe("harness — bifurcar", () => {
 	it("crea la rama con el historial hasta esa respuesta y hereda espacio y unidad", async () => {
 		const res = await bifurcarRuta.POST(new Request("http://test", json({ messageId: "a1" })), params(original));

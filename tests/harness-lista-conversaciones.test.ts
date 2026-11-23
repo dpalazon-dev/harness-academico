@@ -23,8 +23,16 @@ describe("lista de conversaciones — estado y metadatos", () => {
 		const lista = [c("f1", "Plan ML"), c("r1", "Regla"), c("x1", "Regla vieja"), c("r2", "Otra")];
 		const todo = repartir(lista, meta, "");
 		assert.deepEqual([todo.fijadas, todo.resto, todo.archivadas].map(l => l.map(x => x.id)), [["f1"], ["r1", "r2"], ["x1"]]);
+		assert.deepEqual(todo.activas, []);
 		const buscado = repartir(lista, meta, "regla");
 		assert.deepEqual([buscado.fijadas, buscado.resto, buscado.archivadas].map(l => l.map(x => x.id)), [[], ["r1"], ["x1"]]);
+	});
+	it("las activas (trabajando o te espera) suben a su grupo, antes que las fijadas", () => {
+		const meta = (id: string): MetaConversacion => ({ ...SIN_META, fijada: id === "f", estado: id === "t" ? "trabajando" : id === "e" ? "te-espera" : "terminada", archivada: id === "x" });
+		const r = repartir([c("f"), c("t"), c("e"), c("r")], meta, "");
+		assert.deepEqual(r.activas.map(x => x.id), ["t", "e"]);
+		assert.deepEqual(r.fijadas.map(x => x.id), ["f"]);
+		assert.deepEqual(r.resto.map(x => x.id), ["r"]);
 	});
 	it("anida cada rama bajo su origen si está en la misma lista", () => {
 		const padres: Record<string, string> = { b: "a", c: "b", z: "fuera" };

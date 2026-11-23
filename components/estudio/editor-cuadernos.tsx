@@ -619,7 +619,7 @@ function Parrafo({ nota: b, primera, escribir, enfocar, tecla, marcas, resaltado
 	return (
 		<div className="relative">
 			{b.quote && (
-				<blockquote className="mb-2 border-l-2 border-border pl-4 text-[0.9375rem] italic leading-7 text-muted-foreground">
+				<blockquote className="mb-2 rounded-md bg-muted px-4 py-2 text-[0.9375rem] italic leading-7 text-muted-foreground">
 					{b.quote}
 					{b.locator && <cite className="ml-2 text-xs not-italic">{b.locator}</cite>}
 				</blockquote>
