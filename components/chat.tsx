@@ -79,6 +79,7 @@ import { pluginQuestionOccurrenceKey, type PluginQuestionSnapshot } from "@/src/
 import type { PluginQuestionDraft } from "./session-core";
 import { SessionFind } from "@/components/session-find";
 import { SessionMessageNavigation } from "@/components/session-navigation";
+import { NavegacionMensajes } from "@/components/estudio/navegar-mensajes";
 import { SelectionToolbar } from "@/components/selection-toolbar";
 import { createCiteAction, type CitationEditTarget } from "@/components/citation-actions";
 import { CitationActionsContext, type CitationActions } from "@/components/citation-chip";
@@ -1760,6 +1761,7 @@ export function Chat({
 				<div ref={sessionFindScopeRef} className="relative flex min-h-0 flex-1">
 				<Conversation className="h-full min-w-0 flex-1" initial="instant" contextRef={scrollContextRef}>
 					<SessionMessageNavigation />
+					<NavegacionMensajes visible={messages.length > 1} />
 					<TranscriptElementReporter onElement={setTranscriptElement} />
 					<ConversationContent className="min-h-full gap-0 p-0">
 						<div data-session-find-root="" className={`${COLUMN} flex flex-1 flex-col gap-4 pt-4`}>
@@ -1870,6 +1872,7 @@ export function Chat({
 										    Rendered WITHOUT the Message wrapper — that is the bubble. */
 											<div
 										data-testid="user-message"
+										data-parada-mensaje=""
 										/* THE DOCUMENT, ALL-IN (owner rounds two+three, 2026-10-07):
 										    no chat side — the user message is a full-width card-color
 										    BAND, the IDENTICAL geometry as the thinking rows: 5px band
@@ -1889,7 +1892,7 @@ export function Chat({
 												<SubmittedImages images={m.parts.filter((part) => part.type === "image").map(part => ({ type: "image" as const, data: part.data as string, mimeType: part.mimeType as string }))} />
 											</div>
 									) : (
-									<Message from="assistant" className="max-w-full">
+									<Message from="assistant" className="max-w-full" data-parada-mensaje="">
 									<MessageContent className="w-full">
 											{m.parts.map((part, pi) => {
 												if (part.pluginProblem) return <ProblemCard key={pi} part={{ ...part, state: part.state ?? "input-available", toolCallId: part.toolCallId ?? "" }} />;

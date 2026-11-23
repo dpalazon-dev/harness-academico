@@ -7,7 +7,7 @@
  * cada unidad (ticket 02), Biblioteca (ticket 05), Cuadernos (ticket 09),
  * las conversaciones del espacio, agrupables por fecha o por unidad del plan y filtrables por actividad y fecha
  * (ticket 03 de la segunda ronda), y, abajo, la actividad en segundo plano, Progreso y Ajustes. Plegable a
- * iconos con su botón y con ⌘B. Bajo el espacio, el botón de la paleta de búsqueda y acciones (⌘K, ticket 08).
+ * iconos con su botón y con ⌘B; el asa de su borde derecho cambia el ancho (asa-barra.tsx). Bajo el espacio, el botón de la paleta de búsqueda y acciones (⌘K, ticket 08).
  *
  * Cada conversación tiene su menú (clic derecho, botón de «más» o la tecla de menú) para renombrarla en línea,
  * exportarla como Markdown o borrarla; F2 sobre la fila la renombra (ticket 12). Las piezas son las del núcleo:
@@ -48,6 +48,7 @@ import { usePorDecidir } from "./por-decidir";
 import { RUTA_BIBLIOTECA } from "./documentos";
 import { RUTA_CUADERNOS } from "./cuadernos";
 import { recordarPlegadas, seccionesPlegadas, type IdSeccion } from "./secciones";
+import { AsaAnchoBarra, ProveedorAncho, useEstadoAncho } from "./asa-barra";
 
 export interface Espacio {
 	id: string;
@@ -397,6 +398,7 @@ export function BarraLateralEstudio({
 					</SidebarMenuItem>
 				</SidebarMenu>
 			</SidebarFooter>
+			<AsaAnchoBarra />
 		</Sidebar>
 	);
 }
@@ -558,14 +560,19 @@ export function ProveedorBarraLateral({ open, onToggle, children }: { open: bool
 		const primero = requestAnimationFrame(() => { segundo = requestAnimationFrame(() => setAnimar(true)); });
 		return () => { cancelAnimationFrame(primero); cancelAnimationFrame(segundo); };
 	}, []);
+	// El ancho que David fija arrastrando el borde (asa-barra.tsx); arrastrando, sin transiciones.
+	const ancho = useEstadoAncho();
 	return (
-		<SidebarProvider
-			open={open}
-			onOpenChange={(siguiente) => { if (siguiente !== open) onToggle(); }}
-			className={cn("min-h-0 h-dvh", !animar && "[&_*]:transition-none")}
-		>
-			{children}
-		</SidebarProvider>
+		<ProveedorAncho value={ancho}>
+			<SidebarProvider
+				open={open}
+				onOpenChange={(siguiente) => { if (siguiente !== open) onToggle(); }}
+				className={cn("min-h-0 h-dvh", (!animar || ancho.arrastrando) && "[&_*]:transition-none")}
+				style={{ "--sidebar-width": `${ancho.ancho}px` } as React.CSSProperties}
+			>
+				{children}
+			</SidebarProvider>
+		</ProveedorAncho>
 	);
 }
 

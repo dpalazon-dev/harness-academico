@@ -38,7 +38,9 @@ export type KeyAction =
 	| "question-submit"
 	| "open-settings"
 	| "toggle-user-thinking"
-	| "toggle-question-thread";
+	| "toggle-question-thread"
+	| "message-prev"
+	| "message-next";
 
 /** Where the cheat sheet groups an action (display only — dispatch is
  *  global; a seam that isn't mounted simply no-ops). */
@@ -70,6 +72,10 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	// used, felt laggy. Session navigation lives IN the search now — ↑/↓
 	// walk the filtered list, Enter opens (first match when nothing
 	// walked) — see sidebar.tsx's search input.)
+	// Navegar entre mensajes de la conversación (petición de David, 23-nov-2026). Reutiliza Alt+↑/↓, libres
+	// desde que se retiró el ciclo de sesiones; Alt hace que también funcionen escribiendo.
+	{ id: "message-prev", label: "Mensaje anterior", scope: "chat", binding: "alt+arrowup" },
+	{ id: "message-next", label: "Mensaje siguiente", scope: "chat", binding: "alt+arrowdown" },
 	{ id: "jump-graph", label: "Ir al inicio", scope: "global", binding: "mod+g" },
 	{ id: "new-session", label: "Conversación nueva", scope: "global", binding: "mod+n" },
 	{ id: "rename-session", label: "Renombrar conversación", scope: "chat", binding: "f2" },
