@@ -63,7 +63,7 @@ export function InicioEstudio({ espacio, lectura, unidades, agenda, ritmo, ahora
 	/** Las unidades activas del plan, en su orden. */
 	unidades: UnidadActiva[];
 	/** Lo leído de la agenda y a quién avisar de los rangos que pide. */
-	agenda: { datos: DatosAgenda | null; onRangos(r: { visible: Rango; seleccion: Rango }): void };
+	agenda: { datos: DatosAgenda | null; error?: string | null; refrescar?(): void; onRangos(r: { visible: Rango; seleccion: Rango }): void };
 	/** La lectura `ritmo`; null mientras se lee. */
 	ritmo: LecturaRitmo | null;
 	ahora?: Date;
@@ -141,6 +141,8 @@ export function InicioEstudio({ espacio, lectura, unidades, agenda, ritmo, ahora
 						<div className="mb-3"><LineaRitmo ritmo={ritmo} /></div>
 						<AgendaInicio
 							datos={agenda.datos}
+							error={agenda.error}
+							reintentar={agenda.refrescar}
 							ahora={ahora}
 							ocupado={ocupado}
 							onRangos={agenda.onRangos}
@@ -369,7 +371,7 @@ export function Inicio({ initialConfigured }: { initialConfigured: boolean }) {
 				agenda={agenda}
 				ritmo={ritmo}
 				ocupado={ocupado || conversacion.abriendo}
-				error={error ?? conversacion.error ?? agenda.error}
+				error={error ?? conversacion.error}
 				acciones={{
 					enviar: (t, u) => void enviar(t, u),
 					paso: (p) => {
