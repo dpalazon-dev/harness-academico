@@ -4,6 +4,18 @@ All notable changes to HarnessAcademico. The format follows [Keep a Changelog](h
 
 ## Unreleased
 
+## [0.1.1] - 2026-11-23
+
+### Changed
+
+- The `estudio` plugin starts enabled on a fresh data folder, so a new install opens with the study features. Turning it off in Settings is remembered; the other core plugins still start disabled.
+- Visible texts say HarnessAcademico instead of LearnHarness: connection notices, errors, the ChatGPT sign-in return page and the agent name sent to providers. The plugin compatibility error is in Spanish.
+
+### Added
+
+- Windows scripts: `scripts/windows/arrancar.ps1` opens the managed development window, and `scripts/windows/compilar.ps1` builds the installer in a separate worktree and, unless `-SoloCompilar` is given, installs it and warms up the first launch.
+- Community files: code of conduct, citation file, pull request template and Dependabot configuration.
+
 ## [0.1.0] - 2026-11-23
 
 First public release of HarnessAcademico, a modified version of LearnHarness 0.6.0 (`v0.6.0`, commit `a636647`). The detailed list of differences is in [docs/sistema-comun/divergencias.md](docs/sistema-comun/divergencias.md).
@@ -48,4 +60,5 @@ HarnessAcademico numbers its own releases from 0.1.0. Plugin compatibility still
 
 - Security fixes from LearnHarness 0.7.0: hardened desktop IPC, a restricted environment for spawned CLI providers, and stricter handling of ChatGPT credentials.
 
+[0.1.1]: https://github.com/dpalazon-dev/harness-academico/releases/tag/v0.1.1
 [0.1.0]: https://github.com/dpalazon-dev/harness-academico/releases/tag/v0.1.0

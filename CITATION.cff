@@ -6,7 +6,7 @@ abstract: "Windows desktop application for studying with an AI tutor that critiq
 authors:
   - family-names: "Palazón"
     given-names: "David"
-version: "0.1.0"
+version: "0.1.1"
 date-released: "2026-11-23"
 license: AGPL-3.0-only
 repository-code: "https://github.com/dpalazon-dev/harness-academico"
