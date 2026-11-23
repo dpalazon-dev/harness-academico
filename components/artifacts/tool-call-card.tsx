@@ -2,6 +2,7 @@
 
 import { ChevronRight } from "lucide-react";
 import type { ArtifactPartProps } from "@/src/core";
+import { nombreHerramienta } from "@/components/actividad";
 
 /**
  * The generic tool-call card (sources v1, 2026-09-19): a quiet, collapsed
@@ -74,8 +75,9 @@ export function ToolCallCard({ part }: ArtifactPartProps) {
 			className="group my-1 w-full max-w-2xl select-none"
 		>
 			<summary className="flex cursor-pointer list-none items-center gap-2 text-xs text-muted-foreground [&::-webkit-details-marker]:hidden">
-				<span className={`font-medium uppercase tracking-wide ${failed ? "text-error" : ""}`}>
-					{tool}
+				{/* HarnessAcademico: nombre en español (components/actividad.ts), sin mayúsculas. */}
+				<span className={`font-medium ${failed ? "text-error" : "text-foreground"}`}>
+					{nombreHerramienta(tool).hecho}
 				</span>
 				{arg && <span className="truncate">{arg}</span>}
 				<ChevronRight className="size-3 shrink-0 opacity-50 transition-transform group-open:rotate-90" />
@@ -86,7 +88,7 @@ export function ToolCallCard({ part }: ArtifactPartProps) {
 						<div className="mb-1 font-medium uppercase tracking-wide text-muted-foreground">
 							Entrada
 						</div>
-						<pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed">
+						<pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all font-mono text-xs leading-relaxed">
 							{JSON.stringify(p.input, null, 2)}
 						</pre>
 					</div>
@@ -96,7 +98,7 @@ export function ToolCallCard({ part }: ArtifactPartProps) {
 						<div className="mb-1 font-medium uppercase tracking-wide text-muted-foreground">
 							Error
 						</div>
-						<pre className="whitespace-pre-wrap break-all font-mono text-[11px] text-error">
+						<pre className="whitespace-pre-wrap break-all font-mono text-xs text-error">
 							{p.errorText}
 						</pre>
 					</div>
@@ -105,7 +107,7 @@ export function ToolCallCard({ part }: ArtifactPartProps) {
 						<div className="mb-1 font-medium uppercase tracking-wide text-muted-foreground">
 							Salida
 						</div>
-						<pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed">
+						<pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all font-mono text-xs leading-relaxed">
 							{out}
 						</pre>
 					</div>

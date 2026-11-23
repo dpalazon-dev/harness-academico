@@ -13,11 +13,12 @@ import { createHash } from "node:crypto";
 import { PATHS } from "../../config.ts";
 import { emit } from "../core/events.ts";
 import type { ChatStore } from "../core/ports.ts";
-import type { ChatRecord, ChatSettings, ChatSummary, ExtractionRunUsage, ImageSnapshot, PlanTree, SideChatThread, TurnUsage } from "../core/contracts.ts";
+import type { ChatFlags, ChatRecord, ChatSettings, ChatSummary, ExtractionRunUsage, ImageSnapshot, PlanTree, SideChatThread, TurnUsage } from "../core/contracts.ts";
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import { activeProblemOf, danglingQuestionOf } from "../core/native-messages.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
+import { tituloDeRama } from "../core/bifurcar.ts";
 import { removeLeftoverTemps, writeFileAtomicSync } from "./atomic-write.ts";
 
 function chatFile(id: string): string {
@@ -203,6 +204,47 @@ function renameChat(id: string, title: string): ChatRecord {
 	return record;
 }
 
+/** HarnessAcademico (harness conversacional): fijar y archivar. Como
+ *  renombrar, no es actividad: updatedAt no cambia y la lista no se reordena.
+ *  Un `false` borra la marca en lugar de guardarla. */
+function setChatFlags(id: string, flags: ChatFlags): ChatRecord {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	for (const key of ["pinned", "archived"] as const) {
+		if (flags[key] === true) record[key] = true;
+		else if (flags[key] === false) delete record[key];
+	}
+	writeChat(record);
+	emit("chats-changed", {});
+	return record;
+}
+
+/** HarnessAcademico: una rama nueva con un prefijo del historial del
+ *  original (core/bifurcar.ts lo corta). Copia lo que el historial necesita
+ *  para seguir igual (tipo, ajustes de modelo, árbol del plan e imágenes);
+ *  el uso, las extracciones y los hilos al margen se quedan en el original. */
+function forkChat(sourceId: string, messages: LhMessage[], messageId: string): ChatRecord {
+	const source = getChat(sourceId);
+	if (!source) throw new Error(`Chat not found: ${sourceId}`);
+	const now = new Date().toISOString();
+	const record: ChatRecord = {
+		id: `chat_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`,
+		title: tituloDeRama(source.title),
+		createdAt: now,
+		updatedAt: now,
+		messages: structuredClone(messages),
+		...(source.kind ? { kind: source.kind } : {}),
+		...(source.settings ? { settings: structuredClone(source.settings) } : {}),
+		...(source.tree ? { tree: structuredClone(source.tree) } : {}),
+		...(source.imageSnapshots ? { imageSnapshots: structuredClone(source.imageSnapshots) } : {}),
+		forkedFrom: { chatId: source.id, messageId, title: source.title },
+	};
+	fs.mkdirSync(PATHS.chats, { recursive: true });
+	writeChat(record);
+	emit("chats-changed", {});
+	return { ...record, version: CURRENT_CHAT_VERSION };
+}
+
 /** Delete the session record file entirely (session-deletion wave 6,
  *  owner 2026-09-22). False when the id is unknown — the route turns that
  *  into a 404. The record's graph traces and jobs are the route's
@@ -256,4 +298,6 @@ export const chatStore: ChatStore = {
 	appendTurnUsage,
 	appendExtractionUsage,
 	updateSideChats,
+	setChatFlags,
+	forkChat,
 };

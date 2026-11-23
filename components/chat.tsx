@@ -11,7 +11,7 @@ import { usePageSurfaceBoundary, SurfaceRegion } from "./plugin-surfaces";
 import { findSurfaceBoundary } from "./plugin-surface-targets";
 import { scheduleOpeningSubmission } from "./plugin-submission-opening";
 import { activeProblemOccurrenceOf, buildAnswer, toClientQuestion, type PluginSubmission, type PluginSubmissionTarget, type QuestionData } from "@/src/core";
-import { validatePluginBuiltinSubmissionAnswer } from "@/src/core";
+import { newMessageId, validatePluginBuiltinSubmissionAnswer } from "@/src/core";
 import { visibleQueuedSteers } from "@/components/session-core";
 import { SetupDialog } from "@/components/setup-dialog";
 import { Hint } from "@/components/ui/hint";
@@ -67,6 +67,12 @@ import { PlanBlock, PlanPopup, latestTree } from "@/components/plan-block";
 import { PlanMarginalia, planExists } from "@/components/plan-window";
 import { MermaidOverlay, SessionMermaidContext, type SessionImage } from "@/components/session-overlay";
 import { AbortTurnDialog, type AbortMode } from "@/components/abort-turn-dialog";
+// Harness conversacional (HarnessAcademico): bloque de actividad, cola de mensajes y bifurcar.
+import { agruparActividad } from "@/components/actividad";
+import { ActividadTurno } from "@/components/actividad-turno";
+import { AvisoRama, BifurcarMensaje } from "@/components/bifurcar-mensaje";
+import { ColaMensajes, colaLista, encolar, quitar, textoDeCola, type MensajeEnCola } from "@/components/cola-mensajes";
+import { esHerramientaSilenciosa } from "@/components/herramienta-silenciosa";
 import { ArrowRightIcon, DumbbellIcon, MessageCircleQuestionIcon, WaypointsIcon } from "lucide-react";
 import type { PlanBlockData } from "@/src/core";
 import { QuestionDock } from "@/components/question-dock";
@@ -284,11 +290,14 @@ export function Chat({
 	initiallyInFlight,
 	initiallyCompacting = false,
 	initialConfigured = false,
+	forkedFrom,
 	kind = "teach",
 }: {
 	chatId: string;
 	title: string;
 	initialMessages: LhMessage[];
+	/** Harness conversacional: la conversación es una rama de otra. */
+	forkedFrom?: { chatId: string; title: string };
 	/** Memory-only settlement notice supplied on reopening. */
 	initialError?: string;
 	/** The session kind (practice sessions, owner 2026-10-04): practice
@@ -327,7 +336,8 @@ export function Chat({
 	const sessionFindScopeRef = useRef<HTMLDivElement | null>(null);
 	const pathname = usePathname();
 	const surfaceTarget = usePageSurfaceBoundary({ active: pathname === `/chat/${encodeURIComponent(chatId)}`, viewKey: chatId, bodyRef: sessionFindScopeRef });
-	const { manager: pluginManager } = usePlugins();
+	const { manager: pluginManager, snapshot: pluginSnapshot } = usePlugins();
+	const conRenderizador = useMemo(() => new Set(pluginSnapshot.toolRenderers.map(entry => entry.renderer.toolName)), [pluginSnapshot.toolRenderers]);
 	const [, submissionChanged] = useState(0);
 	const [preparationError, setPreparationError] = useState<string>();
 	const [submissionRunner] = useState(() => new PluginSubmissionRunner(() => submissionChanged(n => n + 1)));
@@ -472,6 +482,8 @@ export function Chat({
 	// itself — before the abort chain may open its confirm. A mermaid focus,
 	// the plan popup, or the setup dialog over a pending question must not
 	// dismiss the question underneath.
+	const abortInFlightTurnRef = useRef(abortInFlightTurn);
+	abortInFlightTurnRef.current = abortInFlightTurn;
 	const [abortAsk, setAbortAsk] = useState<AbortMode | null>(null);
 	const abortAskRef = useRef<AbortMode | null>(null);
 	abortAskRef.current = abortAsk;
@@ -496,7 +508,8 @@ export function Chat({
 			if (target === "side-thread") closeSideThreadRef.current();
 			else if (target === "question") { pluginAbortTarget.current = pluginQuestion; setAbortAsk("question"); }
 			else if (target === "problem") setAbortAsk("problem");
-			else if (target === "turn") setAbortAsk("turn");
+			// Harness conversacional (diseño 3A): Esc detiene el turno sin confirmar; se reanuda escribiendo.
+			else if (target === "turn") abortInFlightTurnRef.current();
 			else if (target === "mermaid") setMermaidFocus(null);
 			else if (target === "plan") setPlanOpen(false);
 			// setup closes itself; null = nothing to do — both claimed.
@@ -698,6 +711,9 @@ export function Chat({
 		textRef.current = v; composerEditRevision.current++;
 		setComposerDraftRevision((revision) => revision + 1);
 	}, []);
+	// Harness conversacional (diseño 3A): mensajes escritos mientras el tutor responde.
+	const [cola, setCola] = useState<MensajeEnCola[]>([]);
+	const enviandoCola = useRef(false);
 	const recordComposerText = useCallback((v: string) => {
 		textRef.current = v; composerEditRevision.current++;
 	}, []);
@@ -819,6 +835,16 @@ export function Chat({
 	const prepareText = (supplied?: string, openingAccepted?: () => void, beforePost?: (captured: string) => boolean) => {
 		const target = textTarget();
 		if (!target || pendingRef.current || pluginOwnsDock || activeProblemRef.current || compacting) return Promise.resolve(false);
+		// Harness conversacional (diseño 3A): lo escrito en la caja mientras el tutor
+		// responde espera en la cola y se envía al terminar el turno. Lo que llega con
+		// texto propio (plugins, «Empezar») sigue su camino de siempre.
+		if (supplied === undefined && busyRef.current) {
+			const texto = textRef.current.trim();
+			if (!texto) return Promise.resolve(false);
+			setCola(c => encolar(c, texto, newMessageId()));
+			applyText("");
+			return Promise.resolve(true);
+		}
 		if (!busyRef.current && zeroKeys) { setSetupOpen(true); return Promise.resolve(false); }
 		if (!busyRef.current && selectedModelUnavailable(catalog, selectedModel)) { openModelPicker(); return Promise.resolve(false); }
 		let captured = "", capturedRevision = 0;
@@ -1114,6 +1140,34 @@ export function Chat({
 	// affordance).
 	const [compacting, setCompacting] = useState(initiallyCompacting);
 	submissionLive.current.ready = !compacting && reconciliation === "ready";
+	// Al terminar el turno, la cola sale junta como un solo mensaje. Si el envío no
+	// sale (sin modelo, una pregunta que aparece…), el texto vuelve a la caja en
+	// lugar de reintentarse solo.
+	const prepareTextRef = useRef(prepareText);
+	prepareTextRef.current = prepareText;
+	useEffect(() => {
+		if (cola.length === 0) return;
+		if (!colaLista({ ocupado: busy, pendiente: !!pending || !!activeProblem || pluginOwnsDock, compactando: compacting, enviando: enviandoCola.current })) return;
+		const texto = textoDeCola(cola);
+		enviandoCola.current = true;
+		setCola([]);
+		void prepareTextRef.current(texto).then(
+			ok => { if (!ok) applyText(textRef.current.trim() ? `${textRef.current}
+
+${texto}` : texto); },
+			() => applyText(textRef.current.trim() ? `${textRef.current}
+
+${texto}` : texto),
+		).finally(() => { enviandoCola.current = false; });
+	}, [cola, busy, pending, activeProblem, pluginOwnsDock, compacting, applyText]);
+	const editarDeCola = useCallback((m: MensajeEnCola) => {
+		setCola(c => quitar(c, m.id));
+		applyText(textRef.current.trim() ? `${textRef.current}
+
+${m.texto}` : m.texto);
+		composerInputRef.current?.focus();
+	}, [applyText]);
+
 	// A failed model response (issue #110): Retry keeps the saved input
 	// and completed work, without another learner message. Offered from
 	// "error" too: a dropped stream leaves the model there, and send()
@@ -1763,6 +1817,7 @@ export function Chat({
 					<TranscriptElementReporter onElement={setTranscriptElement} />
 					<ConversationContent className="min-h-full gap-0 p-0">
 						<div data-session-find-root="" className={`${COLUMN} flex flex-1 flex-col gap-4 pt-4`}>
+							{forkedFrom && <AvisoRama forkedFrom={forkedFrom} />}
 							{messages.length === 0 && !busy && (
 								<ConversationEmptyState
 									title="Conversación nueva"
@@ -1889,9 +1944,18 @@ export function Chat({
 												<SubmittedImages images={m.parts.filter((part) => part.type === "image").map(part => ({ type: "image" as const, data: part.data as string, mimeType: part.mimeType as string }))} />
 											</div>
 									) : (
-									<Message from="assistant" className="max-w-full">
+									<Message from="assistant" className="group/mensaje max-w-full">
 									<MessageContent className="w-full">
-											{m.parts.map((part, pi) => {
+											{agruparActividad(m.parts, (part) => esHerramientaSilenciosa(part, conRenderizador)).map((seg) => {
+												// Harness conversacional (diseño 2B): las herramientas silenciosas seguidas, plegadas en un bloque.
+												if (seg.tipo === "actividad") {
+													return (
+														<ActividadTurno key={`actividad-${seg.partes[0]?.indice ?? 0}`} partes={seg.partes.map(x => x.parte)} turnoVivo={busy && mi === messages.length - 1}>
+															{seg.partes.filter(x => x.parte.type.startsWith("tool-")).map(x => <ToolPartRenderer key={x.indice} part={x.parte} />)}
+														</ActividadTurno>
+													);
+												}
+												const part = seg.parte, pi = seg.indice;
 												if (part.pluginProblem) return <ProblemCard key={pi} part={{ ...part, state: part.state ?? "input-available", toolCallId: part.toolCallId ?? "" }} />;
 												if (part.pluginQuestion) return <PluginQuestionPart key={pi} part={part} chatId={chatId} />;
 												const isLastPart = mi === messages.length - 1 && pi === m.parts.length - 1;
@@ -1981,6 +2045,8 @@ export function Chat({
 											})}
 										</MessageContent>
 										{m.role === "assistant" && renderSideEntry(sideEntries.get(m.id)?.get(m.parts.length))}
+										{/* Harness conversacional (diseño 4A): la última respuesta de un turno en marcha aún no está entera. */}
+										{m.role === "assistant" && !(busy && mi === messages.length - 1) && <BifurcarMensaje chatId={chatId} messageId={m.id} />}
 									</Message>
 									)}
 								</Fragment>
@@ -2097,6 +2163,7 @@ export function Chat({
 					dictationSlot={<DictationBar dictation={dictation} disabled={pluginOwnsDock && !pluginMicAvailable} />}
 					dictationCancel={dictation.cancel}
 					queuedSteers={visibleQueuedSteers(steerQueue, nativeMessages)}
+					cola={<ColaMensajes cola={cola} onEditar={editarDeCola} onQuitar={(m) => setCola(c => quitar(c, m.id))} />}
 					setupCta={
 						zeroKeys ? (
 							<ZeroKeysPill onOpen={() => setSetupOpen(true)} />
@@ -2417,6 +2484,7 @@ export function DockOverlay({
 	dictationCancel,
 	setupCta,
 	queuedSteers,
+	cola,
 }: {
 	viewReader?: SessionInputViewReader;
 	viewTargets?: SessionViewTargets;
@@ -2489,6 +2557,8 @@ export function DockOverlay({
 	/** The queued-steer indicator's lines (composer steering, 2026-10-03):
 	 *  already filtered by visibleQueuedSteers — only undrained steers. */
 	queuedSteers: QueuedSteerLine[];
+	/** Harness conversacional (diseño 3A): los mensajes en cola, editables, sobre la caja. */
+	cola?: React.ReactNode;
 	/** The persistent setup CTA (BYOK, owner 2026-09-22): the same pill
 	 *  home and /chat/new carry, above the composer while slots are unset. */
 	setupCta?: React.ReactNode;
@@ -2865,6 +2935,7 @@ export function DockOverlay({
 					    rounding starts, truncated, no background, no container. A
 					    line dies when its card lands (visibleQueuedSteers). */}
 					<QueuedSteersBody steers={queuedSteers} />
+					{cola}
 					{/* The reading-thinking field (owner 2026-10-03): mounted while a
 					    teach-phase check waits — the same cue that collapses it. It
 					    claims dictated speech until the learner reveals the check

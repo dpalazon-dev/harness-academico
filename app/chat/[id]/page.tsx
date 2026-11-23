@@ -36,6 +36,8 @@ export default async function ChatPage({
 			// attach (busy shimmer + poll), never resurrect the stale record.
 			initiallyInFlight={isTurnRunning(chat.id)}
 			initiallyCompacting={compactionInFlight(chat.id)}
+			// HarnessAcademico (harness conversacional): aviso «Bifurcada de…» en las ramas.
+			forkedFrom={chat.forkedFrom}
 		/>
 	);
 }
