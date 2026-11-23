@@ -26,8 +26,8 @@ describe("anillo de foco común", () => {
 		const agenda = renderToStaticMarkup(<AgendaInicio datos={{ hoy: "2026-11-14", dias: {} }} ahora={new Date("2026-11-14T10:00:00")} ocupado={false} acciones={{ repasar: nada, paso: nada, abrirUnidad: nada, abrirConversacion: nada }} onRangos={nada} />);
 		for (const texto of ["Hoy", "Próximos 7 días", "Elegir rango"]) assert.match(agenda, new RegExp(`<button[^>]*class="anillo-foco [^"]*"[^>]*>${texto}</button>`), texto);
 		assert.match(agenda, /<button[^>]*class="anillo-foco [^"]*"[^>]*>(<svg[\s\S]*?<\/svg>)?Ver el mes/);
-		const porDecidir = renderToStaticMarkup(<ListaPorDecidir lectura={{ unidades: [{ id: "u1", revision: 1, titulo: "Planaridad", capacidad: "", notas: "", planId: null }], cambios: [], borradores: [] }} ocupado={false} error={null}
-			acciones={{ abrirUnidad: nada, confirmarUnidad: nada, descartarUnidad: nada, aplicarCambio: nada, rechazarCambio: nada, confirmarBorrador: nada, descartarBorrador: nada }} />);
+		const porDecidir = renderToStaticMarkup(<ListaPorDecidir lectura={{ planes: [{ id: "p1", revision: 1, objetivo: "Planaridad", elementos: 3 }], cambios: [], sugerencias: [], borradores: [] }} ocupado={false} error={null}
+			acciones={{ abrirUnidad: nada, abrirPlan: nada, aceptarPlan: nada, descartarPlan: nada, aceptarSugerencia: nada, descartarSugerencia: nada, aplicarCambio: nada, rechazarCambio: nada, confirmarBorrador: nada, descartarBorrador: nada }} />);
 		assert.match(porDecidir, /<button[^>]*class="anillo-foco [^"]*"[^>]*>Planaridad<\/button>/);
 		assert.match(renderToStaticMarkup(<ErrorDeLectura que="x" reintentar={nada} />), /class="anillo-foco [^"]*"[^>]*>Reintentar/);
 	});

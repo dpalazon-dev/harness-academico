@@ -19,9 +19,9 @@ import type { LecturaPorDecidir } from "../components/estudio/tipos.ts";
 const nada = () => {};
 const AHORA = new Date("2026-11-14T10:00:00");
 const accionesAgenda: AccionesAgenda = { repasar: nada, paso: nada, abrirUnidad: nada, abrirConversacion: nada };
-const accionesPorDecidir = { abrirUnidad: nada, confirmarUnidad: nada, descartarUnidad: nada, aplicarCambio: nada, rechazarCambio: nada, confirmarBorrador: nada, descartarBorrador: nada };
+const accionesPorDecidir = { abrirUnidad: nada, abrirPlan: nada, aceptarPlan: nada, descartarPlan: nada, aceptarSugerencia: nada, descartarSugerencia: nada, aplicarCambio: nada, rechazarCambio: nada, confirmarBorrador: nada, descartarBorrador: nada };
 const accionesBiblioteca = { subir: nada, incorporarRuta: nada, leer: nada, detalle: nada, vincular: nada, registrarEnBase: nada, reintentar: nada, borrar: nada };
-const VACIA: LecturaPorDecidir = { unidades: [], cambios: [], borradores: [] };
+const VACIA: LecturaPorDecidir = { planes: [], cambios: [], sugerencias: [], borradores: [] };
 
 const agenda = (props: Partial<React.ComponentProps<typeof AgendaInicio>> = {}) =>
 	renderToStaticMarkup(<AgendaInicio datos={null} ahora={AHORA} ocupado={false} acciones={accionesAgenda} onRangos={nada} {...props} />);
