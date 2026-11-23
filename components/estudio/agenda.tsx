@@ -18,6 +18,7 @@ import { es } from "react-day-picker/locale";
 import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { llamarEstudio } from "./llamar";
+import { ErrorDeLectura } from "./error-lectura";
 import type { DiaAgenda, HechoAgenda, LecturaAgenda, PasoDeUnidad, PendienteAgenda, Tarea } from "./tipos";
 
 export type RepasoAgenda = Extract<PendienteAgenda, { tipo: "repaso" }>;
@@ -107,9 +108,12 @@ function FilaSemana(props: WeekProps) {
 }
 const COMPONENTES = { DayButton: BotonDia, Week: FilaSemana };
 
-export function AgendaInicio({ datos, ahora = new Date(), ocupado, acciones, inicial, onRangos }: {
+export function AgendaInicio({ datos, error, reintentar, ahora = new Date(), ocupado, acciones, inicial, onRangos }: {
 	/** null mientras se lee por primera vez. */
 	datos: DatosAgenda | null;
+	/** La última lectura falló: la lista lo dice en lugar de quedarse leyendo. */
+	error?: string | null;
+	reintentar?(): void;
 	ahora?: Date;
 	ocupado: boolean;
 	acciones: AccionesAgenda;
@@ -187,13 +191,13 @@ export function AgendaInicio({ datos, ahora = new Date(), ocupado, acciones, ini
 					<button
 						type="button"
 						onClick={() => setEstado(e => ({ ...e, vista: e.vista === "semana" ? "mes" : "semana", mes: primeroDeMes(hoy), eligiendo: null }))}
-						className="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+						className="anillo-foco ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
 					>
 						{semana ? <><ChevronDownIcon className="size-3.5" />Ver el mes</> : <><ChevronUpIcon className="size-3.5" />Ver solo esta semana</>}
 					</button>
 				</div>
 				<Leyenda />
-				<ListaAgenda datos={datos} hoy={hoy} seleccion={seleccion} ocupado={ocupado} acciones={acciones} />
+				<ListaAgenda datos={datos} error={error ?? null} reintentar={reintentar} hoy={hoy} seleccion={seleccion} ocupado={ocupado} acciones={acciones} />
 			</section>
 		</SemanaPlegada.Provider>
 	);
@@ -205,7 +209,7 @@ function Atajo({ activo, children, onClick }: { activo: boolean; children: React
 			type="button"
 			aria-pressed={activo}
 			onClick={onClick}
-			className={cn("rounded-full border border-border px-2.5 py-0.5 text-xs transition-colors hover:border-primary", activo && "border-primary bg-primary text-primary-foreground")}
+			className={cn("anillo-foco rounded-full border border-border px-2.5 py-0.5 text-xs transition-colors hover:border-primary", activo && "border-primary bg-primary text-primary-foreground")}
 		>
 			{children}
 		</button>
@@ -276,7 +280,9 @@ const sinPunto = (t: string) => t.replace(".", "");
 const mayuscula = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 
-function ListaAgenda({ datos, hoy, seleccion, ocupado, acciones }: { datos: DatosAgenda | null; hoy: string; seleccion: Rango; ocupado: boolean; acciones: AccionesAgenda }) {
+function ListaAgenda({ datos, error, reintentar, hoy, seleccion, ocupado, acciones }: {
+	datos: DatosAgenda | null; error: string | null; reintentar?: () => void; hoy: string; seleccion: Rango; ocupado: boolean; acciones: AccionesAgenda;
+}) {
 	const unDia = seleccion.desde === seleccion.hasta;
 	// Cada día dice lo suyo: lo hecho si pasó; hoy, lo pendiente (en un rango, solo sus repasos); después, sus repasos.
 	const filas = [...dias(seleccion)].map(dia => {
@@ -295,14 +301,16 @@ function ListaAgenda({ datos, hoy, seleccion, ocupado, acciones }: { datos: Dato
 		: seleccion.hasta < hoy ? "No estudiaste en estas fechas." : "Nada planificado en estas fechas.";
 
 	return (
-		<div data-agenda="lista" aria-busy={datos === null} className="mt-3 border-t border-border pt-2">
+		<div data-agenda="lista" aria-busy={datos === null && !error} className="mt-3 border-t border-border pt-2">
 			<div className="flex items-baseline justify-between gap-3 px-2 pb-1.5 pt-1">
 				<h2 className="text-sm font-semibold">
 					{unDia ? mayuscula(sinPunto(fechaLarga.format(fechaLocal(seleccion.desde)))) : `${sinPunto(fechaCorta.format(fechaLocal(seleccion.desde)))} – ${sinPunto(fechaCorta.format(fechaLocal(seleccion.hasta)))}`}
 				</h2>
 				{resumen && <small className="shrink-0 text-xs text-muted-foreground">{resumen}</small>}
 			</div>
-			{datos === null ? <p className="px-2 py-1.5 text-sm text-muted-foreground">Leyendo la agenda…</p>
+			{/* Con datos de antes, la lista se queda y el aviso va encima: puede que ya no esté al día. */}
+			{error && <ErrorDeLectura que="la agenda" reintentar={reintentar} className="px-2 py-1.5" />}
+			{datos === null ? (!error && <p className="px-2 py-1.5 text-sm text-muted-foreground">Leyendo la agenda…</p>)
 				: filas.length === 0 ? <p className="px-2 py-1.5 text-sm text-muted-foreground">{vacio}</p>
 				: (
 					<ol>
@@ -332,7 +340,7 @@ function FilaElemento({ e, ocupado }: { e: Elemento; ocupado: boolean }) {
 			disabled={ocupado}
 			title={e.motivo}
 			data-actividad-tipo={e.actividad}
-			className="-ml-2 flex w-full items-start gap-2.5 rounded-md px-2 py-1 text-left text-sm hover:bg-accent disabled:opacity-60"
+			className="anillo-foco -ml-2 flex w-full items-start gap-2.5 rounded-md px-2 py-1 text-left text-sm hover:bg-accent disabled:opacity-60"
 		>
 			<span className="inline-flex w-28 shrink-0 items-center gap-1.5 pt-px text-xs font-semibold" style={{ color }}>
 				<span className="inline-flex size-5 items-center justify-center rounded-md" style={{ background: `color-mix(in srgb, ${color} 14%, transparent)` }}>

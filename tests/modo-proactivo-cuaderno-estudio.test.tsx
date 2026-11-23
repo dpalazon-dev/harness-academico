@@ -55,7 +55,15 @@ describe("ModoProactivo, pintado", () => {
 	it("sin modelo económico avisa y manda a Ajustes, sin enseñar un gasto que no existe", () => {
 		const html = modo({ estado: { ...ESTADO, modeloEconomico: false } });
 		assert.match(html, /data-aviso="sin-modelo"[^>]*>No hay modelo económico configurado[^<]*Ajustes/);
+		assert.match(html, /<button[^>]*data-abrir-ajustes[^>]*>Abrir Ajustes<\/button>/);
 		assert.doesNotMatch(html, /de 40 hoy/);
+	});
+
+	it("sin modelo económico el interruptor no sale encendido: dice lo mismo que el aviso", () => {
+		const html = modo({ estado: { ...ESTADO, modeloEconomico: false } });
+		assert.match(html, /role="switch"[^>]*aria-checked="false"/);
+		assert.match(html, />Cuando se lo pido</);
+		assert.doesNotMatch(html, />Lee y comenta solo</);
 	});
 
 	it("un error al cambiar el modo (por ejemplo, el tope agotado) se muestra tal como lo dice el plugin", () => {
@@ -154,6 +162,14 @@ describe("ModoProactivo, montado", () => {
 		const f = await pintar();
 		await f.clic(f.q("[data-modo-interruptor]")!);
 		assert.deepEqual(f.llamadas, ["modo a-peticion"]);
+	});
+
+	it("«Abrir Ajustes» del aviso sin modelo abre Ajustes en la pestaña del agente, donde se elige el modelo económico", async () => {
+		const secciones: string[] = [];
+		const f = await pintar({ estado: { ...ESTADO, modeloEconomico: false }, abrirAjustes: s => secciones.push(s) });
+		await f.clic(f.q("[data-abrir-ajustes]")!);
+		assert.deepEqual(secciones, ["agent"]);
+		assert.deepEqual(f.llamadas, []);
 	});
 
 	it("apagado, pulsarlo pide volver a «Lee y comenta solo»", async () => {

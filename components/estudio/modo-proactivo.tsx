@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import type { AvisoModo, EstadoProactivo, ModoCuaderno } from "./cuadernos";
 import { ETIQUETA_MODO, textoAviso, type MotivoAviso } from "./proactivo";
 import { TINTA_MARGEN } from "./margen-cuaderno";
@@ -25,6 +26,8 @@ export interface ModoProactivoProps {
 	error?: string | null;
 	cambiarModo(modo: ModoCuaderno): void;
 	fijarTope(tope: number): void;
+	/** Abre Ajustes en una sección; por defecto, el diálogo de Ajustes de la app. */
+	abrirAjustes?(seccion: string): void;
 	/** Lo que va al final de la línea del modo: el propósito del cuaderno (ticket 12f). */
 	children?: ReactNode;
 }
@@ -42,17 +45,19 @@ export function motivoDelAviso({ modo, estado, aviso }: Pick<ModoProactivoProps,
 export function ModoProactivo(props: ModoProactivoProps) {
 	const { modo, estado, leyendo, error, cambiarModo, fijarTope, children } = props;
 	const motivo = motivoDelAviso(props);
-	/** Lo que el tutor hace de verdad: con el tope agotado no comenta solo, diga lo que diga el modo guardado. */
-	const activo = modo === "proactivo" && motivo !== "tope";
+	/** Lo que el tutor hace de verdad: con el tope agotado o sin modelo económico no comenta solo, diga lo que diga el modo guardado. */
+	const activo = modo === "proactivo" && motivo === null;
 	const [editando, setEditando] = useState(false);
+	const ajustes = useSettingsDialog();
+	const abrirAjustes = props.abrirAjustes ?? ajustes.open;
 	return (
 		<div className="min-w-0" data-modo={modo}>
 			<div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-sans text-xs">
 				<button
 					type="button" role="switch" aria-checked={activo} data-modo-interruptor
 					title="Que el tutor lea mientras escribes y comente cuando paras"
-					// Lo que se pide es lo contrario del modo guardado, no del que se ve: con el tope agotado el cuaderno se ve apagado pero sigue
-					// guardado como «Lee y comenta solo», y pulsar debe dejarlo apagado de verdad.
+					// Lo que se pide es lo contrario del modo guardado, no del que se ve: con el tope agotado o sin modelo económico el cuaderno
+					// se ve apagado pero sigue guardado como «Lee y comenta solo», y pulsar debe dejarlo apagado de verdad.
 					onClick={() => cambiarModo(modo === "proactivo" ? "a-peticion" : "proactivo")}
 					className="inline-flex h-7 items-center gap-2 rounded-full border border-border px-2.5 text-foreground/90 outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
 				>
@@ -81,6 +86,10 @@ export function ModoProactivo(props: ModoProactivoProps) {
 					{error ?? textoAviso(motivo!, estado?.tope ?? 0)}
 					{motivo === "tope" && estado && (
 						<> <button type="button" onClick={() => setEditando(true)} className="rounded-sm underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring">Cambiar el tope</button></>
+					)}
+					{motivo === "sin-modelo" && (
+						// El modelo económico se elige en la pestaña «Agente» de Ajustes.
+						<> <button type="button" data-abrir-ajustes onClick={() => abrirAjustes("agent")} className="anillo-foco rounded-sm underline underline-offset-2">Abrir Ajustes</button></>
 					)}
 				</p>
 			)}

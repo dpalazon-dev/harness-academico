@@ -106,15 +106,18 @@ export function PantallaConfianzaEstudio({ titulo, confianza, ocupado, mensaje, 
 	return (
 		<Marco titulo={titulo} paso={0} salir={acciones.salir} salirTexto={textoVolver(volver)} ocupado={ocupado}>
 			<h1 className="mt-10 font-title text-3xl tracking-tight">¿Cuánto confías en recordarlo sin mirar?</h1>
-			<p className="mt-2 text-sm text-muted-foreground">Decláralo antes de ver la tarea: el regulador lo compara con lo que de verdad recuerdas.</p>
-			<label className="mt-8 flex items-center gap-4 text-sm">
+			<p className="mt-2 text-sm text-muted-foreground">Decláralo antes de ver la tarea: después se compara con lo que de verdad recuerdas.</p>
+			<label className="mt-8 flex items-center gap-3 text-sm">
 				<span className="sr-only">Confianza antes de empezar</span>
+				<span aria-hidden="true" className="text-xs text-muted-foreground">Nada</span>
 				<input
 					type="range" min={0} max={100} step={5} value={confianza} name="confidence" aria-label="Confianza antes de empezar"
+					aria-valuetext={`${confianza} %`}
 					disabled={ocupado} onChange={(e) => acciones.cambiar(Number(e.target.value))}
 					className="flex-1 accent-primary"
 				/>
-				<output className="w-10 text-right tabular-nums">{confianza}</output>
+				<span aria-hidden="true" className="text-xs text-muted-foreground">Seguro</span>
+				<output className="w-14 text-right tabular-nums">{confianza} %</output>
 			</label>
 			<div className="mt-8 flex items-center gap-3">
 				<Button disabled={ocupado} onClick={acciones.empezar}>Empezar</Button>
@@ -123,6 +126,65 @@ export function PantallaConfianzaEstudio({ titulo, confianza, ocupado, mensaje, 
 			{error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
 		</Marco>
 	);
+}
+
+/** Como en Cuadernos: lo que se ve junto a la respuesta mientras se guarda sola. */
+export type EstadoGuardadoRespuesta = { tipo: "guardado" } | { tipo: "sin-guardar" } | { tipo: "guardando" } | { tipo: "error"; motivo: string };
+const TEXTO_GUARDADO = { guardado: "Guardado", "sin-guardar": "Sin guardar", guardando: "Guardando…" } as const;
+export const textoGuardadoRespuesta = (g: EstadoGuardadoRespuesta) => g.tipo === "error" ? `No se pudo guardar: ${g.motivo}` : TEXTO_GUARDADO[g.tipo];
+
+/** Lo que se pregunta al salir si la respuesta no se pudo guardar. */
+export const AVISO_SALIR_SIN_GUARDAR = "No se pudo guardar tu respuesta. Si sales ahora, perderás lo último que escribiste. ¿Salir de todos modos?";
+
+/** Salir de un intento: primero se guarda; si falla, solo se sale si David lo confirma. */
+export async function salirGuardando(guardar: () => Promise<void>, confirmar: (texto: string) => boolean, ir: () => void): Promise<void> {
+	try {
+		await guardar();
+	} catch {
+		if (!confirmar(AVISO_SALIR_SIN_GUARDAR)) return;
+	}
+	ir();
+}
+
+/**
+ * La respuesta se guarda sola 1,5 s después de dejar de escribir, y antes de cada operación y de salir. `guardar` lanza si
+ * falla, para que quien llama decida; el estado lo cuenta siempre.
+ */
+export function useGuardarRespuesta(id: string, abierto: boolean) {
+	const [guardado, setGuardado] = useState<EstadoGuardadoRespuesta | null>(null);
+	/** La última respuesta guardada en el plugin, para no guardar dos veces lo mismo. */
+	const guardada = useRef("");
+	const actual = useRef("");
+	const espera = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+	const guardar = useCallback(async () => {
+		clearTimeout(espera.current);
+		const texto = actual.current;
+		if (!abierto || texto === guardada.current) return;
+		setGuardado({ tipo: "guardando" });
+		try {
+			await llamarEstudio("guardar-respuesta", { attemptId: id, answer: texto });
+		} catch (e) {
+			setGuardado({ tipo: "error", motivo: e instanceof Error ? e.message : "error desconocido" });
+			throw e;
+		}
+		guardada.current = texto;
+		setGuardado(actual.current === texto ? { tipo: "guardado" } : { tipo: "sin-guardar" });
+	}, [abierto, id]);
+	useEffect(() => () => clearTimeout(espera.current), []);
+	const cargar = useCallback((texto: string) => { guardada.current = texto; actual.current = texto; }, []);
+	return {
+		guardado,
+		guardar,
+		/** Lo leído del plugin: ya está guardado. */
+		cargar,
+		/** Lo que David escribe: se guarda solo al rato. El fallo queda en `guardado`. */
+		escribir: (texto: string) => {
+			actual.current = texto;
+			setGuardado(g => (g?.tipo === "error" ? g : { tipo: "sin-guardar" }));
+			clearTimeout(espera.current);
+			espera.current = setTimeout(() => void guardar().catch(() => {}), 1500);
+		},
+	};
 }
 
 export interface AccionesIntento {
@@ -140,8 +202,10 @@ export interface AccionesIntento {
 }
 
 /** Pasos 2 a 4: respuesta sin fuente, contraste y valoración, o el intento ya cerrado. */
-export function PantallaIntentoEstudio({ intento, borrador, aviso, ocupado, mensaje, error, volver = null, acciones }: {
+export function PantallaIntentoEstudio({ intento, borrador, guardado = null, aviso, ocupado, mensaje, error, volver = null, acciones }: {
 	intento: LecturaIntento;
+	/** Cómo va el guardado de la respuesta mientras se escribe; null antes de escribir nada. */
+	guardado?: EstadoGuardadoRespuesta | null;
 	/** El destino de vuelta, si no es la unidad. */
 	volver?: string | null;
 	/** La respuesta tal como David la está escribiendo. */
@@ -165,7 +229,7 @@ export function PantallaIntentoEstudio({ intento, borrador, aviso, ocupado, mens
 		<section className="mt-10">
 			<div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
 				<span className="rounded-md border border-border px-1.5 py-0.5 text-xs">{TAREA[a.taskKind]}</span>
-				<span>Confianza declarada: {a.confidence}</span>
+				<span>Confianza declarada: {a.confidence} %</span>
 			</div>
 			<p className="mt-4 whitespace-pre-wrap text-lg leading-relaxed">{intento.prompt}</p>
 			{intento.cues.length > 0 && a.status === "open" && (
@@ -180,7 +244,7 @@ export function PantallaIntentoEstudio({ intento, borrador, aviso, ocupado, mens
 		return (
 			<Marco titulo={intento.titulo} paso={1} salir={acciones.salir} salirTexto={textoVolver(volver)} ocupado={ocupado}>
 				{enunciado}
-				<p className="mt-8 text-sm text-muted-foreground">Abandonaste este intento antes de congelar la respuesta: no cuenta como evidencia.</p>
+				<p className="mt-8 text-sm text-muted-foreground">Abandonaste este intento antes de terminar la respuesta: no cuenta como evidencia.</p>
 				{pie}
 			</Marco>
 		);
@@ -203,11 +267,17 @@ export function PantallaIntentoEstudio({ intento, borrador, aviso, ocupado, mens
 					className="lh-input mt-6 w-full resize-y rounded-xl border border-border bg-background px-4 py-3 text-base leading-relaxed text-foreground"
 				/>
 				<div className="mt-3 flex flex-wrap items-center gap-2">
-					<Button disabled={ocupado} onClick={acciones.congelar}>Congelar respuesta</Button>
+					<Button disabled={ocupado} onClick={acciones.congelar} aria-describedby="terminar-fija">Terminar y comparar</Button>
 					<Button variant="outline" disabled={ocupado || a.cueLevel >= PISTAS} onClick={acciones.pista}>Necesito una pista</Button>
 					<Button variant="ghost" disabled={ocupado || fuenteAbierta} onClick={acciones.verReferencia}>Me rindo: ver la referencia</Button>
 					<Button variant="ghost" disabled={ocupado} onClick={acciones.abandonar}>Abandonar</Button>
+					{guardado && (
+						<span role="status" data-guardado={guardado.tipo} className={cn("ml-auto text-xs", guardado.tipo === "error" ? "text-destructive" : "text-muted-foreground")}>
+							{textoGuardadoRespuesta(guardado)}
+						</span>
+					)}
 				</div>
+				<p id="terminar-fija" className="mt-2 text-xs text-muted-foreground">Al terminar, la respuesta queda fija: ya no podrás cambiarla.</p>
 				{pie}
 			</Marco>
 		);
@@ -379,9 +449,9 @@ export function PantallaIntento({ id, initialConfigured, volver: pedido }: { id:
 	const [ocupado, setOcupado] = useState(false);
 	const [mensaje, setMensaje] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
-	/** La última respuesta guardada en el plugin, para no guardar dos veces lo mismo. */
-	const guardada = useRef("");
-	const espera = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+	const abierto = intento?.attempt.status === "open";
+	const respuesta = useGuardarRespuesta(id, abierto);
+	const { guardar, cargar } = respuesta;
 
 	useEffect(() => {
 		let vivo = true;
@@ -389,26 +459,14 @@ export function PantallaIntento({ id, initialConfigured, volver: pedido }: { id:
 			if (!vivo) return;
 			setIntento(leido);
 			setBorrador(leido.attempt.answer);
-			guardada.current = leido.attempt.answer;
+			cargar(leido.attempt.answer);
 		}, (e: unknown) => { if (vivo) setError(e instanceof Error ? e.message : "No se pudo leer el intento."); });
 		return () => { vivo = false; };
-	}, [id]);
-
-	const abierto = intento?.attempt.status === "open";
-	const borradorActual = useRef(borrador);
-	borradorActual.current = borrador;
-	const guardar = useCallback(async () => {
-		clearTimeout(espera.current);
-		const texto = borradorActual.current;
-		if (!abierto || texto === guardada.current) return;
-		await llamarEstudio("guardar-respuesta", { attemptId: id, answer: texto });
-		guardada.current = texto;
-	}, [abierto, id]);
-	useEffect(() => () => clearTimeout(espera.current), []);
+	}, [id, cargar]);
 
 	const unidad = destino ?? (intento ? `/unidad/${intento.attempt.unitId}` : "/");
 	const salir = useCallback(() => {
-		void guardar().catch(() => {}).finally(() => router.push(unidad));
+		void salirGuardando(guardar, (texto) => window.confirm(texto), () => router.push(unidad));
 	}, [guardar, router, unidad]);
 	useEscape(salir, ocupado || conversacion.abriendo);
 
@@ -448,6 +506,7 @@ export function PantallaIntento({ id, initialConfigured, volver: pedido }: { id:
 			<PantallaIntentoEstudio
 				intento={intento}
 				borrador={borrador}
+				guardado={respuesta.guardado}
 				aviso={aviso}
 				ocupado={ocupado || conversacion.abriendo}
 				mensaje={mensaje}
@@ -456,10 +515,9 @@ export function PantallaIntento({ id, initialConfigured, volver: pedido }: { id:
 				acciones={{
 					escribir: (texto) => {
 						setBorrador(texto);
-						clearTimeout(espera.current);
-						espera.current = setTimeout(() => void guardar().catch(() => {}), 1500);
+						respuesta.escribir(texto);
 					},
-					congelar: () => void operar("congelar", {}, "Respuesta congelada. El modelo está preparando el contraste…"),
+					congelar: () => void operar("congelar", {}, "Respuesta terminada; ya no se puede cambiar. El modelo está preparando el contraste…"),
 					pista: () => void operar("pista"),
 					verReferencia: () => {
 						if (window.confirm("Si ves la referencia ahora, el intento contará como no recuperado. ¿Continuar?")) {

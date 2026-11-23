@@ -163,7 +163,7 @@ export function LectorEstudio({ pagina: vista, detalle, unidad, capturas, ocupad
 										type="button"
 										aria-current={s.actual ? "true" : undefined}
 										onClick={() => acciones.ir(s.primera)}
-										className={cn("flex w-full gap-2 rounded px-1.5 py-0.5 text-left hover:bg-accent", s.actual ? "text-foreground" : "text-muted-foreground")}
+										className={cn("anillo-foco flex w-full gap-2 rounded px-1.5 py-0.5 text-left hover:bg-accent", s.actual ? "text-foreground" : "text-muted-foreground")}
 									>
 										<span className="flex-1">{s.rotulo}</span><span className="tabular-nums">{s.primera}</span>
 									</button>

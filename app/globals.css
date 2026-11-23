@@ -27,6 +27,13 @@
 	outline: none;
 }
 
+/* HarnessAcademico (revisión de UI, 23-nov-2026): el anillo de foco común de los controles hechos a mano (botones,
+   enlaces y <summary> que no son el Button de shadcn). La ley de arriba sigue: nunca el contorno del navegador; el
+   anillo es el del token --ring del tema activo, como el de los botones de shadcn, y solo con :focus-visible. */
+@utility anillo-foco {
+	@apply outline-none focus-visible:ring-2 focus-visible:ring-ring;
+}
+
 /* Palette (owner's hexes): main #141414, raised #1C1C1C, edges #434343.
    Mono chrome = JetBrains Mono; prose = Source Sans 3; titles = CMU Serif.
    Dark is the default variant (:root) and the `.dark` class on <html>.
