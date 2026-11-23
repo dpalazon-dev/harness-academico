@@ -6,6 +6,9 @@ import * as path from "node:path";
 import { createHash } from "node:crypto";
 import { readCoreCatalog } from "./build-core-plugins.mjs";
 
+// Must match `enabledByDefault` in src/server/plugins.ts (HarnessAcademico).
+const ENABLED_BY_DEFAULT = ["estudio"];
+
 function hashes(root) {
 	const result = {};
 	function walk(directory) {
@@ -27,11 +30,12 @@ export async function verifyCorePlugins({ root, standalone, dataDirectory, url }
 	const initial = await request("/api/plugins");
 	assert.deepEqual(initial.plugins.filter(p => p.origin === "core").map(p => p.id).sort(), [...ids].sort());
 	for (const id of ids) {
-		const info = initial.plugins.find(p => p.id === id);
-		assert.equal(info.enabled, false, id); assert.equal(info.status, "disabled", JSON.stringify(info));
+		const info = initial.plugins.find(p => p.id === id), byDefault = ENABLED_BY_DEFAULT.includes(id);
+		assert.equal(info.enabled, byDefault, id); assert.equal(info.status, byDefault ? "active" : "disabled", JSON.stringify(info));
 		assert.equal(fs.existsSync(path.join(dataDirectory, "plugins", id)), false, "core code must not be installed into user data");
+		if (!byDefault) assert.equal(fs.existsSync(path.join(dataDirectory, "core-plugin-data", id)), false, "disabled fresh discovery creates no core records");
 	}
-	assert.equal(fs.existsSync(path.join(dataDirectory, "core-plugin-data")), false, "disabled fresh discovery creates no core records");
+	assert.equal(fs.existsSync(path.join(dataDirectory, "plugins-state.json")), false, "a default is not written as a user choice");
 	const shadow = path.join(dataDirectory, "plugins", ids[0]);
 	fs.mkdirSync(path.join(shadow, "dist"), { recursive: true });
 	fs.writeFileSync(path.join(shadow, "dist", "manifest.json"), "{invalid shadow must never substitute for core}");
@@ -59,5 +63,5 @@ export async function verifyCorePlugins({ root, standalone, dataDirectory, url }
 		for (const id of ids) await request(`/api/plugins/${id}`, { enabled: false });
 		fs.rmSync(shadow, { recursive: true }); await request("/api/plugins", { action: "refresh" });
 	}
-	console.log("[smoke-core-plugins] four disabled defaults → direct core activation/assets/private-file refusal → separate data → reserved-ID collision → cooperative disable; code byte-identical");
+	console.log("[smoke-core-plugins] Estudio active and the rest disabled by default → direct core activation/assets/private-file refusal → separate data → reserved-ID collision → cooperative disable; code byte-identical");
 }
