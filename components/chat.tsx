@@ -105,6 +105,7 @@ import { useViewReader } from "./session-view-readers";
 import type { JobRecord, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
 import type { LhViewMessage } from "@/src/core";
 import { PhaseChip, PhaseDivider } from "@/components/phase-divider";
+import { ACCIONES_FUTURAS, agenteDelMensaje, charlaEnCurso, MENSAJE_EMPEZAR } from "@/components/estudio/presentacion";
 import {
 	CompactionCutDivider,
 	CompactionMomentDivider,
@@ -1142,6 +1143,8 @@ export function Chat({
 					(b, contentIndex) => b.type === "toolCall" && !!practiceProblemForCall(nativeMessages, { messageId: m.id, contentIndex, toolCallId: b.id, toolName: b.name }),
 				),
 		);
+	/* La charla antes de empezar (23-nov-2026): el botón solo cuando nada está en marcha ni pendiente. */
+	const empezarListo = !busy && !pending && !pluginOwnsDock && !compacting && charlaEnCurso(messages, kind);
 	const sendNext = useCallback(() => {
 		if (!nextReady || submissionRunner.occupied) return;
 		if (pendingTextInput) { void prepareText(); return; }
@@ -1766,7 +1769,7 @@ export function Chat({
 							{messages.length === 0 && !busy && (
 								<ConversationEmptyState
 									title="Conversación nueva"
-									description="El tutor empezará sondeando lo que ya sabes."
+									description="Charla con el tutor. Cuando quieras, pulsa «Empezar» o pídele que empiece."
 								/>
 							)}
 
@@ -1891,6 +1894,12 @@ export function Chat({
 									) : (
 									<Message from="assistant" className="max-w-full">
 									<MessageContent className="w-full">
+											{/* HarnessAcademico: el agente que atiende esta respuesta, en el registro de «Tú». */}
+											<div>
+												<span data-testid="agent-label" className="inline-block rounded-full border border-border/80 px-2.5 py-0.5 font-ui text-xs font-medium uppercase tracking-wide text-muted-foreground">
+													{agenteDelMensaje(phases, mi, kind)}
+												</span>
+											</div>
 											{m.parts.map((part, pi) => {
 												if (part.pluginProblem) return <ProblemCard key={pi} part={{ ...part, state: part.state ?? "input-available", toolCallId: part.toolCallId ?? "" }} />;
 												if (part.pluginQuestion) return <PluginQuestionPart key={pi} part={part} chatId={chatId} />;
@@ -2017,6 +2026,19 @@ export function Chat({
 							)}
 							{(status === "submitted" || turnInFlight) && (
 								<PendingTurnIndicator evaluating={evaluating} />
+							)}
+							{/* HarnessAcademico: la charla de una conversación libre termina con «Empezar» (o pidiéndolo con palabras). */}
+							{empezarListo && (
+								<div className="flex flex-wrap justify-start gap-2" data-testid="acciones-charla">
+									<Button variant="outline" size="xs" data-testid="empezar" onClick={() => { void prepareText(MENSAJE_EMPEZAR); }}>
+										{MENSAJE_EMPEZAR}
+									</Button>
+									{ACCIONES_FUTURAS.map((accion) => (
+										<Button key={accion} variant="outline" size="xs" disabled title="Llegará con el rediseño de planes">
+											{accion}
+										</Button>
+									))}
+								</div>
 							)}
 							{openingError && <p role="alert" className="text-sm text-destructive">{OPENING_PROMPT_FAILURE}</p>}
 							{error && (

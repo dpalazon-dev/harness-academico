@@ -142,11 +142,34 @@ test('the prober opens a new conversation by asking once what he wants from it a
   // What the study context or his opening message already answers is not asked; a unit does not answer it.
   assert.match(framing, /retrieval attempt[\s\S]*passage[^\n]*skip the framing/);
   assert.match(framing, /from a unit[^\n]*ask the framing/);
-  assert.match(framing, /opening message already states what he wants[^\n]*skip/);
+  assert.match(framing, /request to start already states what he wants[^\n]*skip/);
   assert.match(framing, /specific doubt[^\n]*no time question/);
   // His answer goes where the teacher reads it: probe_done's summary.
   assert.match(framing, /probe_done[^\n]*summary/);
   assert.doesNotMatch(f.instructions[2]!.text, /Framing the conversation/);
+});
+
+// Presentación del tutor (23-nov-2026, punto 3): a free conversation opens as brief chat; «Empezar» or his own words start it.
+test('a free conversation chats briefly until he asks to start, then frames it', async t => {
+  const f = await fixture(t);
+  const probe = f.instructions[1]!.text;
+  const chat = /## Chat before starting[\s\S]*?(?=\n## |$)/.exec(probe)?.[0] ?? '';
+  assert.match(chat, /without a unit, a passage of the reader or a retrieval attempt/);
+  assert.match(chat, /briefly/);
+  assert.match(chat, /ask him no questions and call no question tool \(ask_user_question, quiz, explain\)/);
+  assert.match(chat, /«Empezar»[^\n]*in his own words/);
+  assert.match(chat, /opened with a context skips this chat/);
+  assert.ok(probe.indexOf('## Chat before starting') < probe.indexOf('## Framing the conversation'));
+  assert.doesNotMatch(f.instructions[2]!.text, /Chat before starting/);
+});
+
+// Punto 4: Ajustes › Estudio shows what the plugin gives the tutor; the catalog follows the registrations.
+test('aporta lists every instruction it registers and a Spanish line for every tool it gives', async t => {
+  const f = await fixture(t);
+  const aporta = await f.call('aporta') as { instrucciones: { agentes: string[] }[]; herramientas: { nombre: string; descripcion: string }[] };
+  assert.deepEqual(aporta.instrucciones.map(i => i.agentes), f.instructions.map(i => i.agents));
+  assert.deepEqual(aporta.herramientas.map(h => h.nombre), f.tools().map(tool => tool.name));
+  for (const h of aporta.herramientas) assert.doesNotMatch(h.descripcion, /\b(the|learner)\b/i, h.nombre);
 });
 
 test('the briefing is composed on a conversation\'s first turn and stays the same for the rest of it', async t => {
