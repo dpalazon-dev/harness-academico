@@ -49,62 +49,27 @@ npx electron-builder --win --x64 --publish never    # Windows
 npx electron-builder --linux --x64 --publish never # Linux
 ```
 
-## CI and release modes
+## CI and release modes (HarnessAcademico)
 
-[CI](../.github/workflows/ci.yml) runs typecheck/tests/lint on Ubuntu, plus standalone/native checks on macOS, Windows, and Linux. Its `macos-15` job does not compile the release icon.
+HarnessAcademico releases only the unsigned Windows x64 NSIS installer, with no update feed. The macOS and Linux notes above come from LearnHarness and are untested in this fork.
+
+[CI](../.github/workflows/ci.yml) runs typecheck/tests/lint on Ubuntu, plus standalone/native checks on macOS, Windows, and Linux.
 
 [Desktop release](../.github/workflows/release.yml) has two modes:
 
-- **Manual dispatch:** unsigned rehearsal installers retained as workflow artifacts for seven days. No signing secrets, release creation, or publication. macOS notarization is skipped; these are not production installers.
-- **Matching `v<package.json version>` tag:** gates, one shared draft-preparation job, three OS packaging/upload jobs, then read-only draft verification. Published/ambiguous existing releases fail preparation; same-ref runs serialize rather than cancelling uploads. macOS must sign/notarize. **The workflow never publishes the draft.**
+- **Manual dispatch:** builds the installer and its `.sha256` as a workflow artifact kept for seven days. No release is created.
+- **Matching `v<package.json version>` tag:** typecheck, tests, lint and the tag/version check; one job prepares the tag's draft (refusing a published or ambiguous match); then `windows-2025` runs the native renderer tests and `npm run desktop:dist:win`, computes the SHA-256 and uploads installer and checksum to the draft. Same-ref runs serialize rather than cancelling uploads. **The workflow never publishes the draft.**
 
 ### Draft verification
 
-[`scripts/verify-release.ts`](../scripts/verify-release.ts) runs after all packaging jobs. It requires one draft matched by `v<version>` or bare `<version>`, refusing zero/two matches or a published match. Bare-version matches warn because later runs could split assets across tags.
-
-The draft must contain **exactly 11 uploaded, nonempty assets**:
-
-| Assets | Purpose |
-| --- | --- |
-| `LearnHarness-<v>-arm64.dmg` + `.blockmap` | macOS installer |
-| `LearnHarness-<v>-arm64-mac.zip` + `.blockmap` | macOS updater |
-| `LearnHarness-<v>-x64-setup.exe` + `.blockmap` | Windows installer/updater |
-| `LearnHarness-<v>-x86_64.AppImage` | Linux AppImage |
-| `LearnHarness-<v>-amd64.deb` | Debian package |
-| `latest-mac.yml`, `latest.yml`, `latest-linux.yml` | Updater feeds |
-
-Feed versions, exact referenced asset sets, bare filenames, sizes, and legacy path/hash fields must agree; macOS's ZIP must be first. Missing/stale extra assets, path traversal/URLs, or builder naming drift fail validation. The validator does not download/hash every installer; it checks draft metadata and downloaded feeds.
-
-The verification job needs `contents: write` to list private drafts but performs GET-only operations. Its token is exposed only to release listing/feed download, not dependency installation or offline validation.
-
-### Signing secrets
-
-Repository Actions secrets:
-
-| Secret | Purpose |
-| --- | --- |
-| `MAC_CSC_LINK` | Base64 Developer ID Application `.p12`, including private key |
-| `MAC_CSC_KEY_PASSWORD` | `.p12` password |
-| `APPLE_ID` | Notarization Apple ID |
-| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password |
-| `APPLE_TEAM_ID` | Apple developer team ID |
-
-The workflow maps the certificate to `CSC_LINK`/`CSC_KEY_PASSWORD`; signing credentials reach packaging only, not the Next build. The built-in `GITHUB_TOKEN` supplies scoped `GH_TOKEN`; no separate release token is needed. Never commit keys, certificates, passwords, or environment-secret files.
+The last step of the packaging job is read-only. It fails unless the release is still a draft, holds exactly `HarnessAcademico-<version>-x64-setup.exe` and its `.sha256`, and the checksum matches the downloaded installer. Only the upload and this step receive the token. The tests in [`tests/release-workflow.test.ts`](../tests/release-workflow.test.ts) fail if the workflow loses any gate, the checksum upload or this verification.
 
 ## Release runbook
 
-1. Agree scope/version and complete relevant gates and human functional acceptance. Use manual dispatch if rehearsal installers are useful; unsigned rehearsal does not prove macOS signing.
-2. Update package/lockfile versions, check the intended source on main, and push the authorized matching tag. Verify signing secrets before production macOS packaging.
-3. Wait for **all OS jobs and Verify draft release**. Inspect the single draft's tag, notes, 11 assets, and feeds. Diagnose failures before retrying. Re-upload replaces same-named assets; stale extras still fail. Deleting assets/releases is a mutation, not verification.
-4. If editing draft metadata, include canonical **`tag_name: "v<version>"` in every metadata PATCH**, even for title/body changes; omission has reset tags before. Re-read tag, draft status, and assets afterward. A tag correction does not authorize deleting/recreating a release.
-5. The owner checks the packaged build as needed and explicitly publishes the complete draft. Confirm public installers/feeds and website links; use a prior installed version for real update-path checks.
+1. Agree scope and version, and complete the relevant checks and functional acceptance. Use manual dispatch for a rehearsal installer.
+2. Update the version in `package.json` and `package-lock.json`, commit, and push a matching `v<version>` tag.
+3. Wait for the release run. Inspect the draft: tag, notes (copy the version's section from [CHANGELOG.md](../CHANGELOG.md) and paste the SHA-256), and the two assets. Diagnose failures before retrying; re-upload replaces same-named assets.
+4. Install the draft's installer on a clean Windows profile and check first run.
+5. Publish the draft by hand.
 
-Shell, native-module, packaging/updater, or Electron changes warrant focused platform checks: install/open, window controls/dragging/zoom, setup/resume, PDF/SVG, and demo helper. Fixture gates do not prove account functionality or lesson quality. Do not repeat accepted feature testing without a concrete risk.
-
-## Updates and website notification
-
-Packaged apps check at startup and every 24 hours by default, download automatically, and install on quit or Restart. **Settings → General** provides release notes, manual checks, status, and Automatic updates. Disabling automatic checks does not cancel downloads/staged installs; manual checks still download updates. Dev builds disable the updater. Errors go to `userData/logs/main.log`; `LH_UPDATE_FEED` is a test-only generic-feed override.
-
-Sources: [`electron/main.cjs`](../electron/main.cjs), [`preload.cjs`](../electron/preload.cjs), [`update-settings.tsx`](../components/settings/update-settings.tsx).
-
-After stable publication, [`notify-website.yml`](../.github/workflows/notify-website.yml) dispatches the tag to the website using `WEBSITE_DISPATCH_TOKEN`. Drafts/prereleases do not trigger it. HTTP 204 means the website update was queued, not deployed or publicly verified.
+There is no automatic update: users install the new release over the old one.
