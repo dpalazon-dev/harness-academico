@@ -11,8 +11,8 @@ describe("plugin package contract", () => {
 	});
 	it("refuses incompatible API/app versions before code executes", () => {
 		assert.throws(() => parsePluginManifest({ ...manifest, apiVersion: 2 }, "example-plugin", "0.3.7"), /apiVersion/);
-		assert.throws(() => parsePluginManifest(manifest, "example-plugin", "0.3.6"), /Requires/);
-		assert.throws(() => parsePluginManifest({ ...manifest, minAppVersion: "0.4.0" }, "example-plugin", "0.3.99"), /Requires/);
+		assert.throws(() => parsePluginManifest(manifest, "example-plugin", "0.3.6"), /Requiere la API de plugins/);
+		assert.throws(() => parsePluginManifest({ ...manifest, minAppVersion: "0.4.0" }, "example-plugin", "0.3.99"), /Requiere la API de plugins/);
 		assert.doesNotThrow(() => parsePluginManifest(manifest, "example-plugin", "0.4.0"));
 		assert.doesNotThrow(() => parsePluginManifest(manifest, "example-plugin", "1.0.0"));
 	});
