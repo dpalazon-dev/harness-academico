@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono, Source_Sans_3 } from "next/font/google";
+import { Atkinson_Hyperlegible_Next, JetBrains_Mono, Source_Sans_3 } from "next/font/google";
 import { connection } from "next/server";
 import "katex/dist/katex.min.css";
 import "./globals.css";
@@ -11,8 +11,11 @@ import UpdateBanner from "@/components/update-banner";
 import { PluginsProvider } from "@/components/plugins";
 import { readThemeBoot } from "@/src/server";
 
-// Chrome = JetBrains Mono, teaching prose = Source Sans 3, titles = CMU
-// Serif (the bundled lh-cmu @font-face in globals.css — no CDN).
+// HarnessAcademico (guía de diseño, decisión de David del 23-nov-2026):
+// interfaz y prosa = Atkinson Hyperlegible Next; JetBrains Mono solo para
+// código; Source Sans 3 queda como fuente elegible. Titles = CMU Serif (the
+// bundled lh-cmu @font-face in globals.css — no CDN).
+const atkinson = Atkinson_Hyperlegible_Next({ subsets: ["latin"], variable: "--font-atkinson" });
 const ui = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains" });
 const prose = Source_Sans_3({ subsets: ["latin"], variable: "--font-sans3" });
 
@@ -32,7 +35,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 	return (
 		<html
 			lang="es"
-			className={`${theme.mode} ${ui.variable} ${prose.variable}`}
+			className={`${theme.mode} ${atkinson.variable} ${ui.variable} ${prose.variable}`}
 			style={vars as React.CSSProperties}
 			suppressHydrationWarning
 		>

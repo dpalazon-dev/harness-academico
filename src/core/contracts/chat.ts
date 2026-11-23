@@ -47,10 +47,31 @@ export interface ChatRecord {
 	 * shares one thread. Every main request appends new raw exchanges across
 	 * all threads; already-recorded teacher history is never rewritten. */
 	sideChats?: SideChatThread[];
+	/** HarnessAcademico (harness conversacional): fijada arriba en la barra. */
+	pinned?: boolean;
+	/** HarnessAcademico: archivada, fuera de la lista salvo en «Archivadas». */
+	archived?: boolean;
+	/** HarnessAcademico: la conversación es una rama de otra, bifurcada desde una respuesta del tutor. */
+	forkedFrom?: ChatFork;
+	/** HarnessAcademico: mensajes fijados para volver a ellos (ids de la vista), en orden de fijado. */
+	pinnedMessages?: string[];
 	/** Schema version. Absence denotes version 1; writes stamp the current
 	 * supported version. Reads refuse records stamped newer than this build
 	 * so a downgraded app cannot rewrite an unsupported record. */
 	version?: number;
+}
+
+/** HarnessAcademico: de dónde salió una rama. El título se guarda para el aviso aunque el original cambie o se borre. */
+export interface ChatFork {
+	chatId: string;
+	messageId: string;
+	title: string;
+}
+
+/** HarnessAcademico: marcas de la lista que no son actividad de la conversación. */
+export interface ChatFlags {
+	pinned?: boolean;
+	archived?: boolean;
 }
 
 /** The chat record format this build writes and understands. */
@@ -310,6 +331,10 @@ export interface ChatSummary {
 	pendingProblem: boolean;
 	/** Saved per-session model/thinking choices included in the list payload. */
 	settings?: ChatSettings;
+	/** HarnessAcademico: marcas de la lista y origen de una rama (ver ChatRecord). */
+	pinned?: boolean;
+	archived?: boolean;
+	forkedFrom?: ChatFork;
 }
 
 /** Session-list row combining a saved summary with live server state.

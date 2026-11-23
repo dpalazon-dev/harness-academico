@@ -23,7 +23,7 @@
  * it). In a plain dev browser the API is absent → a small curated list
  * + a footer that says exactly that — never a fabricated system list.
  * The custom-family input inside the menu is the manual escape path.
- * Empty/unset keeps meaning Source Sans 3.
+ * Empty/unset keeps meaning the factory family (Atkinson Hyperlegible Next in HarnessAcademico).
  *
  * Overrides live in two homes by design: `background` and
  * `mdRendering.boldColor/italicColor` keep their pre-theme keys (existing
@@ -34,6 +34,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
 	EXTRACTION_CHUNK_TOKENS_FLOOR,
+	FACTORY_THEME_ID,
 	resolveSettings,
 	THEME_COLOR_KEYS,
 	type AppearanceSettings,
@@ -50,7 +51,7 @@ import { CommitInput, SettingsMenuTrigger, SettingsRow, Toggle } from "./control
 
 /** The factory reading family — the DEFAULT row's identity (unset =
  *  this). Exported for tests. */
-export const DEFAULT_READING_FONT = "Source Sans 3";
+export const DEFAULT_READING_FONT = "Atkinson Hyperlegible Next";
 
 /** The dev-browser fallback list (queryLocalFonts is absent there):
  *  the app's own knowns plus a handful of ubiquitous macOS families,
@@ -84,7 +85,7 @@ function localFontsApi(): LocalFontsApi | null {
 }
 
 /** Compose the reading-font pick: null (or blank) = the factory
- *  Source Sans 3; otherwise the family verbatim (trimmed — the
+ *  the factory family; otherwise the family verbatim (trimmed — the
  *  sanitizer trims again server-side). Pure — exported for tests. */
 export function composeFontFamily(
 	appearance: AppearanceSettings | undefined,
@@ -398,7 +399,7 @@ export function AppearanceSection({
 					void refreshThemes();
 					// The server already fell back to Default; the write keeps the
 					// dialog's record mirror and the live vars in step with it.
-					if (removed.id === activeTheme.id) onSectionChange({ ...appearance, theme: "default" });
+					if (removed.id === activeTheme.id) onSectionChange({ ...appearance, theme: FACTORY_THEME_ID });
 				}}
 			/>
 			<div data-testid="group-colors" className="mt-5 flex flex-col gap-2">

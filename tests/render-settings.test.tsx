@@ -397,9 +397,10 @@ describe("AppearanceSection (thin SSR)", () => {
 		assert.ok(!html.includes("theme-remove-"), "presets cannot be removed");
 	});
 
-	it("absent theme = the Default card pressed", () => {
+	// HarnessAcademico: el tema de fábrica es Papel.
+	it("absent theme = the Papel card pressed", () => {
 		const html = renderAppearance(undefined);
-		assert.ok(tagOf(html, "theme-card-default").includes('aria-pressed="true"'));
+		assert.ok(tagOf(html, "theme-card-papel").includes('aria-pressed="true"'));
 	});
 
 	it("an imported theme gets a custom card with a remove button", () => {
@@ -435,7 +436,7 @@ describe("AppearanceSection (thin SSR)", () => {
 		assert.ok(html.includes('data-testid="font-trigger"'));
 		assert.ok(html.includes('data-testid="row-prose-size"'));
 		assert.ok(html.includes('data-testid="row-heading-weight"'));
-		assert.ok(html.includes("16px"));
+		assert.ok(html.includes("17px"));
 		assert.ok(!html.includes('data-testid="row-mode"'), "the mode row is gone — the theme declares it");
 	});
 });

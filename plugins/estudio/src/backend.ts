@@ -244,6 +244,13 @@ export async function activate(ctx: PluginBackendContext): Promise<() => Promise
     ctx.handle('kb-descartar', writeAsync(kb.discard)),
     // La creación de conversaciones del núcleo la llama con el id de la conversación nueva (ADR 0003).
     ctx.handle('contexto-conversacion', write(contexto)),
+    // Harness conversacional: la ruta de bifurcar del núcleo la llama para que la rama herede el espacio y la unidad del original.
+    ctx.handle('rama-conversacion', write(input => {
+      const r = fields(input, ['chatId', 'origenId'], 'input');
+      const original = study.getConversation(id(r.origenId, 'input.origenId'));
+      sessions.register(id(r.chatId, 'input.chatId'), { areaId: original?.areaId ?? null, unitId: original?.unitId ?? null, origen: original?.origen ?? (original?.unitId ? 'unidad' : 'libre') });
+      return { ok: true };
+    })),
     ctx.handle('conversaciones', () => { assertActive(); return filasConversaciones(sessions.list(filter()), study, () => ops.plans(null)); }),
     ctx.handle('resumir-conversacion', writeAsync(input => sessions.summarizeNow(id(fields(input, ['chatId'], 'input').chatId, 'input.chatId')))),
     // Ajustes › Estudio: lo que el plugin aporta al tutor, en español (aporta.ts).

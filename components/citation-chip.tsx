@@ -31,7 +31,7 @@ export interface CitationChipProps {
 export function CitationQuoteCard({ citation, onOpenSource }: { citation: TutorCitation; onOpenSource: () => void }) {
 	return (
 		<div className="flex flex-col gap-2">
-			<blockquote className="max-h-64 overflow-y-auto whitespace-pre-wrap border-l-2 border-muted-foreground/30 pl-2 text-sm">{citation.text}</blockquote>
+			<blockquote className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-md bg-muted px-3 py-2 text-sm">{citation.text}</blockquote>
 			{citation.comment ? <p className="whitespace-pre-wrap text-sm">{citation.comment}</p> : null}
 			<button type="button" className="inline-flex items-center gap-1 self-start text-xs font-medium text-muted-foreground hover:text-foreground" onClick={onOpenSource}>
 				<ArrowUpRight aria-hidden="true" className="size-3.5" />Ir al texto original

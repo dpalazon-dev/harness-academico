@@ -11,6 +11,7 @@ import { describe, it } from "node:test";
 import {
 	BUILTIN_THEMES,
 	DEFAULT_THEME,
+	FACTORY_THEME,
 	effectiveColors,
 	exportThemeFile,
 	parseThemeFile,
@@ -69,13 +70,16 @@ describe("presets", () => {
 		}
 		assert.deepEqual([...ids], [
 			"default", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha",
-			"rose-pine", "rose-pine-dawn", "gruvbox-dark", "ivory", "pastel", "nvchad-onedark",
+			"rose-pine", "rose-pine-dawn", "gruvbox-dark", "ivory", "pastel", "papel", "nvchad-onedark",
 		]);
 	});
 
-	it("an unknown or removed id resolves to Default", () => {
-		assert.equal(resolveTheme(undefined), DEFAULT_THEME);
-		assert.equal(resolveTheme("gone"), DEFAULT_THEME);
+	// HarnessAcademico: el tema de fábrica es «Papel»; Default sigue siendo la paleta oscura original.
+	it("an unknown or removed id resolves to the factory theme (Papel)", () => {
+		assert.equal(resolveTheme(undefined), FACTORY_THEME);
+		assert.equal(resolveTheme("gone"), FACTORY_THEME);
+		assert.equal(FACTORY_THEME.id, "papel");
+		assert.equal(DEFAULT_THEME.mode, "dark");
 		const custom: Theme = { ...validFile, mode: "dark", id: "my-ayu", builtin: false };
 		assert.equal(resolveTheme("my-ayu", [custom]), custom);
 	});

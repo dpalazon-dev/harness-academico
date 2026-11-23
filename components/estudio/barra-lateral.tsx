@@ -18,7 +18,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3Icon, CheckIcon, ChevronRightIcon, ChevronsUpDownIcon, GraduationCapIcon, HomeIcon, InboxIcon, LibraryIcon, MessageSquareIcon, MoreHorizontalIcon, NotebookPenIcon, PlusIcon, QuoteIcon, SearchIcon, SettingsIcon, TargetIcon } from "lucide-react";
+import { BarChart3Icon, CheckIcon, ChevronRightIcon, ChevronsUpDownIcon, GraduationCapIcon, HomeIcon, InboxIcon, LibraryIcon, Loader2Icon, MessageSquareIcon, MoreHorizontalIcon, NotebookPenIcon, PlusIcon, QuoteIcon, SearchIcon, SettingsIcon, TargetIcon } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd";
 import { bindingForAction, formatBinding, kbdEventForAction } from "@/src/core";
 import {
@@ -50,6 +50,7 @@ import { RUTA_BIBLIOTECA } from "./documentos";
 import { RUTA_CUADERNOS } from "./cuadernos";
 import { recordarPlegadas, seccionesPlegadas, type IdSeccion } from "./secciones";
 import { AsaAnchoBarra, ProveedorAncho, useEstadoAncho } from "./asa-barra";
+import { anidarRamas, ETIQUETA_ESTADO, LINEA_ACTIVA, repartir, SIN_META, useMetaConversaciones, type MetaConversacion } from "./estado-conversaciones";
 
 export interface Espacio {
 	id: string;
@@ -104,6 +105,10 @@ export interface AccionesBarraLateral {
 	abrirPorDecidir(): void;
 	/** Cambia la agrupación o un filtro de las conversaciones. */
 	cambiarFiltros(filtros: FiltrosConversaciones): void;
+	/** Harness conversacional: fija la conversación arriba o la quita de Fijadas. */
+	fijarConversacion?(id: string, fijada: boolean): void;
+	/** Harness conversacional: la manda a Archivadas o la devuelve a la lista. */
+	archivarConversacion?(id: string, archivada: boolean): void;
 }
 
 export const RUTA_PROGRESO = "/progreso";
@@ -115,7 +120,8 @@ type Edicion = { modo: "crear" } | { modo: "renombrar"; id: string; nombre: stri
 
 export function BarraLateralEstudio({
 	espacios, conversaciones, planes, ruta, ahora, error, atajoPaleta = "Ctrl+K", plegadas = [], porDecidir = 0, filtros = FILTROS_INICIALES, acciones,
-}: DatosBarraLateral & { acciones: AccionesBarraLateral }) {
+	meta = metaVacia,
+}: DatosBarraLateral & { acciones: AccionesBarraLateral; /** Estado en vivo y marcas de cada conversación (núcleo). */ meta?: (id: string) => MetaConversacion }) {
 	const [edicion, setEdicion] = useState<Edicion>(null);
 	/** Al elegir «Nuevo» o «Renombrar», el menú no devuelve el foco a su botón: va al campo. */
 	const editarAlCerrar = useRef(false);
@@ -129,12 +135,85 @@ export function BarraLateralEstudio({
 	const activo = visibles.find(a => a.id === espacios?.activeAreaId) ?? null;
 	const nombre = espacios === null ? "Estudio" : activo?.name ?? "Todos los espacios";
 	const todos = espacios !== null && activo === null;
-	const grupos = conversaciones ? agruparConversaciones(conversaciones, filtros, { ahora, planes, todos }) : [];
 	/** Los planes plegados en esta barra; los demás se ven desplegados. */
 	const [plegados, setPlegados] = useState<string[]>([]);
 	const alternarPlan = (id: string) => setPlegados(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
 	/** El campo del objetivo de un plan nuevo, abierto con el «+» de la sección. */
 	const [creandoPlan, setCreandoPlan] = useState(false);
+	// Harness conversacional (diseño 1A): búsqueda, Fijadas arriba y Archivadas aparte; el resto, en los grupos de siempre.
+	const [busqueda, setBusqueda] = useState("");
+	const [verArchivadas, setVerArchivadas] = useState(false);
+	const reparto = conversaciones ? repartir(conversaciones, meta, busqueda) : null;
+	const grupos = reparto ? agruparConversaciones(reparto.resto, filtros, { ahora, planes, todos }) : [];
+	/** Una fila de conversación: en Fijadas, en su grupo o en Archivadas; `nivel` sangra las ramas bajo su origen. */
+	const fila = (c: ConversacionLista, nivel = 0, activa = false) => (
+									<SidebarMenuItem key={c.id} style={nivel > 0 ? { paddingLeft: `${nivel * 12}px` } : undefined} data-nivel-rama={nivel || undefined}>
+										{renombrando === c.id ? (
+											<RenameRow
+												chat={comoFila(c)}
+												onCommit={(titulo) => {
+													setRenombrando(null);
+													if (titulo.trim() && titulo.trim() !== c.title) acciones.renombrarConversacion(c.id, titulo);
+												}}
+												onCancel={() => setRenombrando(null)}
+											/>
+										) : <>
+											<SidebarMenuButton
+												isActive={ruta === `/chat/${c.id}`}
+												onClick={() => acciones.navegar(`/chat/${c.id}`)}
+												onContextMenu={(e) => { e.preventDefault(); setMenu(c.id); }}
+												onKeyDown={(e) => {
+													// F2 renombra la fila enfocada, no la conversación abierta en la cabecera.
+													if (e.key === "F2" && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+														e.preventDefault();
+														setRenombrando(c.id);
+													}
+													// La tecla de menú y Mayús+F10 abren el menú de la fila, como el clic derecho.
+													if (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey)) {
+														e.preventDefault();
+														setMenu(c.id);
+													}
+												}}
+												data-testid="conversacion"
+												data-conversacion={c.id}
+												data-actividad={c.origen}
+												title={c.unidad ? `${ETIQUETA_ACTIVIDAD[c.origen]} · ${c.unidad.titulo}` : ETIQUETA_ACTIVIDAD[c.origen]}
+												className={cn("text-muted-foreground data-[active=true]:text-sidebar-accent-foreground", activa && "h-auto py-1.5")}
+											>
+												<IconoEstado estado={meta(c.id).estado} origen={c.origen} />
+												<span className="grid min-w-0"><span className="truncate"><span className="sr-only">{ETIQUETA_ACTIVIDAD[c.origen]}{meta(c.id).estado !== "terminada" ? ` (${ETIQUETA_ESTADO[meta(c.id).estado]})` : ""}: </span>{c.title}</span>{activa && meta(c.id).estado !== "terminada" && <span aria-hidden className="truncate text-xs text-muted-foreground">{LINEA_ACTIVA[meta(c.id).estado as Exclude<MetaConversacion["estado"], "terminada">]}</span>}</span>
+											</SidebarMenuButton>
+											<DropdownMenu open={menu === c.id} onOpenChange={(abierto) => setMenu(abierto ? c.id : null)}>
+												<DropdownMenuTrigger asChild>
+													<SidebarMenuAction showOnHover aria-label={`Más acciones de «${c.title}»`} title="Más acciones" data-testid="conversacion-mas">
+														<MoreHorizontalIcon />
+													</SidebarMenuAction>
+												</DropdownMenuTrigger>
+												<DropdownMenuContent
+													side="right"
+													align="start"
+													className="w-56 font-prose"
+													data-testid="menu-conversacion"
+													onCloseAutoFocus={(e) => {
+														const id = renombrarAlCerrar.current;
+														renombrarAlCerrar.current = null;
+														if (id) { e.preventDefault(); setRenombrando(id); }
+													}}
+												>
+													<DropdownMenuItem onSelect={() => { renombrarAlCerrar.current = c.id; }}>
+														Renombrar<DropdownMenuShortcut>F2</DropdownMenuShortcut>
+													</DropdownMenuItem>
+													<DropdownMenuItem onSelect={() => acciones.exportarConversacion(c.id)}>Exportar como Markdown</DropdownMenuItem>
+													<DropdownMenuItem onSelect={() => acciones.resumirConversacion(c.id)}>Resumir ahora</DropdownMenuItem>
+													{acciones.fijarConversacion && <DropdownMenuItem onSelect={() => acciones.fijarConversacion?.(c.id, !meta(c.id).fijada)}>{meta(c.id).fijada ? "Quitar de fijadas" : "Fijar arriba"}</DropdownMenuItem>}
+													{acciones.archivarConversacion && <DropdownMenuItem onSelect={() => acciones.archivarConversacion?.(c.id, !meta(c.id).archivada)}>{meta(c.id).archivada ? "Sacar de archivadas" : "Archivar"}</DropdownMenuItem>}
+													<DropdownMenuSeparator />
+													<DropdownMenuItem variant="destructive" onSelect={() => acciones.borrarConversacion(c)}>Borrar…</DropdownMenuItem>
+												</DropdownMenuContent>
+											</DropdownMenu>
+										</>}
+									</SidebarMenuItem>
+	);
 	const propsSeccion = (id: IdSeccion) => ({ seccion: id, plegada: plegadas.includes(id), onAlternar: () => acciones.alternarSeccion(id) });
 
 	return (
@@ -379,83 +458,55 @@ export function BarraLateralEstudio({
 					) : conversaciones.length === 0 ? (
 						<p className="px-2 text-xs text-muted-foreground">Aún no hay conversaciones en este espacio.</p>
 					) : <>
+					<div className="px-2 pt-1">
+						<input
+							type="search"
+							value={busqueda}
+							onChange={(e) => setBusqueda(e.target.value)}
+							onKeyDown={(e) => { if (e.key === "Escape" && busqueda) { e.preventDefault(); e.stopPropagation(); setBusqueda(""); } }}
+							placeholder="Buscar conversaciones"
+							aria-label="Buscar conversaciones por título"
+							data-testid="buscar-conversaciones"
+							className="h-7 w-full rounded-md border border-sidebar-border bg-background px-2 text-xs text-sidebar-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+						/>
+					</div>
 					<SelectoresConversaciones filtros={filtros} todos={todos} onCambiar={acciones.cambiarFiltros} />
-					{grupos.length === 0 && <p className="px-2 pt-1 text-xs text-muted-foreground">Ninguna conversación con estos filtros.</p>}
+					{reparto && reparto.activas.length > 0 && (
+						<div className="mb-2" data-testid="conversaciones-activas">
+							<p className="truncate px-2 pb-1 pt-2 text-xs text-muted-foreground">Activas</p>
+							<SidebarMenu>{reparto.activas.map(c => fila(c, 0, true))}</SidebarMenu>
+						</div>
+					)}
+					{reparto && reparto.fijadas.length > 0 && (
+						<div className="mb-2" data-testid="conversaciones-fijadas">
+							<p className="truncate px-2 pb-1 pt-2 text-xs text-muted-foreground">Fijadas</p>
+							<SidebarMenu>{anidarRamas(reparto.fijadas, meta).map(({ conversacion: c, nivel }) => fila(c, nivel))}</SidebarMenu>
+						</div>
+					)}
+					{grupos.length === 0 && reparto?.fijadas.length === 0 && reparto?.activas.length === 0 && <p className="px-2 pt-1 text-xs text-muted-foreground">{busqueda.trim() ? "Ninguna conversación con ese título." : "Ninguna conversación con estos filtros."}</p>}
 					{grupos.map(g => (
 						<div key={g.clave} className="mb-2">
 							<p data-grupo-conversaciones={g.etiqueta} title={g.etiqueta} className="truncate px-2 pb-1 pt-2 text-[11px] text-muted-foreground/80">
 								{g.numero !== null && <span className="tabular-nums">{g.numero} · </span>}{g.etiqueta}
 							</p>
 							<SidebarMenu>
-								{g.conversaciones.map(c => (
-									<SidebarMenuItem key={c.id}>
-										{renombrando === c.id ? (
-											<RenameRow
-												chat={comoFila(c)}
-												onCommit={(titulo) => {
-													setRenombrando(null);
-													if (titulo.trim() && titulo.trim() !== c.title) acciones.renombrarConversacion(c.id, titulo);
-												}}
-												onCancel={() => setRenombrando(null)}
-											/>
-										) : <>
-											<SidebarMenuButton
-												isActive={ruta === `/chat/${c.id}`}
-												onClick={() => acciones.navegar(`/chat/${c.id}`)}
-												onContextMenu={(e) => { e.preventDefault(); setMenu(c.id); }}
-												onKeyDown={(e) => {
-													// F2 renombra la fila enfocada, no la conversación abierta en la cabecera.
-													if (e.key === "F2" && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
-														e.preventDefault();
-														setRenombrando(c.id);
-													}
-													// La tecla de menú y Mayús+F10 abren el menú de la fila, como el clic derecho.
-													if (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey)) {
-														e.preventDefault();
-														setMenu(c.id);
-													}
-												}}
-												data-testid="conversacion"
-												data-conversacion={c.id}
-												data-actividad={c.origen}
-												title={c.unidad ? `${ETIQUETA_ACTIVIDAD[c.origen]} · ${c.unidad.titulo}` : ETIQUETA_ACTIVIDAD[c.origen]}
-												className="text-muted-foreground data-[active=true]:text-sidebar-accent-foreground"
-											>
-												<IconoActividad origen={c.origen} />
-												<span className="truncate"><span className="sr-only">{ETIQUETA_ACTIVIDAD[c.origen]}: </span>{c.title}</span>
-											</SidebarMenuButton>
-											<DropdownMenu open={menu === c.id} onOpenChange={(abierto) => setMenu(abierto ? c.id : null)}>
-												<DropdownMenuTrigger asChild>
-													<SidebarMenuAction showOnHover aria-label={`Más acciones de «${c.title}»`} title="Más acciones" data-testid="conversacion-mas">
-														<MoreHorizontalIcon />
-													</SidebarMenuAction>
-												</DropdownMenuTrigger>
-												<DropdownMenuContent
-													side="right"
-													align="start"
-													className="w-56 font-prose"
-													data-testid="menu-conversacion"
-													onCloseAutoFocus={(e) => {
-														const id = renombrarAlCerrar.current;
-														renombrarAlCerrar.current = null;
-														if (id) { e.preventDefault(); setRenombrando(id); }
-													}}
-												>
-													<DropdownMenuItem onSelect={() => { renombrarAlCerrar.current = c.id; }}>
-														Renombrar<DropdownMenuShortcut>F2</DropdownMenuShortcut>
-													</DropdownMenuItem>
-													<DropdownMenuItem onSelect={() => acciones.exportarConversacion(c.id)}>Exportar como Markdown</DropdownMenuItem>
-													<DropdownMenuItem onSelect={() => acciones.resumirConversacion(c.id)}>Resumir ahora</DropdownMenuItem>
-													<DropdownMenuSeparator />
-													<DropdownMenuItem variant="destructive" onSelect={() => acciones.borrarConversacion(c)}>Borrar…</DropdownMenuItem>
-												</DropdownMenuContent>
-											</DropdownMenu>
-										</>}
-									</SidebarMenuItem>
-								))}
+								{anidarRamas(g.conversaciones, meta).map(({ conversacion: c, nivel }) => fila(c, nivel))}
 							</SidebarMenu>
 						</div>
 					))}
+					{reparto && reparto.archivadas.length > 0 && (
+						<div className="mb-2" data-testid="conversaciones-archivadas">
+							<button
+								type="button"
+								aria-expanded={verArchivadas || busqueda.trim() !== ""}
+								onClick={() => setVerArchivadas(v => !v)}
+								className="w-full rounded-md px-2 pb-1 pt-2 text-left text-xs text-muted-foreground underline-offset-2 hover:underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+							>
+								Archivadas ({reparto.archivadas.length})
+							</button>
+							{(verArchivadas || busqueda.trim() !== "") && <SidebarMenu>{reparto.archivadas.map(c => fila(c))}</SidebarMenu>}
+						</div>
+					)}
 					</>}
 				</SeccionBarra>
 			</SidebarContent>
@@ -489,6 +540,15 @@ const ICONO_ACTIVIDAD = { unidad: GraduationCapIcon, pasaje: QuoteIcon, intento:
 function IconoActividad({ origen }: { origen: OrigenConversacion }) {
 	const Icono = ICONO_ACTIVIDAD[origen];
 	return <Icono aria-hidden />;
+}
+
+const metaVacia = () => SIN_META;
+
+/** Diseño 1A: giro mientras el tutor trabaja, punto ámbar si te espera; terminada, el icono de su origen (decisión de David). */
+function IconoEstado({ estado, origen }: { estado: MetaConversacion["estado"]; origen: OrigenConversacion }) {
+	if (estado === "trabajando") return <Loader2Icon aria-hidden className="animate-spin" data-estado="trabajando" />;
+	if (estado === "te-espera") return <span aria-hidden data-estado="te-espera" className="flex size-4 shrink-0 items-center justify-center"><span className="size-2 rounded-full bg-warning" /></span>;
+	return <IconoActividad origen={origen} />;
 }
 
 /** Agrupar, actividad y fecha: tres selectores nativos compactos bajo la cabecera, como en el prototipo. */
@@ -727,6 +787,17 @@ export function BarraLateral() {
 	}, [leer]);
 
 	const revision = (id: string) => espacios?.areas.find(a => a.id === id)?.revision;
+	const meta = useMetaConversaciones();
+	/** Fijar y archivar viven en el registro del núcleo; la lista se refresca con chats-changed. */
+	const marcarConversacion = useCallback(async (id: string, marcas: { pinned?: boolean; archived?: boolean }) => {
+		setError(null);
+		try {
+			const res = await fetch(`/api/chats/${encodeURIComponent(id)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(marcas) });
+			if (!res.ok) throw new Error();
+		} catch {
+			setError("No se pudo cambiar la conversación.");
+		}
+	}, []);
 	// El atajo admite cambios del usuario y depende del sistema: se calcula en el cliente.
 	const [atajoPaleta, setAtajoPaleta] = useState("Ctrl+K");
 	useEffect(() => { setAtajoPaleta(formatBinding(bindingForAction("command-palette"))); }, []);
@@ -769,7 +840,10 @@ export function BarraLateral() {
 				alternarSeccion,
 				abrirPorDecidir: porDecidir.abrir,
 				cambiarFiltros,
+				fijarConversacion: (id, fijada) => void marcarConversacion(id, { pinned: fijada }),
+				archivarConversacion: (id, archivada) => void marcarConversacion(id, { archived: archivada }),
 			}}
+			meta={meta}
 		/>
 		{porDecidir.panel}
 		<DeleteSessionDialog chat={borrando} onClose={() => setBorrando(null)} onDeleted={borrada} />
