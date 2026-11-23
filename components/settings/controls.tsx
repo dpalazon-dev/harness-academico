@@ -221,7 +221,7 @@ export function SettingsSlider({ label, min, max, step, value, display, onChange
 			{showLabel && label}<span className="tabular-nums">{display ?? value}</span>
 		</span>
 		<input type="range" aria-label={label} min={min} max={max} step={step} value={value} disabled={disabled}
-			onChange={(e) => onChange(Number(e.target.value))} className="h-1.5 w-full accent-primary" />
+			onChange={(e) => onChange(Number(e.target.value))} className="anillo-foco h-1.5 w-full rounded-full accent-primary" />
 	</label>;
 }
 
@@ -323,7 +323,7 @@ export function CommitInput({
 					e.currentTarget.blur();
 				}
 			}}
-			className="h-7 w-40 rounded-sm border border-border bg-background px-2 font-ui text-xs text-foreground outline-none placeholder:text-muted-foreground/60"
+			className="anillo-foco h-7 w-40 rounded-sm border border-border bg-background px-2 font-ui text-xs text-foreground placeholder:text-muted-foreground/60"
 		/>
 	);
 }
