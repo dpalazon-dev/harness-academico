@@ -139,8 +139,9 @@ import { currentUserThinkingOpen, setAllUserThinkingOpen } from "@/components/th
  * same place — width polish only.
  */
 // HarnessAcademico (estilo «papel tranquilo»): columna de lectura del ancho de la caja de texto.
-const COLUMN = "mx-auto w-full max-w-[46rem] px-6";
-const DOCK = "mx-auto w-full max-w-[46rem] px-4";
+const COLUMN = "mx-auto w-full max-w-[42rem] px-6";
+// HarnessAcademico (chat estilo assistant-ui, decisión de David): columna y caja de 42 rem.
+const DOCK = "mx-auto w-full max-w-[42rem] px-4";
 // The DOCK container's fixed width (46rem) and the plan marginalia's
 // geometry (owner, plan-placement round): the bare diagram sits in the
 // dock band's RIGHT flank — MARGIN_GAP from the DOCK container's edge and
@@ -149,7 +150,7 @@ const DOCK = "mx-auto w-full max-w-[46rem] px-4";
 // the fade floor (owner, resize round) — below it the marginalia fades
 // out over the normal transition instead of popping away, and it stays
 // mounted while the question owns the band so widening fades it back.
-const DOCK_W = 46 * 16;
+const DOCK_W = 42 * 16;
 const MARGIN_GAP = 16;
 const MARGIN_MIN_W = 220;
 // The dock overlay's gradient band (h-24) — part of the reserved tail.
@@ -1950,16 +1951,16 @@ ${m.texto}` : m.texto);
 										    transparent prose). The "You" label stays — one register
 										    with the thinking labels. */
 										data-mensaje-id={m.id}
-										className="group/mensaje my-2 w-full rounded-lg bg-card px-4 py-2 font-ui text-xs"
+										// HarnessAcademico (chat estilo assistant-ui): tus mensajes, en burbuja a la derecha.
+										className="group/mensaje my-2 ml-auto flex w-fit max-w-[80%] flex-col items-end"
 									>
-												{/* The rail GROUPS (owner round 4, 2026-10-05): the YOU heading
-												    sits INSIDE the rail, same mono-xs register and same 1ch
-												    rail as the thinking rows — one quote geometry. */}
-												<div className="font-medium uppercase tracking-wide text-muted-foreground">Tú</div>
+											<div className="rounded-3xl bg-card px-5 py-2.5">
+												<span className="sr-only">Tú: </span>
 												<div className="lh-prose whitespace-pre-wrap text-foreground">
 													<PathText text={m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")} />
 												</div>
 												<SubmittedImages images={m.parts.filter((part) => part.type === "image").map(part => ({ type: "image" as const, data: part.data as string, mimeType: part.mimeType as string }))} />
+											</div>
 												<AccionesMensaje chatId={chatId} messageId={m.id} texto={textoDeMensaje(m.parts as never)} bifurcable={false} fijado={fijados.includes(m.id)} onFijar={fijar} />
 											</div>
 									) : (
@@ -2972,7 +2973,7 @@ export function DockOverlay({
 							claim={revealPending}
 						/>
 					)}
-					<div ref={shellRef} data-attachment-composer="" className="pointer-events-auto overflow-hidden rounded-2xl border bg-card shadow-lg">
+					<div ref={shellRef} data-attachment-composer="" className="pointer-events-auto overflow-hidden rounded-3xl border bg-card shadow-sm">
 						{preparationStatus}
 						{/* Include descendant margins (notably practice thinking's
 						    bottom margin) in the natural content measurement. */}

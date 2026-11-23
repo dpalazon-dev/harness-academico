@@ -80,7 +80,7 @@
 	/* HarnessAcademico (estilo «papel tranquilo»): interlineado amplio para leer. */
 	--lh-prose-leading: 1.7;
 	/* Markdown heading weight (appearance settings; 900 = the Black cut). */
-	--lh-heading-weight: 900;
+	--lh-heading-weight: 700;
 }
 
 /* The light variant: the colors come from the active light theme (inline
@@ -201,7 +201,7 @@ body {
    smeared strokes. No weight synthesis: real bold/black faces still win
    the 900 match, a single-weight family draws as designed. */
 .font-title {
-	font-weight: 900;
+	font-weight: 700;
 	font-synthesis-weight: none;
 }
 
@@ -607,7 +607,8 @@ body {
    utilities read these vars; Source Sans 3 remains the default/loading face. */
 @theme {
 	--font-prose: var(--font-atkinson), var(--font-sans3), ui-sans-serif, system-ui, sans-serif;
-	--font-title: "lh-cmu", serif;
+	/* HarnessAcademico (decisión de David del 23-nov-2026): títulos en Atkinson negrita, sin serifa; CMU sigue elegible. */
+	--font-title: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Card enter (owner round, 2026-10-05): the transcript cards' one-shot

@@ -35,9 +35,9 @@ describe("resolveAppearance — delta over factory", () => {
 		assert.equal(a.background, null);
 		assert.deepEqual(a.colors, {});
 		assert.equal(a.fontFamily, null);
-		assert.equal(a.proseFontSize, 17);
+		assert.equal(a.proseFontSize, 16);
 		assert.equal(a.sessionNameSerif, true);
-		assert.deepEqual(a.mdRendering, { headingWeight: 900, boldColor: null, italicColor: null });
+		assert.deepEqual(a.mdRendering, { headingWeight: 700, boldColor: null, italicColor: null }); // HarnessAcademico
 	});
 
 	it("explicit deltas win field-by-field", () => {
@@ -55,8 +55,8 @@ describe("appearanceVars — the mapping the provider applies", () => {
 		assert.equal(vars["--background"], "#141414");
 		assert.equal(vars["--accent"], "#2a2a2a", "the hover surface keeps its hand-picked value");
 		assert.equal(vars["--lh-ink-strong"], "#e6e6e6", "emphasis = text on Default");
-		assert.equal(vars["--lh-prose-size"], "17px"); // HarnessAcademico: prosa a 17 px
-		assert.equal(vars["--lh-heading-weight"], "900");
+		assert.equal(vars["--lh-prose-size"], "16px");
+		assert.equal(vars["--lh-heading-weight"], "700");
 		assert.equal(vars["--font-prose"], undefined, "no font override at factory");
 		assert.equal(vars["--font-title"], undefined, "CMU stays");
 	});

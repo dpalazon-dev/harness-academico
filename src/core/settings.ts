@@ -553,11 +553,11 @@ export const FACTORY_SETTINGS: FactorySettings = {
 		background: null, // null = the active theme's background
 		colors: {}, // no overrides: every color is the theme's
 		fontFamily: null, // Atkinson Hyperlegible Next (HarnessAcademico)
-		proseFontSize: 17,
+		proseFontSize: 16, // HarnessAcademico: 16 px, como el chat de assistant-ui (decisión de David)
 		codeLigatures: false,
 		sessionNameSerif: true,
 		titleFont: null, // Computer Modern (or the reading font, toggle off)
-		mdRendering: { headingWeight: 900, boldColor: null, italicColor: null },
+		mdRendering: { headingWeight: 700, boldColor: null, italicColor: null }, // HarnessAcademico: encabezados en negrita, no en Black
 	},
 	graph: { enabled: true, rendering: true, extractionChunkTokens: 4096 },
 	compaction: { thresholdTokens: 150_000, includeReasoning: false },

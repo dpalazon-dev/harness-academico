@@ -97,7 +97,7 @@ export function composeFontFamily(
 
 /** The title default (the bundled "lh-cmu" face) and the pick that
  *  follows the reading font (HarnessAcademico, ux2 ticket 08). */
-export const DEFAULT_TITLE_FONT = "Computer Modern";
+export const DEFAULT_TITLE_FONT = "Atkinson Hyperlegible Next"; // HarnessAcademico: títulos sin serifa
 /** Its installed name (the curated list has it): left out of the title
  *  menu, where the default row already is that face. */
 const CMU_FAMILY = "CMU Serif";

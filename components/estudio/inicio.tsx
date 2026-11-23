@@ -17,7 +17,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRightIcon, ArrowUpIcon, PlusIcon, MessageSquarePlusIcon, RotateCwIcon, TargetIcon, Undo2Icon, UploadIcon, XIcon } from "lucide-react";
+import { ArrowRightIcon, ArrowUpIcon, CalendarDaysIcon, ChevronDownIcon, PlusIcon, MessageSquarePlusIcon, RotateCwIcon, TargetIcon, Undo2Icon, UploadIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SetupDialog } from "@/components/setup-dialog";
@@ -90,11 +90,15 @@ export function InicioEstudio({ espacio, lectura, unidades, agenda, ritmo, ahora
 			{/* Franja para arrastrar la ventana en Electron; primera en el DOM (ver home del núcleo). */}
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
 			<main className="mx-auto w-full max-w-2xl px-6 pb-24 pt-[12vh]">
-				<h1 className="text-center font-title text-[2.5rem] leading-tight tracking-tight">¿Qué quieres poder hacer hoy?</h1>
-				<p className="mt-2 text-center text-muted-foreground">{lectura?.plan?.objetivo ?? espacio ?? "Todos los espacios"}</p>
+				{/* HarnessAcademico (Inicio, variante A elegida el 23-nov-2026): bienvenida al estilo assistant-ui. */}
+				<h1 className="text-center font-title text-3xl leading-tight" suppressHydrationWarning>{saludo(ahora)}</h1>
+				<p className="mt-2 text-center text-muted-foreground">
+					{lectura?.plan?.objetivo ?? espacio ?? "Todos los espacios"}
+					{lectura && repasosFijados(lectura).length > 0 && ` · ${repasosFijados(lectura).length === 1 ? "1 repaso pendiente" : `${repasosFijados(lectura).length} repasos pendientes`}`}
+				</p>
 				{error && <p role="alert" className="mt-6 text-sm text-destructive">{error}</p>}
 				<form
-					className="mt-8 rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.12)] transition-shadow focus-within:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.2)]"
+					className="mt-8 rounded-3xl border border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.12)] transition-shadow focus-within:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.2)]"
 					onSubmit={(e) => { e.preventDefault(); enviar(); }}
 				>
 					<textarea
@@ -137,16 +141,23 @@ export function InicioEstudio({ espacio, lectura, unidades, agenda, ritmo, ahora
 				{lectura && <AccionesRapidas lectura={lectura} unidades={unidades} volcadoPendiente={volcadoPendiente} enfocarCaja={() => { setIndicacion(true); caja.current?.focus(); }} ocupado={ocupado} acciones={acciones} />}
 
 				{lectura && (
-					<div className="mt-12">
-						<div className="mb-3"><LineaRitmo ritmo={ritmo} /></div>
-						<AgendaInicio
-							datos={agenda.datos}
-							ahora={ahora}
-							ocupado={ocupado}
-							onRangos={agenda.onRangos}
-							acciones={{ repasar: acciones.repasar, paso: acciones.paso, abrirUnidad: acciones.abrirUnidad, abrirConversacion: acciones.retomar }}
-						/>
-					</div>
+					// La agenda, plegada: lo primero es escribir o elegir una sugerencia (variante A).
+					<details className="group mt-10" data-agenda-plegable="">
+						<summary className="mx-auto flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+							<CalendarDaysIcon className="size-4" aria-hidden />Agenda de la semana
+							<ChevronDownIcon className="size-3.5 transition-transform group-open:rotate-180" aria-hidden />
+						</summary>
+						<div className="mt-4">
+							<div className="mb-3"><LineaRitmo ritmo={ritmo} /></div>
+							<AgendaInicio
+								datos={agenda.datos}
+								ahora={ahora}
+								ocupado={ocupado}
+								onRangos={agenda.onRangos}
+								acciones={{ repasar: acciones.repasar, paso: acciones.paso, abrirUnidad: acciones.abrirUnidad, abrirConversacion: acciones.retomar }}
+							/>
+						</div>
+					</details>
 				)}
 			</main>
 		</div>
@@ -184,18 +195,18 @@ function AccionesRapidas({ lectura, unidades, volcadoPendiente, enfocarCaja, ocu
 	const fichas = fichasDe(lectura, unidades);
 	return (
 		<div className="mt-4">
-			<div className="flex flex-wrap gap-2" role="group" aria-label="Acciones rápidas">
+			<div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2" role="group" aria-label="Acciones rápidas">
 				{fichas.map(f => {
 					switch (f) {
 						case "crear-plan": return (
-							<FichaBoton key={f} ficha={f} onClick={() => setCreandoPlan(v => !v)} disabled={ocupado} aria-expanded={creandoPlan}>
+							<FichaBoton key={f} ficha={f} detalle="Tu objetivo en este espacio, dividido en unidades" onClick={() => setCreandoPlan(v => !v)} disabled={ocupado} aria-expanded={creandoPlan}>
 								<PlusIcon className="size-3.5" />Crear plan
 							</FichaBoton>
 						);
 						case "continuar": {
 							const paso = lectura.paso!;
 							return (
-								<FichaBoton key={f} ficha={f} destacada title={paso.motivo} onClick={() => acciones.paso(paso)} disabled={ocupado}>
+								<FichaBoton key={f} ficha={f} destacada title={paso.motivo} detalle={paso.motivo} onClick={() => acciones.paso(paso)} disabled={ocupado}>
 									<ArrowRightIcon className="size-3.5 shrink-0" />Continuar
 									<small className="min-w-0 truncate text-xs text-muted-foreground">{paso.accion} · {paso.titulo}</small>
 								</FichaBoton>
@@ -204,7 +215,7 @@ function AccionesRapidas({ lectura, unidades, volcadoPendiente, enfocarCaja, ocu
 						case "repasar": {
 							const repasos = repasosFijados(lectura);
 							return (
-								<FichaBoton key={f} ficha={f} onClick={() => acciones.repasar(repasos[0]!)} disabled={ocupado}>
+								<FichaBoton key={f} ficha={f} detalle="Los que tocan hoy o ya han vencido" onClick={() => acciones.repasar(repasos[0]!)} disabled={ocupado}>
 									<RotateCwIcon className="size-3.5" />Repasar <small className="text-xs text-muted-foreground">({repasos.length})</small>
 								</FichaBoton>
 							);
@@ -213,7 +224,7 @@ function AccionesRapidas({ lectura, unidades, volcadoPendiente, enfocarCaja, ocu
 							const abierto = lectura.abierto!;
 							const pendiente = [...abierto.abierto, ...(abierto.siguiente ? [`Siguiente: ${abierto.siguiente}`] : [])].join("\n");
 							return (
-								<FichaBoton key={f} ficha={f} title={pendiente || undefined} onClick={() => acciones.retomar(abierto.chatId)} disabled={ocupado}>
+								<FichaBoton key={f} ficha={f} title={pendiente || undefined} detalle={abierto.abierto[0] ?? (abierto.siguiente ? `Siguiente: ${abierto.siguiente}` : undefined)} onClick={() => acciones.retomar(abierto.chatId)} disabled={ocupado}>
 									<Undo2Icon className="size-3.5 shrink-0" />Retomar
 									<small className="min-w-0 truncate text-xs text-muted-foreground">«{abierto.titulo}»</small>
 								</FichaBoton>
@@ -222,7 +233,7 @@ function AccionesRapidas({ lectura, unidades, volcadoPendiente, enfocarCaja, ocu
 						case "prueba": return (
 							<DropdownMenu key={f}>
 								<DropdownMenuTrigger asChild disabled={ocupado}>
-									<FichaBoton ficha={f}><TargetIcon className="size-3.5" />Ponerme a prueba</FichaBoton>
+									<FichaBoton ficha={f} detalle="Elige una unidad del plan"><TargetIcon className="size-3.5" />Ponerme a prueba</FichaBoton>
 								</DropdownMenuTrigger>
 								<DropdownMenuContent align="start" className="max-h-72 max-w-xs font-prose">
 									<DropdownMenuLabel className="text-xs text-muted-foreground">Practicar una unidad</DropdownMenuLabel>
@@ -233,12 +244,12 @@ function AccionesRapidas({ lectura, unidades, volcadoPendiente, enfocarCaja, ocu
 							</DropdownMenu>
 						);
 						case "material": return (
-							<FichaBoton key={f} ficha={f} onClick={acciones.anadirMaterial} disabled={ocupado}>
+							<FichaBoton key={f} ficha={f} detalle="Sube un PDF o un apunte a la biblioteca" onClick={acciones.anadirMaterial} disabled={ocupado}>
 								<UploadIcon className="size-3.5" />Añadir material
 							</FichaBoton>
 						);
 						case "contexto": return (
-							<FichaBoton key={f} ficha={f} onClick={() => volcadoPendiente ? acciones.abrirVolcado(volcadoPendiente) : enfocarCaja()} disabled={ocupado}>
+							<FichaBoton key={f} ficha={f} detalle="Cuéntale al tutor lo que ya sabes del tema" onClick={() => volcadoPendiente ? acciones.abrirVolcado(volcadoPendiente) : enfocarCaja()} disabled={ocupado}>
 								<MessageSquarePlusIcon className="size-3.5" />Añadir contexto
 							</FichaBoton>
 						);
@@ -250,8 +261,8 @@ function AccionesRapidas({ lectura, unidades, volcadoPendiente, enfocarCaja, ocu
 	);
 }
 
-/** Una ficha: píldora con borde, como en la variante C del prototipo; la destacada lleva el acento. */
-function FichaBoton({ ficha, destacada, children, className, ...props }: React.ComponentProps<"button"> & { ficha: Ficha; destacada?: boolean }) {
+/** Una sugerencia (Inicio, variante A): tarjeta con la acción y su motivo a la vista; la destacada lleva el acento. */
+function FichaBoton({ ficha, destacada, detalle, children, className, ...props }: React.ComponentProps<"button"> & { ficha: Ficha; destacada?: boolean; detalle?: string }) {
 	return (
 		<button
 			type="button"
@@ -259,14 +270,21 @@ function FichaBoton({ ficha, destacada, children, className, ...props }: React.C
 			data-ficha={ficha}
 			data-destacada={destacada || undefined}
 			className={cn(
-				"inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[13px] transition-colors hover:border-primary disabled:opacity-60",
-				destacada && "border-primary bg-primary/10",
+				"flex min-w-0 flex-col items-start gap-0.5 rounded-2xl border border-border bg-card px-4 py-3 text-left transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60",
+				destacada && "border-[var(--lh-accent)]",
 				className,
 			)}
 		>
-			{children}
+			<span className="flex w-full min-w-0 items-center gap-1.5 font-medium">{children}</span>
+			{detalle && <span className="line-clamp-2 text-sm text-muted-foreground">{detalle}</span>}
 		</button>
 	);
+}
+
+/** El saludo de la bienvenida según la hora. */
+export function saludo(ahora: Date): string {
+	const h = ahora.getHours();
+	return h >= 6 && h < 14 ? "Buenos días" : h >= 14 && h < 21 ? "Buenas tardes" : "Buenas noches";
 }
 
 /** Crear el plan del espacio a mano, como en la Ruta de la vista antigua (ticket 11): solo el objetivo; las unidades

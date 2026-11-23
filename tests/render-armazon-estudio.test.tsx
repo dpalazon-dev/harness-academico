@@ -346,9 +346,10 @@ describe("InicioEstudio", () => {
 	const inicio = (props: Partial<React.ComponentProps<typeof InicioEstudio>> = {}) =>
 		renderToStaticMarkup(<InicioEstudio espacio="Grafos" lectura={COMPLETA} unidades={[]} agenda={AGENDA} ritmo={null} ahora={AHORA} ocupado={false} error={null} acciones={accionesInicio} {...props} />);
 
-	it("pregunta qué quiere poder hacer, con título en serifa, y ofrece el cuadro de mensaje", () => {
+	// HarnessAcademico (Inicio, variante A): saludo según la hora, en la letra de títulos.
+	it("saluda según la hora y ofrece el cuadro de mensaje", () => {
 		const html = inicio();
-		assert.match(html, /<h1[^>]*font-title[^>]*>¿Qué quieres poder hacer hoy\?<\/h1>/);
+		assert.match(html, /<h1[^>]*font-title[^>]*>(Buenos días|Buenas tardes|Buenas noches)<\/h1>/);
 		assert.match(html, /<textarea/);
 		assert.match(html, /aria-label="Empezar conversación"/);
 		assert.match(html, /Dominar los algoritmos de grafos/);
@@ -438,8 +439,9 @@ describe("InicioEstudio", () => {
 
 	it("«Añadir material» y «Añadir contexto» se nombran tal cual", () => {
 		const html = inicio({ lectura: VACIA });
-		assert.match(html, /data-ficha="material"[^>]*>.*Añadir material<\/button>/);
-		assert.match(html, /data-ficha="contexto"[^>]*>.*Añadir contexto<\/button>/);
+		// Variante A: tarjetas con la acción y su motivo debajo.
+		assert.match(html, /data-ficha="material"[^>]*>.*Añadir material<\/span>.*Sube un PDF.*<\/button>/);
+		assert.match(html, /data-ficha="contexto"[^>]*>.*Añadir contexto<\/span>.*Cuéntale al tutor.*<\/button>/);
 	});
 
 	it("enseña el error cuando lo hay", () => {
