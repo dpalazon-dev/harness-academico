@@ -1,6 +1,7 @@
 {
 	"name": "harnessacademico",
-	"version": "0.6.0",
+	"version": "0.1.0",
+	"pluginHostVersion": "0.6.0",
 	"license": "AGPL-3.0-only",
 	"author": {
 		"name": "Amos Blomqvist",

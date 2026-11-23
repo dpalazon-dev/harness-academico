@@ -19,7 +19,7 @@ body:
     id: version
     attributes:
       label: HarnessAcademico version or build
-      description: The installer filename (for example `HarnessAcademico-0.6.0-x64-setup.exe`) or the source commit. If you cannot find it, write "unknown".
+      description: The installer filename (for example `HarnessAcademico-0.1.0-x64-setup.exe`) or the source commit. If you cannot find it, write "unknown".
     validations:
       required: true
   - type: input

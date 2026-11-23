@@ -4,7 +4,11 @@ All notable changes to HarnessAcademico. The format follows [Keep a Changelog](h
 
 ## Unreleased
 
+## [0.1.0] - 2026-11-23
+
 First public release of HarnessAcademico, a modified version of LearnHarness 0.6.0 (`v0.6.0`, commit `a636647`). The detailed list of differences is in [docs/sistema-comun/divergencias.md](docs/sistema-comun/divergencias.md).
+
+HarnessAcademico numbers its own releases from 0.1.0. Plugin compatibility still follows the LearnHarness plugin API: `package.json` declares `pluginHostVersion` (0.6.0), and that is the version a plugin's `minAppVersion` is checked against.
 
 ### Added
 
@@ -27,6 +31,7 @@ First public release of HarnessAcademico, a modified version of LearnHarness 0.6
 - The tutor's contract: the learner produces, the tutor critiques. Conversations open with the unit and plan as context.
 - KBOL is the only long-term memory; the inherited knowledge-graph extraction is off ([ADR 0006](docs/adr/0006-kbol-unica-memoria-y-extraccion-del-grafo-apagada.md)).
 - Startup waits up to 120 seconds for the packaged server instead of 30.
+- Dependencies brought forward from LearnHarness 0.7.0: Pi 1.5.2 (`pi-agent-core`, `pi-ai`) and Next 16.4.6, with the dependency cleanup that came with them.
 
 ### Removed
 
@@ -38,3 +43,9 @@ First public release of HarnessAcademico, a modified version of LearnHarness 0.6
 - Opening `/chat/<id>` directly no longer returns a 500 error.
 - Learner actions saved during context compaction are preserved ([amosblomqvist/learnharness#518](https://github.com/amosblomqvist/learnharness/issues/518)).
 - Production dependency advisories in the desktop and `estudio` lockfiles.
+
+### Security
+
+- Security fixes from LearnHarness 0.7.0: hardened desktop IPC, a restricted environment for spawned CLI providers, and stricter handling of ChatGPT credentials.
+
+[0.1.0]: https://github.com/dpalazon-dev/harness-academico/releases/tag/v0.1.0
