@@ -1,0 +1,40 @@
+# Dependency updates, kept small and reviewable.
+# - Security updates arrive as soon as an advisory is published (repository setting).
+# - Routine updates are weekly, minor and patch only, grouped into one PR per directory.
+# - Pi (@earendil-works/*) follows LearnHarness: it is updated by hand when upstream moves,
+#   because its catalog data is pinned by tests (see docs/sistema-comun/divergencias.md).
+# - Major versions are reviewed by hand.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories:
+      - "/"
+      - "/plugins/coding-questions"
+      - "/plugins/drawing-pad"
+      - "/plugins/estudio"
+      - "/plugins/flashcards"
+      - "/plugins/rich-code-blocks"
+      - "/plugins/ui-showcase"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "@earendil-works/*"
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"

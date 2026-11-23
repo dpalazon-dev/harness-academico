@@ -68,8 +68,30 @@ The last step of the packaging job is read-only. It fails unless the release is 
 
 1. Agree scope and version, and complete the relevant checks and functional acceptance. Use manual dispatch for a rehearsal installer.
 2. Update the version in `package.json` and `package-lock.json`, commit, and push a matching `v<version>` tag.
-3. Wait for the release run. Inspect the draft: tag, notes (copy the version's section from [CHANGELOG.md](../CHANGELOG.md) and paste the SHA-256), and the two assets. Diagnose failures before retrying; re-upload replaces same-named assets.
+3. Wait for the release run. Inspect the draft: tag, notes (see [Release notes](#release-notes)), and the two assets. Diagnose failures before retrying; re-upload replaces same-named assets.
 4. Install the draft's installer on a clean Windows profile and check first run.
 5. Publish the draft by hand.
 
 There is no automatic update: users install the new release over the old one.
+
+## Release notes
+
+Every release uses the same shape, in English, so readers can compare versions:
+
+```markdown
+**Released:** YYYY-MM-DD · **Tag:** [`vX.Y.Z`](https://github.com/dpalazon-dev/harness-academico/releases/tag/vX.Y.Z) · **Compare:** [`vA.B.C...vX.Y.Z`](https://github.com/dpalazon-dev/harness-academico/compare/vA.B.C...vX.Y.Z) · **Changelog:** [X.Y.Z](https://github.com/dpalazon-dev/harness-academico/blob/vX.Y.Z/CHANGELOG.md)
+
+One or two sentences on what this release is about.
+
+## Highlights
+
+- Three to six bullets a learner would notice, taken from the version's CHANGELOG section.
+
+## Install
+
+Download `HarnessAcademico-X.Y.Z-x64-setup.exe`. It is unsigned: SmartScreen warns, choose *More info → Run anyway*. Install over the previous version; your data stays where it is.
+
+SHA-256: `<from the .sha256 asset>`
+```
+
+The first release (`v0.1.0`) has no previous tag, so its **Compare** link is omitted.
