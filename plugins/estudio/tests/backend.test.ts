@@ -71,14 +71,13 @@ const PROBE_SESSION = {
   ],
 };
 
-test('a settled turn with a concluded probe creates proposed units once and notifies the view', async t => {
+test('a settled turn with a concluded probe leaves no units behind', async t => {
   const f = await fixture(t);
   f.sessions.set('chat-1', PROBE_SESSION);
   f.settle('chat-1');
-  f.settle('chat-1');
-  const state = await f.call('estado') as { units: { status: string; title: string }[] };
-  assert.deepEqual(state.units.map(u => [u.status, u.title]), [['propuesta', 'Límites']]);
-  assert.deepEqual(f.emitted, [CHANGED_TOPIC]);
+  const state = await f.call('estado') as { units: unknown[] };
+  assert.deepEqual(state.units, []);
+  assert.deepEqual(f.emitted, []);
 });
 
 test('operations validate input and reject unknown fields', async t => {
@@ -89,28 +88,44 @@ test('operations validate input and reject unknown fields', async t => {
   assert.throws(() => f.call('confirmar-unidad', { id: 'nope', expectedRevision: 1 }), /no existe/);
 });
 
-test('the tutor proposes; only applying the proposal changes the plan', async t => {
+test('the tutor drafts a whole plan in one call and proposes changes; only David accepting or applying changes the plan', async t => {
   const f = await fixture(t);
-  const [estado, proponerUnidad, proponerPlan] = f.tools();
-  assert.deepEqual([estado?.name, proponerUnidad?.name, proponerPlan?.name], ['estudio_estado', 'estudio_proponer_unidad', 'estudio_proponer_plan']);
-  const unitResult = await proponerUnidad!.execute('t1', { title: 'Regla de la cadena', capability: 'Aplicarla', criterion: 'Resuelvo sin pistas' });
-  const unitId = (unitResult.details as { unitId: string }).unitId;
-  const planResult = await proponerPlan!.execute('t2', { goal: 'Cálculo', ops: [{ op: 'add', unitId }], rationale: 'Base' });
-  const proposalId = (planResult.details as { proposalId: string }).proposalId;
-  let state = await f.call('estado') as { plans: { unitIds: string[] }[]; units: { status: string }[] };
-  assert.deepEqual(state.plans[0]?.unitIds, []);
-  assert.equal(state.units[0]?.status, 'propuesta');
-  f.call('aplicar-propuesta', { id: proposalId });
-  state = await f.call('estado') as typeof state;
-  assert.deepEqual(state.plans[0]?.unitIds, [unitId]);
-  const text = (await estado!.execute('t3', {})).content[0] as { text: string };
-  assert.match(text.text, /Regla de la cadena/);
+  assert.deepEqual(f.tools().map(tool => tool.name).filter(n => n !== 'estudio_buscar' && n !== 'estudio_proponer_hecho'),
+    ['estudio_estado', 'estudio_proponer_plan', 'estudio_cambiar_plan', 'estudio_proponer_capacidad', 'estudio_cerrar_bloque']);
+  const tool = (name: string) => f.tools().find(x => x.name === name)!;
+  const drafted = await tool('estudio_proponer_plan').execute('t1', { goal: 'Cálculo', elementos: [{ tipo: 'tema', titulo: 'Regla de la cadena' }, { tipo: 'hito', titulo: 'Parcial', fecha: '2027-01-15' }] });
+  const planId = (drafted.details as { planId: string }).planId;
+  type State = { plans: { id: string; revision: number; estado: string; elementos: { id: string; titulo: string }[] }[]; units: unknown[] };
+  let state = await f.call('estado') as State;
+  assert.deepEqual([state.plans[0]?.estado, state.plans[0]?.elementos.map(e => e.titulo), state.units], ['propuesto', ['Regla de la cadena', 'Parcial'], []]);
+  const refused = await tool('estudio_cambiar_plan').execute('t2', { planId, ops: [{ op: 'add', tipo: 'tarea', titulo: 'Ejercicios' }], rationale: 'x' }) as { isError?: boolean };
+  assert.equal(refused.isError, true, 'a proposed plan is accepted before it is changed');
+  f.call('aceptar-plan', { id: planId, expectedRevision: 1 });
+  const changed = await tool('estudio_cambiar_plan').execute('t3', { planId, ops: [{ op: 'add', tipo: 'tarea', titulo: 'Ejercicios' }], rationale: 'Práctica' });
+  state = await f.call('estado') as State;
+  assert.equal(state.plans[0]?.elementos.length, 2);
+  f.call('aplicar-propuesta', { id: (changed.details as { proposalId: string }).proposalId });
+  state = await f.call('estado') as State;
+  assert.deepEqual(state.plans[0]?.elementos.map(e => e.titulo), ['Regla de la cadena', 'Parcial', 'Ejercicios']);
+  const text = (await tool('estudio_estado').execute('t4', {})).content[0] as { text: string };
+  assert.match(text.text, /Plan \[.*\] \(active\) goal: Cálculo/);
+  assert.match(text.text, /hito: Parcial \(2027-01-15\)/);
+});
+
+test('the tutor suggests capability and criterion for the unit of its conversation; David accepts it', async t => {
+  const f = await fixture(t);
+  const unit = f.call('crear-unidad', { title: 'Cadena' }) as { id: string };
+  const sinUnidad = await f.tools().find(x => x.name === 'estudio_proponer_capacidad')!.execute('t1', { capability: 'Aplicarla', criterion: 'Sin pistas' }) as { isError?: boolean };
+  assert.equal(sinUnidad.isError, true, 'a free conversation has no unit');
+  await f.tools().find(x => x.name === 'estudio_proponer_capacidad')!.execute('t2', { capability: 'Aplicarla', criterion: 'Sin pistas', unitId: unit.id });
+  const accepted = f.call('aceptar-sugerencia', { id: unit.id, expectedRevision: 2 }) as { capability: string; criterion: string };
+  assert.deepEqual([accepted.capability, accepted.criterion], ['Aplicarla', 'Sin pistas']);
 });
 
 test('a refused tool call reports an error result instead of throwing', async t => {
   const f = await fixture(t);
   const proponerPlan = f.tools().find(tool => tool.name === 'estudio_proponer_plan')!;
-  const result = await proponerPlan.execute('t1', { ops: [{ op: 'add', unitId: 'ghost' }], rationale: 'x' }) as { isError?: boolean };
+  const result = await proponerPlan.execute('t1', { goal: 'X', elementos: [{ tipo: 'tarea', titulo: 'Y', fecha: '2027-01-01' }] }) as { isError?: boolean };
   assert.equal(result.isError, true);
 });
 
@@ -189,20 +204,6 @@ test('an aborted activation fails and a later activation over the same data work
   const second = context(root);
   const stop = await activate(second.ctx);
   await second.teardown(stop);
-});
-
-test('reactivating over the same data does not duplicate units from an already ingested probe', async t => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'estudio-backend-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  for (let run = 0; run < 2; run++) {
-    const c = context(root);
-    const stop = await activate(c.ctx);
-    c.sessions.set('chat-1', PROBE_SESSION);
-    c.listeners.forEach(l => l({ type: 'turn-settled', chatId: 'chat-1' }));
-    const state = await c.handlers.get('estado')!(undefined) as { units: unknown[] };
-    assert.equal(state.units.length, 1);
-    await c.teardown(stop);
-  }
 });
 
 test('a unit can only be linked to a document that has been incorporated', async t => {
@@ -293,9 +294,11 @@ test('the proactive handlers switch the mode, report the spending and never call
 
 test('los mensajes que pueden llegar a David salen en español, no en inglés', async t => {
   const f = await fixture(t);
-  const unidad = await f.call('crear-unidad', { title: 'Límites', capability: 'Explicar límites' }) as { id: string };
-  // Proponer un cambio sin plan ni objetivo: el mensaje llega al panel «Por decidir».
-  assert.throws(() => f.call('proponer-cambio', { ops: [{ op: 'add', unitId: unidad.id }] }), /Todavía no hay plan: indica un objetivo para empezar uno/);
+  const plan = await f.call('crear-plan', { goal: 'Cálculo' }) as { id: string };
+  // Cambios del plan desde su página: el mensaje llega a la vista.
+  assert.throws(() => f.call('cambiar-plan', { id: plan.id, expectedRevision: 1, ops: [{ op: 'remove', elementoId: 'nada' }] }), /un elemento que ya no está en el plan no está en el plan/);
+  assert.throws(() => f.call('cambiar-plan', { id: plan.id, expectedRevision: 9, ops: [{ op: 'add', tipo: 'tema', titulo: 'X' }] }), /Esto cambió mientras tanto/);
+  assert.throws(() => f.call('trabajar-tema', { planId: 'nada', elementoId: 'x' }), /El plan no existe/);
   // Una unidad que no existe, desde las lecturas del armazón.
   assert.throws(() => f.call('unidad', { id: 'nada' }), /La unidad nada no existe/);
 });

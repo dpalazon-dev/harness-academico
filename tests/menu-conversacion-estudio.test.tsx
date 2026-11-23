@@ -49,7 +49,7 @@ function montar() {
 	const llamadas: string[] = [];
 	const nada = () => {};
 	const acciones = {
-		elegirEspacio: nada, crearEspacio: nada, renombrarEspacio: nada, archivarEspacio: nada, recuperarEspacio: nada, traerSinEspacio: nada, moverPlan: nada, abrirAjustes: nada, navegar: nada, abrirPaleta: nada,
+		elegirEspacio: nada, crearEspacio: nada, renombrarEspacio: nada, archivarEspacio: nada, recuperarEspacio: nada, traerSinEspacio: nada, crearPlan: nada, abrirAjustes: nada, navegar: nada, abrirPaleta: nada,
 		renombrarConversacion: (id: string, titulo: string) => { llamadas.push(`renombrar ${id} ${titulo}`); },
 		exportarConversacion: (id: string) => { llamadas.push(`exportar ${id}`); },
 		resumirConversacion: (id: string) => { llamadas.push(`resumir ${id}`); },
@@ -83,7 +83,7 @@ async function pintar(filtros?: { agrupar: "fecha" | "unidad"; actividad: "toda"
 						{ id: "c1", title: "Qué es un grafo", updatedAt: "2026-11-12T10:00:00", origen: "libre", unidad: null, plan: null },
 						{ id: "c2", title: "Caminos mínimos", updatedAt: "2026-11-12T09:00:00", origen: "libre", unidad: null, plan: null },
 					]}
-					plan={{ plan: null, unidades: [] }}
+					planes={{ planes: [], sinPlan: [] }}
 					ruta="/"
 					ahora={new Date("2026-11-12T18:00:00")}
 					acciones={f.acciones}

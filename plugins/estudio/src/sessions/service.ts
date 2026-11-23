@@ -200,7 +200,8 @@ export function createSessionService(deps: SessionDeps): SessionService {
       const filter = area?.id ?? null;
       const units = store.listUnits().filter(u => inArea(u, filter));
       const titles = new Map(units.map(u => [u.id, u.title]));
-      const plan = store.listPlans().filter(p => !p.archived && inArea(p, filter)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null;
+      const plans = store.listPlans().filter(p => p.estado !== 'archivado' && inArea(p, filter)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      const linked = new Set(store.listPlans().filter(p => p.estado !== 'archivado').flatMap(p => p.elementos.flatMap(e => (e.unitId ? [e.unitId] : []))));
       const today = deps.today(filter);
       const recent = store.listAttempts().filter(a => a.status === 'graded' && a.grades.length > 0 && titles.has(a.unitId))
         .map(a => ({ a, grade: a.grades.at(-1)! })).sort((x, y) => y.grade.gradedAt.localeCompare(x.grade.gradedAt)).slice(0, RECENT_ATTEMPTS)
@@ -216,8 +217,8 @@ export function createSessionService(deps: SessionDeps): SessionService {
 
       const briefing = composeBriefing({
         area: area ? { name: area.name, description: area.description } : null,
-        plan: plan ? { goal: plan.goal, units: plan.unitIds.map(id => titles.get(id) ?? id) } : null,
-        outsidePlan: units.filter(u => u.status === 'activa' && !plan?.unitIds.includes(u.id)).map(u => u.title),
+        plans: plans.map(p => ({ goal: p.goal, proposed: p.estado === 'propuesto', items: p.elementos.map(e => `${e.tipo}: ${e.titulo}${e.fecha ? ` (${e.fecha})` : ''}${e.hecho ? ' (done)' : ''}${e.unitId ? ' [unit]' : ''}`) })),
+        withoutPlan: units.filter(u => u.status === 'activa' && !linked.has(u.id)).map(u => u.title),
         due: today.queue.map(q => ({ title: q.title, taskKind: q.nextTaskKind, lastFailure: q.lastFailure, needsVerification: q.needsVerification })),
         openAttempts: today.open.length, recent, questions,
         drafts: store.listDrafts().filter(d => d.status === 'pendiente').length,

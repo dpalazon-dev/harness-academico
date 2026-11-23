@@ -7,9 +7,8 @@ import { createAreaService } from '../src/study/areas.ts';
 import { createOperations } from '../src/operations.ts';
 import { createPracticeService } from '../src/practice/service.ts';
 import { createStudyTools } from '../src/tools.ts';
-import { ingestProbeResults } from '../src/probe.ts';
 import { createNotebookService } from '../src/notebooks/service.ts';
-import { NOW, plan, tempStore, unit } from './study-fixtures.ts';
+import { NOW, plan, tema, tempStore, unit } from './study-fixtures.ts';
 
 let n = 0;
 const newId = () => `id-${++n}`;
@@ -46,25 +45,21 @@ test('creating a space makes it active; archiving the active one returns to ever
   assert.deepEqual(areas.view().areas.map(a => a.name), ['Física general', 'Matemáticas']);
 });
 
-test('each space has its own current plan, units and proposals; «Todos» sees everything', t => {
+test('each space has its own plans, units and proposals; «Todos» sees everything', t => {
   const store = tempStore(t);
   const ops = createOperations(store, now, newId);
   const a = ops.createPlan({ goal: 'Dinámica' }, 'fis');
-  const b = ops.createPlan({ goal: 'Cálculo' }, 'mat');
+  ops.createPlan({ goal: 'Cálculo' }, 'mat');
   const u = ops.createUnit({ title: 'Newton' }, undefined, undefined, 'fis');
   ops.createUnit({ title: 'Cadena' }, undefined, undefined, 'mat');
   assert.equal(u.areaId, 'fis');
-  assert.equal(ops.currentPlan('fis')!.id, a.id);
-  assert.equal(ops.currentPlan('mat')!.id, b.id);
-  const proposal = ops.proposePlanChange({ ops: [{ op: 'add', unitId: u.id }], rationale: '' }, 'david', 'fis');
-  assert.equal(proposal.planId, a.id);
+  assert.deepEqual(ops.plans('fis').map(p => p.goal), ['Dinámica']);
+  const proposal = ops.proposePlanChange({ planId: a.id, ops: [{ op: 'add', tipo: 'tema', titulo: 'Newton' }], rationale: '' });
   assert.deepEqual(ops.state('fis').units.map(x => x.title), ['Newton']);
   assert.deepEqual(ops.state('fis').proposals.map(p => p.id), [proposal.id]);
   assert.equal(ops.state('mat').proposals.length, 0);
   assert.equal(ops.state().units.length, 2);
-  // A space without a plan starts one in that space from the goal.
-  const created = ops.proposePlanChange({ goal: 'Óptica', ops: [{ op: 'add', unitId: u.id }], rationale: '' }, 'tutor', 'opt');
-  assert.equal(store.getPlan(created.planId)!.areaId, 'opt');
+  assert.equal(ops.plans().length, 2);
 });
 
 test('Hoy, Ruta and Progreso read only the units of the active space', t => {
@@ -83,7 +78,7 @@ test('moving a plan takes its units; bringing in takes everything without a spac
   const areas = createAreaService(store, now, newId);
   store.saveUnit(unit({ id: 'u1' }), null);
   store.saveUnit(unit({ id: 'u2', title: 'Otra' }), null);
-  store.savePlan(plan({ unitIds: ['u1'] }), null);
+  store.savePlan(plan({ elementos: [tema('e1', { unitId: 'u1' }), tema('e2')] }), null);
   const fis = areas.create({ name: 'Física' });
   assert.deepEqual(areas.move({ kind: 'plan', id: 'p1', areaId: fis.id }), { moved: 2 });
   assert.equal(store.getUnit('u1')!.areaId, fis.id);
@@ -99,7 +94,7 @@ test('moving a plan takes its units; bringing in takes everything without a spac
   assert.throws(() => areas.adopt([]), /Elige primero un espacio/);
 });
 
-test('what the tutor proposes or a probe leaves takes the space of its conversation, else the active one', async t => {
+test('a plan the tutor proposes takes the space of its conversation, else the active one', async t => {
   const store = tempStore(t);
   const areas = createAreaService(store, now, newId);
   const ops = createOperations(store, now, newId);
@@ -108,11 +103,9 @@ test('what the tutor proposes or a probe leaves takes the space of its conversat
   store.saveConversation(conversation('c-fis', fis.id), null);
   // The active space is Matemáticas, but the conversation was started in Física.
   const tools = createStudyTools(ops, { chatId: 'c-fis', agent: 'teacher' } as never, () => {}, undefined, undefined, () => areas.forChat('c-fis'));
-  await tools.find(x => x.name === 'estudio_proponer_unidad')!.execute('t1', { title: 'Newton', capability: 'c', criterion: 'k' } as never, undefined as never);
-  assert.equal(store.listUnits().find(u => u.title === 'Newton')!.areaId, fis.id);
+  await tools.find(x => x.name === 'estudio_proponer_plan')!.execute('t1', { goal: 'Dinámica', elementos: [{ tipo: 'tema', titulo: 'Newton' }] } as never, undefined as never);
+  assert.equal(store.listPlans().find(p => p.goal === 'Dinámica')!.areaId, fis.id);
   assert.equal(areas.forChat('c-sin-registro'), mat.id);
-  const [probed] = ingestProbeResults(store, [{ chatId: 'c-fis', toolCallId: 'p1', strands: [{ strand: 'Inercia', assessment: 'a' }] }], NOW, id => areas.forChat(id));
-  assert.equal(probed!.areaId, fis.id);
 });
 
 test('a new notebook takes the active space; a source note, the space of its document', t => {

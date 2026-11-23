@@ -14,23 +14,23 @@ import { BarraLateralEstudio, type DatosBarraLateral } from "../components/estud
 import {
 	agruparConversaciones, FILTROS_INICIALES, filtrosConversaciones, recordarFiltros, type ConversacionLista, type FiltrosConversaciones,
 } from "../components/estudio/conversaciones.ts";
-import type { LecturaPlan } from "../components/estudio/tipos.ts";
+import type { LecturaPlanes } from "../components/estudio/tipos.ts";
 
 const AHORA = new Date("2026-11-12T18:00:00");
 const nada = () => {};
 const acciones = {
-	elegirEspacio: nada, crearEspacio: nada, renombrarEspacio: nada, archivarEspacio: nada, recuperarEspacio: nada, traerSinEspacio: nada, moverPlan: nada,
+	elegirEspacio: nada, crearEspacio: nada, renombrarEspacio: nada, archivarEspacio: nada, recuperarEspacio: nada, traerSinEspacio: nada, crearPlan: nada,
 	abrirAjustes: nada, navegar: nada, abrirPaleta: nada,
 	renombrarConversacion: nada, exportarConversacion: nada, resumirConversacion: nada, borrarConversacion: nada, alternarSeccion: nada, abrirPorDecidir: nada,
 	cambiarFiltros: nada,
 };
 
 const ciclo = { orientar: "hecho", exponer: "vacio", reconstruir: "vacio", mantener: "vacio" } as const;
-const PLAN: LecturaPlan = { plan: { id: "p1", objetivo: "Dominar grafos" }, unidades: [
-	{ id: "u1", titulo: "Recorridos", propuesta: false, fueraDelPlan: false, ciclo },
-	{ id: "u2", titulo: "Caminos mínimos", propuesta: false, fueraDelPlan: false, ciclo },
-	{ id: "u3", titulo: "Flujo máximo", propuesta: false, fueraDelPlan: true, ciclo },
-] };
+const tema = (id: string, titulo: string) => ({ id: `e-${id}`, tipo: "tema" as const, titulo, hecho: false, fecha: null, unidad: { id, titulo, estado: "activa" as const, ciclo } });
+const PLAN: LecturaPlanes = {
+	planes: [{ id: "p1", revision: 1, objetivo: "Dominar grafos", estado: "activo", origen: "manual", hechos: 0, total: 2, cambios: [], elementos: [tema("u1", "Recorridos"), tema("u2", "Caminos mínimos")] }],
+	sinPlan: [{ id: "u3", titulo: "Flujo máximo", propuesta: false, ciclo }],
+};
 const P1 = { id: "p1", objetivo: "Dominar grafos" };
 const P2 = { id: "p2", objetivo: "Mecánica clásica" };
 
@@ -53,7 +53,7 @@ const resumen = (grupos: ReturnType<typeof agruparConversaciones>) => grupos.map
 describe("agruparConversaciones", () => {
 	it("por defecto agrupa por fecha, con toda actividad y siempre", () => {
 		assert.deepEqual(FILTROS_INICIALES, { agrupar: "fecha", actividad: "toda", fecha: "siempre" });
-		assert.deepEqual(resumen(agruparConversaciones(LISTA, filtros(), { ahora: AHORA, plan: PLAN, todos: false })), [
+		assert.deepEqual(resumen(agruparConversaciones(LISTA, filtros(), { ahora: AHORA, planes: PLAN, todos: false })), [
 			["Hoy", null, ["hoy-libre", "pasaje-suelto"]],
 			["Ayer", null, ["ayer-u2"]],
 			["Últimos 7 días", null, ["semana-pasaje-u1", "otra-unidad"]],
@@ -61,10 +61,10 @@ describe("agruparConversaciones", () => {
 		]);
 	});
 
-	it("por unidad sigue el orden del plan con su número; las de fuera del plan después y «Sin unidad» al final", () => {
-		assert.deepEqual(resumen(agruparConversaciones(LISTA, filtros({ agrupar: "unidad" }), { ahora: AHORA, plan: PLAN, todos: false })), [
-			["Recorridos", 1, ["semana-pasaje-u1", "mes-intento-u1"]],
-			["Caminos mínimos", 2, ["ayer-u2"]],
+	it("por unidad sigue el orden de los planes; las de unidades sin plan después y «Sin unidad» al final", () => {
+		assert.deepEqual(resumen(agruparConversaciones(LISTA, filtros({ agrupar: "unidad" }), { ahora: AHORA, planes: PLAN, todos: false })), [
+			["Recorridos", null, ["semana-pasaje-u1", "mes-intento-u1"]],
+			["Caminos mínimos", null, ["ayer-u2"]],
 			["Flujo máximo", null, ["viejo-fuera"]],
 			["Unidad archivada", null, ["otra-unidad"]],
 			["Sin unidad", null, ["hoy-libre", "pasaje-suelto"]],
@@ -73,7 +73,7 @@ describe("agruparConversaciones", () => {
 
 	it("con «Todos», agrupa por plan, del más reciente al más antiguo, y «Sin plan» al final", () => {
 		const todas = [...LISTA, conv("mecanica", "2026-11-12T12:00:00", "unidad", { id: "m1", titulo: "Newton" }, P2)];
-		assert.deepEqual(resumen(agruparConversaciones(todas, filtros({ agrupar: "unidad" }), { ahora: AHORA, plan: null, todos: true })), [
+		assert.deepEqual(resumen(agruparConversaciones(todas, filtros({ agrupar: "unidad" }), { ahora: AHORA, planes: null, todos: true })), [
 			["Mecánica clásica", null, ["mecanica"]],
 			["Dominar grafos", null, ["ayer-u2", "semana-pasaje-u1", "mes-intento-u1", "viejo-fuera"]],
 			["Sin plan", null, ["hoy-libre", "pasaje-suelto", "otra-unidad"]],
@@ -81,11 +81,11 @@ describe("agruparConversaciones", () => {
 	});
 
 	it("los filtros de actividad y fecha se combinan", () => {
-		const grupos = agruparConversaciones(LISTA, filtros({ actividad: "pasaje", fecha: "7" }), { ahora: AHORA, plan: PLAN, todos: false });
+		const grupos = agruparConversaciones(LISTA, filtros({ actividad: "pasaje", fecha: "7" }), { ahora: AHORA, planes: PLAN, todos: false });
 		assert.deepEqual(resumen(grupos), [["Hoy", null, ["pasaje-suelto"]], ["Últimos 7 días", null, ["semana-pasaje-u1"]]]);
-		assert.deepEqual(resumen(agruparConversaciones(LISTA, filtros({ fecha: "30" }), { ahora: AHORA, plan: PLAN, todos: false })).flatMap(g => g[2]),
+		assert.deepEqual(resumen(agruparConversaciones(LISTA, filtros({ fecha: "30" }), { ahora: AHORA, planes: PLAN, todos: false })).flatMap(g => g[2]),
 			["hoy-libre", "pasaje-suelto", "ayer-u2", "semana-pasaje-u1", "otra-unidad", "mes-intento-u1"]);
-		assert.deepEqual(agruparConversaciones(LISTA, filtros({ actividad: "intento", fecha: "7" }), { ahora: AHORA, plan: PLAN, todos: false }), []);
+		assert.deepEqual(agruparConversaciones(LISTA, filtros({ actividad: "intento", fecha: "7" }), { ahora: AHORA, planes: PLAN, todos: false }), []);
 	});
 });
 
@@ -119,7 +119,7 @@ function barra(datos: Partial<DatosBarraLateral> = {}) {
 			<BarraLateralEstudio
 				espacios={{ areas: [{ id: "a1", name: "Grafos", archived: false }], activeAreaId: "a1" }}
 				conversaciones={LISTA}
-				plan={PLAN}
+				planes={PLAN}
 				ruta="/"
 				ahora={AHORA}
 				acciones={acciones}
@@ -154,10 +154,10 @@ describe("BarraLateralEstudio: conversaciones agrupables y filtrables", () => {
 		assert.match(html, /Sin plan/);
 	});
 
-	it("por unidad, cada grupo lleva su número del plan y «Sin unidad» va al final", () => {
+	it("por unidad, los grupos siguen el orden de los planes, sin número, y «Sin unidad» va al final", () => {
 		const html = barra({ filtros: filtros({ agrupar: "unidad" }) });
 		const cabeceras = [...html.matchAll(/data-grupo-conversaciones="[^"]*"[^>]*>([\s\S]*?)<\/p>/g)].map(m => m[1]!.replace(/<[^>]+>/g, ""));
-		assert.deepEqual(cabeceras, ["1 · Recorridos", "2 · Caminos mínimos", "Flujo máximo", "Unidad archivada", "Sin unidad"]);
+		assert.deepEqual(cabeceras, ["Recorridos", "Caminos mínimos", "Flujo máximo", "Unidad archivada", "Sin unidad"]);
 	});
 
 	it("cada fila lleva el icono y el nombre de su actividad", () => {

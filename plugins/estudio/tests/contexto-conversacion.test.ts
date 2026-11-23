@@ -263,13 +263,14 @@ test('una conversación antigua sin origen se lee como de unidad si tiene unidad
   assert.equal((await f.call<Fila[]>('conversaciones')).find(x => x.id === 'sin-turno')?.origen, 'unidad');
 });
 
-test('la lista da el plan de la unidad: el que la incluye o, fuera de él, el del espacio de la unidad', async t => {
+test('la lista da el plan del tema de la unidad; una unidad sin plan no tiene ninguno', async t => {
   const f = await fixture(t);
   const { unidad } = await espacioConUnidad(f);
   const plan = await f.call<{ id: string }>('crear-plan', { goal: 'Mecánica clásica' });
   const fuera = await f.call<{ id: string }>('crear-unidad', { title: 'Rozamiento', capability: 'Calcular rozamientos', criterion: 'Sin mirar' });
-  const propuesta = await f.call<{ id: string }>('proponer-cambio', { ops: [{ op: 'add', unitId: unidad.id }] });
-  await f.call('aplicar-propuesta', { id: propuesta.id });
+  await f.call('cambiar-plan', { id: plan.id, expectedRevision: 1, ops: [{ op: 'add', tipo: 'tema', titulo: 'Leyes de Newton' }] });
+  const conTema = f.store.getPlan(plan.id)!;
+  f.store.savePlan({ ...conTema, revision: conTema.revision + 1, elementos: [{ ...conTema.elementos[0]!, unitId: unidad.id }] }, conTema.revision);
   await f.abrir('chat-dentro', { tipo: 'unidad', unitId: unidad.id });
   await f.abrir('chat-fuera', { tipo: 'unidad', unitId: fuera.id });
   f.chatsSinContexto('chat-libre');
@@ -277,7 +278,7 @@ test('la lista da el plan de la unidad: el que la incluye o, fuera de él, el de
   const lista = await f.call<Fila[]>('conversaciones');
   assert.deepEqual(lista.map(x => [x.id, x.plan]).sort(), [
     ['chat-dentro', { id: plan.id, objetivo: 'Mecánica clásica' }],
-    ['chat-fuera', { id: plan.id, objetivo: 'Mecánica clásica' }],
+    ['chat-fuera', null],
     ['chat-libre', null],
   ]);
 });

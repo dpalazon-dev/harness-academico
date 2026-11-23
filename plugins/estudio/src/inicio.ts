@@ -7,6 +7,7 @@ import type { TaskKind } from './practice/types.ts';
 import type { ConversationView } from './sessions/types.ts';
 import type { AreaFilter } from './study/areas.ts';
 import type { PlanProposal, StudyPlan } from './study/types.ts';
+import { describirOp } from './study/proposals.ts';
 
 /** Lo que el inicio del armazón lee del plugin (spec, historias 15 y 17 a 22; ADR 0004): el paso propuesto principal
  * y los demás, lo de hoy, lo fijado para la semana y lo que quedó abierto, del espacio activo. Lo pendiente de decidir
@@ -42,8 +43,7 @@ export interface RepasoDeHoy {
 }
 
 export interface LecturaInicio {
-  plan: { id: string; objetivo: string } | null;
-  /** El de la primera unidad del plan que tenga uno. */
+  /** El de la primera unidad, en el orden de los planes, que tenga uno. */
   paso: PasoDeUnidad | null;
   /** Los de las demás unidades. Repasar y reconstruir llevan a la misma pantalla de práctica que un repaso: si la
    * unidad ya está en `repasos`, no se repite. */
@@ -57,18 +57,19 @@ export interface LecturaInicio {
   abierto: { chatId: string; titulo: string; fecha: string; abierto: string[]; siguiente: string } | null;
 }
 
-/** Lo que espera la decisión de David: las unidades que propuso el tutor y sus cambios del plan, del espacio activo, y
- * los borradores de conocimiento, que son de la base, común a todos los espacios. */
+/** Lo que espera la decisión de David, del espacio activo: los planes que propuso el tutor, sus cambios a planes
+ * activos y sus sugerencias de capacidad y criterio; y los borradores de conocimiento, que son de la base, común a
+ * todos los espacios. */
 export interface PorDecidir {
-  unidades: { id: string; revision: number; titulo: string; capacidad: string; notas: string; planId: string | null }[];
-  /** `caducado`: por qué ya no se puede aplicar (otro cambio tocó sus unidades o ya no encaja); solo cabe descartarlo. */
-  cambios: { id: string; descripcion: string[]; motivo: string; caducado: string | null }[];
+  planes: { id: string; revision: number; objetivo: string; elementos: number }[];
+  /** `caducado`: por qué ya no se puede aplicar (otro cambio tocó sus elementos o ya no encaja); solo cabe descartarlo. */
+  cambios: { id: string; planId: string; objetivo: string; descripcion: string[]; motivo: string; caducado: string | null }[];
+  sugerencias: { unitId: string; revision: number; titulo: string; capacidad: string; criterio: string }[];
   borradores: { id: string; tipo: KbDraft['kind']; resumen: string; origen: KbDraft['origin']; registros: number }[];
 }
 
 export interface FuentesPorDecidir {
   estado: (filter: AreaFilter) => StudyState;
-  planActual: (filter: AreaFilter) => StudyPlan | null;
   borradores: () => KbDraft[];
   caducidad: (proposal: PlanProposal) => string | null;
 }
@@ -76,7 +77,6 @@ export interface FuentesPorDecidir {
 export interface FuentesInicio {
   lecturas: LecturasArmazon;
   estado: (filter: AreaFilter) => StudyState;
-  planActual: (filter: AreaFilter) => StudyPlan | null;
   hoy: (filter: AreaFilter) => Today;
   ruta: (filter: AreaFilter) => UnitOverview[];
   conversaciones: (filter: AreaFilter) => ConversationView[];
@@ -91,12 +91,6 @@ const DE_PRACTICA = new Set<PasoDeUnidad['tipo']>(['repasar', 'reconstruir']);
 function titulos(estado: StudyState): (id: string) => string {
   const porId = new Map(estado.units.map(u => [u.id, u.title]));
   return id => porId.get(id) ?? id;
-}
-
-function describir(op: PlanProposal['ops'][number], titulo: (id: string) => string): string {
-  if (op.op === 'add') return `Añadir «${titulo(op.unitId)}»${op.index === undefined ? '' : ` en la posición ${op.index + 1}`}`;
-  if (op.op === 'remove') return `Quitar «${titulo(op.unitId)}»`;
-  return `Mover «${titulo(op.unitId)}» a la posición ${op.index + 1}`;
 }
 
 export function leerInicio(f: FuentesInicio, filter: AreaFilter): LecturaInicio {
@@ -119,7 +113,6 @@ export function leerInicio(f: FuentesInicio, filter: AreaFilter): LecturaInicio 
   const conAlgo = f.conversaciones(filter).find(c => c.summary && (c.summary.abierto.length > 0 || c.summary.siguiente.trim() !== ''));
 
   return {
-    plan: (() => { const p = f.planActual(filter); return p ? { id: p.id, objetivo: p.goal } : null; })(),
     paso,
     pasos: todos.slice(1).filter(p => !(DE_PRACTICA.has(p.tipo) && enRepasos.has(p.unitId))),
     repasos,
@@ -132,12 +125,18 @@ export function leerInicio(f: FuentesInicio, filter: AreaFilter): LecturaInicio 
 
 export function leerPorDecidir(f: FuentesPorDecidir, filter: AreaFilter): PorDecidir {
   const estado = f.estado(filter);
-  const titulo = titulos(estado);
+  const planes = new Map<string, StudyPlan>(estado.plans.map(p => [p.id, p]));
+  const porFecha = <T extends { createdAt: string }>(a: T, b: T) => a.createdAt.localeCompare(b.createdAt);
   return {
-    unidades: estado.units.filter(u => u.status === 'propuesta').sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-      .map(u => ({ id: u.id, revision: u.revision, titulo: u.title, capacidad: u.capability, notas: u.notes, planId: f.planActual(u.areaId)?.id ?? null })),
-    cambios: estado.proposals.filter(p => p.status === 'pendiente' && p.author === 'tutor')
-      .map(p => ({ id: p.id, descripcion: p.ops.map(op => describir(op, titulo)), motivo: p.rationale, caducado: f.caducidad(p) })),
+    planes: estado.plans.filter(p => p.estado === 'propuesto').sort(porFecha)
+      .map(p => ({ id: p.id, revision: p.revision, objetivo: p.goal, elementos: p.elementos.length })),
+    cambios: estado.proposals.filter(p => p.status === 'pendiente' && p.author === 'tutor').sort(porFecha).flatMap((p: PlanProposal) => {
+      const plan = planes.get(p.planId);
+      if (!plan || plan.estado === 'archivado') return [];
+      return [{ id: p.id, planId: plan.id, objetivo: plan.goal, descripcion: p.ops.map(op => describirOp(op, plan.elementos)), motivo: p.rationale, caducado: f.caducidad(p) }];
+    }),
+    sugerencias: estado.units.filter(u => u.sugerencia && u.status !== 'archivada').sort((a, b) => a.sugerencia!.createdAt.localeCompare(b.sugerencia!.createdAt))
+      .map(u => ({ unitId: u.id, revision: u.revision, titulo: u.title, capacidad: u.sugerencia!.capability, criterio: u.sugerencia!.criterion })),
     borradores: f.borradores().filter(d => d.status === 'pendiente')
       .map(d => ({ id: d.id, tipo: d.kind, resumen: d.summary, origen: d.origin, registros: d.records.length })),
   };

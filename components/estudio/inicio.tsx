@@ -33,7 +33,9 @@ import { AgendaInicio, useDatosAgenda, type DatosAgenda, type Rango } from "./ag
 import { LineaRitmo } from "./ritmo";
 import { destinoDelPaso, rutaVolcado } from "./paso";
 import { ANCLA_SUBIR, RUTA_BIBLIOTECA } from "./documentos";
-import type { LecturaInicio, LecturaPlan, LecturaRitmo, PasoDeUnidad } from "./tipos";
+import type { LecturaInicio, LecturaPlanes, LecturaRitmo, PasoDeUnidad } from "./tipos";
+import { unidadesEnOrden } from "./planes";
+import { rutaPlan } from "./plan";
 
 /** Un repaso de hoy: el intento a medias, si lo hay, o la unidad. */
 type Repaso = { unitId: string; intentoId: string | null };
@@ -45,7 +47,7 @@ export interface AccionesInicio {
 	repasar(repaso: Repaso): void;
 	retomar(chatId: string): void;
 	abrirUnidad(unitId: string): void;
-	/** Crea el plan del espacio con su objetivo, sin pasar por el tutor. */
+	/** Crea un plan del espacio con su objetivo, sin pasar por el tutor, y lo abre. Un espacio admite varios. */
 	crearPlan(objetivo: string): void;
 	/** Abre la práctica de una unidad elegida por David, toque o no. */
 	ponerAPrueba(unitId: string): void;
@@ -55,13 +57,15 @@ export interface AccionesInicio {
 	abrirVolcado(unitId: string): void;
 }
 
-export function InicioEstudio({ espacio, lectura, unidades, agenda, ritmo, ahora = new Date(), ocupado, error, acciones }: {
+export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, agenda, ritmo, ahora = new Date(), ocupado, error, acciones }: {
 	/** Nombre del espacio activo; null con «Todos». */
 	espacio: string | null;
 	/** null mientras se lee. */
 	lectura: LecturaInicio | null;
-	/** Las unidades activas del plan, en su orden. */
+	/** Las unidades activas de los planes, en su orden. */
 	unidades: UnidadActiva[];
+	/** El espacio activo no tiene ningún plan vivo: el inicio ofrece crear uno. */
+	sinPlanes?: boolean;
 	/** Lo leído de la agenda y a quién avisar de los rangos que pide. */
 	agenda: { datos: DatosAgenda | null; onRangos(r: { visible: Rango; seleccion: Rango }): void };
 	/** La lectura `ritmo`; null mientras se lee. */
@@ -91,7 +95,7 @@ export function InicioEstudio({ espacio, lectura, unidades, agenda, ritmo, ahora
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
 			<main className="mx-auto w-full max-w-2xl px-6 pb-24 pt-[12vh]">
 				<h1 className="text-center font-title text-[2.5rem] leading-tight tracking-tight">¿Qué quieres poder hacer hoy?</h1>
-				<p className="mt-2 text-center text-muted-foreground">{lectura?.plan?.objetivo ?? espacio ?? "Todos los espacios"}</p>
+				<p className="mt-2 text-center text-muted-foreground">{espacio ?? "Todos los espacios"}</p>
 				{error && <p role="alert" className="mt-6 text-sm text-destructive">{error}</p>}
 				<form
 					className="mt-8 rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.12)] transition-shadow focus-within:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.2)]"
@@ -134,7 +138,7 @@ export function InicioEstudio({ espacio, lectura, unidades, agenda, ritmo, ahora
 					</div>
 				</form>
 
-				{lectura && <AccionesRapidas lectura={lectura} unidades={unidades} volcadoPendiente={volcadoPendiente} enfocarCaja={() => { setIndicacion(true); caja.current?.focus(); }} ocupado={ocupado} acciones={acciones} />}
+				{lectura && <AccionesRapidas lectura={lectura} unidades={unidades} sinPlanes={sinPlanes} volcadoPendiente={volcadoPendiente} enfocarCaja={() => { setIndicacion(true); caja.current?.focus(); }} ocupado={ocupado} acciones={acciones} />}
 
 				{lectura && (
 					<div className="mt-12">
@@ -154,7 +158,7 @@ export function InicioEstudio({ espacio, lectura, unidades, agenda, ritmo, ahora
 }
 
 type Ficha = "crear-plan" | "continuar" | "repasar" | "retomar" | "prueba" | "material" | "contexto";
-/** Una unidad activa del plan, para «Ponerme a prueba». */
+/** Una unidad activa de un plan, para «Ponerme a prueba». */
 export interface UnidadActiva { id: string; titulo: string }
 
 /** Las acciones rápidas bajo la caja (ticket 04 de la segunda ronda): solo las que tocan en este momento, por orden de
@@ -163,9 +167,10 @@ const MAX_FICHAS = 5;
 /** Los repasos fijados por el regulador (de hoy o vencidos); los intentos a medias, sin fecha, no cuentan. */
 const repasosFijados = (lectura: LecturaInicio) => lectura.repasos.filter(r => r.intentoId === null);
 
-function fichasDe(lectura: LecturaInicio, unidades: UnidadActiva[]): Ficha[] {
+/** Con planes, uno nuevo se crea con el «+» de la sección «Planes» de la barra. */
+function fichasDe(lectura: LecturaInicio, unidades: UnidadActiva[], sinPlanes: boolean): Ficha[] {
 	const fichas: Ficha[] = [];
-	if (!lectura.plan) fichas.push("crear-plan");
+	if (sinPlanes) fichas.push("crear-plan");
 	if (lectura.paso) fichas.push("continuar");
 	if (repasosFijados(lectura).length > 0) fichas.push("repasar");
 	if (lectura.abierto) fichas.push("retomar");
@@ -174,14 +179,14 @@ function fichasDe(lectura: LecturaInicio, unidades: UnidadActiva[]): Ficha[] {
 	return fichas.slice(0, MAX_FICHAS);
 }
 
-function AccionesRapidas({ lectura, unidades, volcadoPendiente, enfocarCaja, ocupado, acciones }: {
-	lectura: LecturaInicio; unidades: UnidadActiva[]; ocupado: boolean; acciones: AccionesInicio;
+function AccionesRapidas({ lectura, unidades, sinPlanes, volcadoPendiente, enfocarCaja, ocupado, acciones }: {
+	lectura: LecturaInicio; unidades: UnidadActiva[]; sinPlanes: boolean; ocupado: boolean; acciones: AccionesInicio;
 	/** La unidad de contexto, si aún no tiene volcado; null si no hay contexto o ya lo tiene. */
 	volcadoPendiente: string | null;
 	enfocarCaja(): void;
 }) {
 	const [creandoPlan, setCreandoPlan] = useState(false);
-	const fichas = fichasDe(lectura, unidades);
+	const fichas = fichasDe(lectura, unidades, sinPlanes);
 	return (
 		<div className="mt-4">
 			<div className="flex flex-wrap gap-2" role="group" aria-label="Acciones rápidas">
@@ -245,7 +250,7 @@ function AccionesRapidas({ lectura, unidades, volcadoPendiente, enfocarCaja, ocu
 					}
 				})}
 			</div>
-			{creandoPlan && !lectura.plan && <NuevoPlan ocupado={ocupado} crear={acciones.crearPlan} />}
+			{creandoPlan && fichas.includes("crear-plan") && <NuevoPlan ocupado={ocupado} crear={acciones.crearPlan} />}
 		</div>
 	);
 }
@@ -269,8 +274,8 @@ function FichaBoton({ ficha, destacada, children, className, ...props }: React.C
 	);
 }
 
-/** Crear el plan del espacio a mano, como en la Ruta de la vista antigua (ticket 11): solo el objetivo; las unidades
- * llegan después, propuestas por el tutor o creadas con ⌘K. Se despliega con la ficha «Crear plan». */
+/** Crear un plan del espacio a mano, como en la Ruta de la vista antigua (ticket 11): solo el objetivo; los elementos
+ * se añaden después en su página o los propone el tutor. Se despliega con la ficha «Crear plan». */
 function NuevoPlan({ ocupado, crear }: { ocupado: boolean; crear(objetivo: string): void }) {
 	const [objetivo, setObjetivo] = useState("");
 	const valido = objetivo.trim() !== "";
@@ -300,6 +305,7 @@ export function Inicio({ initialConfigured }: { initialConfigured: boolean }) {
 	const [espacio, setEspacio] = useState<string | null>(null);
 	const [lectura, setLectura] = useState<LecturaInicio | null>(null);
 	const [unidades, setUnidades] = useState<UnidadActiva[]>([]);
+	const [sinPlanes, setSinPlanes] = useState(false);
 	const [ritmo, setRitmo] = useState<LecturaRitmo | null>(null);
 	const [ocupado, setOcupado] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -316,10 +322,14 @@ export function Inicio({ initialConfigured }: { initialConfigured: boolean }) {
 		llamarEstudio<{ areas: { id: string; name: string }[]; activeAreaId: string | null }>("espacios")
 			.then(v => { if (esta === ultima.current) setEspacio(v.areas.find(a => a.id === v.activeAreaId)?.name ?? null); })
 			.catch(() => { if (esta === ultima.current) setEspacio(null); });
-		// Las unidades activas del plan, para «Ponerme a prueba»; si su lectura falla, la ficha no se ofrece.
-		llamarEstudio<LecturaPlan>("plan")
-			.then(p => { if (esta === ultima.current) setUnidades(p.unidades.filter(u => !u.propuesta && !u.fueraDelPlan).map(u => ({ id: u.id, titulo: u.titulo }))); })
-			.catch(() => { if (esta === ultima.current) setUnidades([]); });
+		// Las unidades activas de los planes, para «Ponerme a prueba»; si su lectura falla, la ficha no se ofrece.
+		llamarEstudio<LecturaPlanes>("planes")
+			.then(p => {
+				if (esta !== ultima.current) return;
+				setUnidades(unidadesEnOrden(p).filter(u => !u.propuesta && u.enPlan).map(u => ({ id: u.id, titulo: u.titulo })));
+				setSinPlanes(p.planes.length === 0);
+			})
+			.catch(() => { if (esta === ultima.current) { setUnidades([]); setSinPlanes(false); } });
 		// Si el ritmo no se puede leer, la línea queda vacía: no tapa el inicio con un error.
 		llamarEstudio<LecturaRitmo>("ritmo")
 			.then(r => { if (esta === ultima.current) setRitmo(r); })
@@ -351,12 +361,17 @@ export function Inicio({ initialConfigured }: { initialConfigured: boolean }) {
 		}
 	};
 
-	/** Crear el plan: la operación del plugin y, después, la lectura de nuevo. */
+	/** Crear un plan: la operación del plugin y, después, su página para llenarlo. */
 	const crearPlan = async (objetivo: string) => {
 		setOcupado(true);
 		setError(null);
-		try { await llamarEstudio("crear-plan", { goal: objetivo }); } catch (e) { setError(e instanceof Error ? e.message : "No se pudo crear el plan."); }
-		leer();
+		try {
+			const plan = await llamarEstudio<{ id: string }>("crear-plan", { goal: objetivo });
+			router.push(rutaPlan(plan.id));
+		} catch (e) {
+			setError(e instanceof Error ? e.message : "No se pudo crear el plan.");
+			leer();
+		}
 		setOcupado(false);
 	};
 
@@ -366,6 +381,7 @@ export function Inicio({ initialConfigured }: { initialConfigured: boolean }) {
 				espacio={espacio}
 				lectura={lectura}
 				unidades={unidades}
+				sinPlanes={sinPlanes}
 				agenda={agenda}
 				ritmo={ritmo}
 				ocupado={ocupado || conversacion.abriendo}

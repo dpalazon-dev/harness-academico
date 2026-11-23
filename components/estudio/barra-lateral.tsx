@@ -3,8 +3,8 @@
 /**
  * La barra lateral del armazón de estudio (ADR 0001, ticket 01): el espacio
  * activo como menú en la cabecera, Inicio, «Por decidir» con su panel cuando hay
- * decisiones pendientes (ticket 02 de la segunda ronda), el plan del espacio con el ciclo de
- * cada unidad (ticket 02), Biblioteca (ticket 05), Cuadernos (ticket 09),
+ * decisiones pendientes (ticket 02 de la segunda ronda), los planes del espacio, plegables, con sus temas, tareas e
+ * hitos y el ciclo de cada tema con unidad, y las unidades sin plan (spec de planes), Biblioteca (ticket 05), Cuadernos (ticket 09),
  * las conversaciones del espacio, agrupables por fecha o por unidad del plan y filtrables por actividad y fecha
  * (ticket 03 de la segunda ronda), y, abajo, la actividad en segundo plano, Progreso y Ajustes. Plegable a
  * iconos con su botón y con ⌘B. Bajo el espacio, el botón de la paleta de búsqueda y acciones (⌘K, ticket 08).
@@ -18,16 +18,16 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3Icon, CheckIcon, ChevronRightIcon, ChevronsUpDownIcon, GraduationCapIcon, HomeIcon, InboxIcon, LibraryIcon, MessageSquareIcon, MoreHorizontalIcon, NotebookPenIcon, QuoteIcon, SearchIcon, SettingsIcon, TargetIcon } from "lucide-react";
+import { BarChart3Icon, CheckIcon, ChevronRightIcon, ChevronsUpDownIcon, GraduationCapIcon, HomeIcon, InboxIcon, LibraryIcon, MessageSquareIcon, MoreHorizontalIcon, NotebookPenIcon, PlusIcon, QuoteIcon, SearchIcon, SettingsIcon, TargetIcon } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd";
 import { bindingForAction, formatBinding, kbdEventForAction } from "@/src/core";
 import {
-	DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuSub, DropdownMenuSubContent,
-	DropdownMenuSubTrigger, DropdownMenuTrigger,
+	DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuShortcut,
+	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
 	Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu,
-	SidebarMenuAction, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger,
+	SidebarMenuAction, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem, SidebarProvider, SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { commitChatRename, downloadChatMarkdown, RenameRow } from "@/components/sidebar";
 import { DeleteSessionDialog } from "@/components/delete-session-dialog";
@@ -43,7 +43,8 @@ import {
 } from "./conversaciones";
 import { llamarEstudio } from "./llamar";
 import { BarraCiclo } from "./ciclo";
-import type { LecturaPlan } from "./tipos";
+import type { LecturaPlanes } from "./tipos";
+import { TIPO_ELEMENTO, fechaHito, rutaPlan } from "./plan";
 import { usePorDecidir } from "./por-decidir";
 import { RUTA_BIBLIOTECA } from "./documentos";
 import { RUTA_CUADERNOS } from "./cuadernos";
@@ -60,8 +61,8 @@ export interface DatosBarraLateral {
 	/** null mientras carga o si Estudio no responde. */
 	espacios: { areas: Espacio[]; activeAreaId: string | null } | null;
 	conversaciones: ConversacionLista[] | null;
-	/** El plan del espacio activo; null mientras carga o si Estudio no responde. */
-	plan: LecturaPlan | null;
+	/** Los planes del espacio activo y sus unidades sin plan; null mientras carga o si Estudio no responde. */
+	planes: LecturaPlanes | null;
 	ruta: string;
 	ahora?: Date;
 	/** El error de la última operación de espacios, si falló. */
@@ -85,8 +86,8 @@ export interface AccionesBarraLateral {
 	recuperarEspacio(id: string): void;
 	/** Asigna al espacio activo las unidades, planes, documentos, cuadernos y conversaciones que no tienen ninguno. */
 	traerSinEspacio(): void;
-	/** Lleva el plan, con sus unidades, a otro espacio; null lo deja sin espacio. */
-	moverPlan(planId: string, areaId: string | null): void;
+	/** Crea un plan en el espacio activo con su objetivo y lo abre. */
+	crearPlan(objetivo: string): void;
 	abrirAjustes(): void;
 	navegar(ruta: string): void;
 	abrirPaleta(): void;
@@ -112,7 +113,7 @@ export const sinBarraLateral = (ruta: string | null): boolean => ruta !== null &
 type Edicion = { modo: "crear" } | { modo: "renombrar"; id: string; nombre: string } | null;
 
 export function BarraLateralEstudio({
-	espacios, conversaciones, plan, ruta, ahora, error, atajoPaleta = "Ctrl+K", plegadas = [], porDecidir = 0, filtros = FILTROS_INICIALES, acciones,
+	espacios, conversaciones, planes, ruta, ahora, error, atajoPaleta = "Ctrl+K", plegadas = [], porDecidir = 0, filtros = FILTROS_INICIALES, acciones,
 }: DatosBarraLateral & { acciones: AccionesBarraLateral }) {
 	const [edicion, setEdicion] = useState<Edicion>(null);
 	/** Al elegir «Nuevo» o «Renombrar», el menú no devuelve el foco a su botón: va al campo. */
@@ -127,7 +128,12 @@ export function BarraLateralEstudio({
 	const activo = visibles.find(a => a.id === espacios?.activeAreaId) ?? null;
 	const nombre = espacios === null ? "Estudio" : activo?.name ?? "Todos los espacios";
 	const todos = espacios !== null && activo === null;
-	const grupos = conversaciones ? agruparConversaciones(conversaciones, filtros, { ahora, plan, todos }) : [];
+	const grupos = conversaciones ? agruparConversaciones(conversaciones, filtros, { ahora, planes, todos }) : [];
+	/** Los planes plegados en esta barra; los demás se ven desplegados. */
+	const [plegados, setPlegados] = useState<string[]>([]);
+	const alternarPlan = (id: string) => setPlegados(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+	/** El campo del objetivo de un plan nuevo, abierto con el «+» de la sección. */
+	const [creandoPlan, setCreandoPlan] = useState(false);
 	const propsSeccion = (id: IdSeccion) => ({ seccion: id, plegada: plegadas.includes(id), onAlternar: () => acciones.alternarSeccion(id) });
 
 	return (
@@ -191,7 +197,6 @@ export function BarraLateralEstudio({
 											Renombrar «{activo.name}»…
 										</DropdownMenuItem>
 										<DropdownMenuItem onSelect={acciones.traerSinEspacio}>Traer aquí lo que no tiene espacio</DropdownMenuItem>
-										{plan?.plan && <MoverPlan planId={plan.plan.id} destinos={visibles.filter(a => a.id !== activo.id)} onMover={acciones.moverPlan} />}
 										<DropdownMenuItem onSelect={() => acciones.archivarEspacio(activo.id)}>
 											Archivar «{activo.name}»
 										</DropdownMenuItem>
@@ -243,36 +248,111 @@ export function BarraLateralEstudio({
 					</SidebarMenu>
 				</SidebarGroup>
 
-				<SeccionBarra {...propsSeccion("plan")} titulo="Plan" descripcion={plan?.plan?.objetivo}>
-					{plan === null ? (
+				<SeccionBarra
+					{...propsSeccion("plan")}
+					titulo="Planes"
+					accion={
+						<button
+							type="button"
+							onClick={() => setCreandoPlan(true)}
+							aria-label="Nuevo plan"
+							title="Nuevo plan"
+							data-testid="nuevo-plan-barra"
+							className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:hidden"
+						>
+							<PlusIcon className="size-3.5" />
+						</button>
+					}
+				>
+					{creandoPlan && (
+						<div className="mb-1 px-1">
+							<CampoEspacio
+								inicial=""
+								etiqueta="Objetivo del plan nuevo"
+								onAceptar={(objetivo) => { setCreandoPlan(false); acciones.crearPlan(objetivo); }}
+								onCancelar={() => setCreandoPlan(false)}
+							/>
+						</div>
+					)}
+					{planes === null ? (
 						<p className="px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">Cargando…</p>
-					) : plan.unidades.length === 0 ? (
+					) : planes.planes.length === 0 && planes.sinPlan.length === 0 ? (
 						<p className="px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-							{plan.plan
-								? "El plan aún no tiene unidades. Pide en Inicio al tutor que te proponga una ruta."
-								: "Este espacio aún no tiene plan. Escribe en Inicio qué quieres poder hacer y el tutor te propondrá unidades."}
+							Este espacio aún no tiene plan. Escribe en Inicio qué quieres conseguir y el tutor te propondrá uno, o créalo con «+».
 						</p>
 					) : (
 						<SidebarMenu>
-							{plan.unidades.map((u, i) => (
-								<SidebarMenuItem key={u.id}>
-									<SidebarMenuButton
-										isActive={ruta === `/unidad/${u.id}`}
-										onClick={() => acciones.navegar(`/unidad/${u.id}`)}
-										tooltip={u.propuesta ? `${u.titulo} (propuesta)` : u.titulo}
-										className="h-auto py-1.5"
-									>
-										<span className="flex size-4 shrink-0 items-center justify-center text-[11px] tabular-nums text-muted-foreground">{u.fueraDelPlan ? "·" : i + 1}</span>
-										<span className="grid min-w-0 flex-1 gap-1">
-											<span className={cn("truncate", u.propuesta && "italic text-muted-foreground")}>{u.titulo}</span>
-											{!u.propuesta && <BarraCiclo ciclo={u.ciclo} className="w-20" />}
-										</span>
-									</SidebarMenuButton>
-									{u.propuesta
-										? <SidebarMenuBadge className="text-[10px] font-normal text-muted-foreground">propuesta</SidebarMenuBadge>
-										: u.fueraDelPlan && <SidebarMenuBadge className="text-[10px] font-normal text-muted-foreground">fuera del plan</SidebarMenuBadge>}
-								</SidebarMenuItem>
-							))}
+							{planes.planes.map(p => {
+								const abierto = !plegados.includes(p.id);
+								const propuesto = p.estado === "propuesto";
+								return (
+									<SidebarMenuItem key={p.id} data-plan={p.id}>
+										<SidebarMenuButton
+											isActive={ruta === rutaPlan(p.id)}
+											onClick={() => acciones.navegar(rutaPlan(p.id))}
+											tooltip={propuesto ? `${p.objetivo} (propuesto)` : p.objetivo}
+											className="pr-14"
+										>
+											<TargetIcon />
+											<span className={cn("truncate", propuesto && "italic text-muted-foreground")}>{p.objetivo}</span>
+										</SidebarMenuButton>
+										<SidebarMenuBadge className="right-7 text-[10px] font-normal text-muted-foreground tabular-nums">
+											{propuesto ? "propuesto" : `${p.hechos}/${p.total}`}
+										</SidebarMenuBadge>
+										{p.elementos.length > 0 && (
+											<SidebarMenuAction onClick={() => alternarPlan(p.id)} aria-expanded={abierto} aria-label={`${abierto ? "Plegar" : "Desplegar"} «${p.objetivo}»`}>
+												<ChevronRightIcon className={cn("transition-transform", abierto && "rotate-90")} />
+											</SidebarMenuAction>
+										)}
+										{abierto && p.elementos.length > 0 && (
+											<SidebarMenuSub>
+												{p.elementos.map(e => {
+													const Icono = TIPO_ELEMENTO[e.tipo].icono;
+													const destino = e.unidad ? `/unidad/${e.unidad.id}` : rutaPlan(p.id);
+													return (
+														<SidebarMenuSubItem key={e.id} data-elemento={e.tipo}>
+															<SidebarMenuSubButton
+																asChild
+																isActive={e.unidad !== null && ruta === destino}
+																className="h-auto py-1"
+															>
+																<button type="button" onClick={() => acciones.navegar(destino)} title={e.titulo}>
+																	<Icono aria-label={TIPO_ELEMENTO[e.tipo].nombre} />
+																	<span className="grid min-w-0 flex-1 gap-1">
+																		<span className={cn("truncate", e.hecho && "text-muted-foreground line-through")}>{e.titulo}</span>
+																		{e.unidad && <BarraCiclo ciclo={e.unidad.ciclo} className="w-16" />}
+																		{e.fecha && <span className="text-[10px] text-muted-foreground">{fechaHito(e.fecha)}</span>}
+																	</span>
+																</button>
+															</SidebarMenuSubButton>
+														</SidebarMenuSubItem>
+													);
+												})}
+											</SidebarMenuSub>
+										)}
+									</SidebarMenuItem>
+								);
+							})}
+							{planes.sinPlan.length > 0 && <>
+								<li className="px-2 pt-2 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground group-data-[collapsible=icon]:hidden">Unidades sin plan</li>
+								{planes.sinPlan.map(u => (
+									<SidebarMenuItem key={u.id}>
+										<SidebarMenuButton
+											isActive={ruta === `/unidad/${u.id}`}
+											onClick={() => acciones.navegar(`/unidad/${u.id}`)}
+											tooltip={u.propuesta ? `${u.titulo} (propuesta)` : u.titulo}
+											className="h-auto py-1.5"
+										>
+											<GraduationCapIcon />
+											<span className="grid min-w-0 flex-1 gap-1">
+												<span className={cn("truncate", u.propuesta && "italic text-muted-foreground")}>{u.titulo}</span>
+												{!u.propuesta && <BarraCiclo ciclo={u.ciclo} className="w-20" />}
+											</span>
+										</SidebarMenuButton>
+										{u.propuesta && <SidebarMenuBadge className="text-[10px] font-normal text-muted-foreground">propuesta</SidebarMenuBadge>}
+									</SidebarMenuItem>
+								))}
+							</>}
 						</SidebarMenu>
 					)}
 				</SeccionBarra>
@@ -431,17 +511,20 @@ function SelectoresConversaciones({ filtros, todos, onCambiar }: { filtros: Filt
 
 /** Una sección con jerarquía: la cabecera, en negrita al tamaño del cuerpo y con chevrón, pliega y despliega sus
  * elementos, que van un punto más pequeños y con sangría. Plegada la barra a iconos no hay cabecera. */
-function SeccionBarra({ seccion, plegada, onAlternar, titulo, descripcion, className, children }: {
+function SeccionBarra({ seccion, plegada, onAlternar, titulo, descripcion, accion, className, children }: {
 	seccion: IdSeccion;
 	plegada: boolean;
 	onAlternar(): void;
 	titulo: string;
 	descripcion?: string;
+	/** Un botón junto a la cabecera, como el «+» de Planes. */
+	accion?: React.ReactNode;
 	className?: string;
 	children: React.ReactNode;
 }) {
 	return (
 		<SidebarGroup className={className}>
+			<div className="flex items-center gap-1">
 			<button
 				type="button"
 				aria-expanded={!plegada}
@@ -453,6 +536,8 @@ function SeccionBarra({ seccion, plegada, onAlternar, titulo, descripcion, class
 			>
 				<ChevronRightIcon aria-hidden className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", !plegada && "rotate-90")} />{titulo}
 			</button>
+			{accion}
+			</div>
 			{/* Plegada, sus elementos siguen en la barra de iconos, como antes de haber secciones. */}
 			<div
 				id={`seccion-${seccion}`}
@@ -472,21 +557,6 @@ export function comoFila(c: ConversacionLista): ChatListItem {
 		id: c.id, title: c.title, createdAt: c.updatedAt, updatedAt: c.updatedAt, kind: "teach", messageCount: 0, phase: "teach",
 		pendingQuestion: false, pendingProblem: false, busy: false, compacting: false,
 	} as ChatListItem;
-}
-
-/** «Mover el plan a…» del menú de espacios: los demás espacios y «Sin espacio». Sus unidades van con él. */
-function MoverPlan({ planId, destinos, onMover }: { planId: string; destinos: Espacio[]; onMover(planId: string, areaId: string | null): void }) {
-	return (
-		<DropdownMenuSub>
-			<DropdownMenuSubTrigger>Mover el plan a…</DropdownMenuSubTrigger>
-			<DropdownMenuSubContent className="w-52 font-prose">
-				{destinos.map(a => (
-					<DropdownMenuItem key={a.id} onSelect={() => onMover(planId, a.id)}><span className="truncate">{a.name}</span></DropdownMenuItem>
-				))}
-				<DropdownMenuItem onSelect={() => onMover(planId, null)}>Sin espacio</DropdownMenuItem>
-			</DropdownMenuSubContent>
-		</DropdownMenuSub>
-	);
 }
 
 /** El botón que abre la paleta (ticket 08), con su atajo; plegada la barra, solo la lupa. */
@@ -578,7 +648,7 @@ export function BarraLateral() {
 	const { open: abrirAjustes } = useSettingsDialog();
 	const [espacios, setEspacios] = useState<DatosBarraLateral["espacios"]>(null);
 	const [conversaciones, setConversaciones] = useState<ConversacionLista[] | null>(null);
-	const [plan, setPlan] = useState<LecturaPlan | null>(null);
+	const [planes, setPlanes] = useState<LecturaPlanes | null>(null);
 	const porDecidir = usePorDecidir();
 	const [error, setError] = useState<string | null>(null);
 	const [borrando, setBorrando] = useState<ConversacionLista | null>(null);
@@ -595,8 +665,8 @@ export function BarraLateral() {
 
 	const leer = useCallback(async () => {
 		try {
-			// El plan va aparte: si su lectura falla, el menú de espacios y las conversaciones siguen.
-			const plan = llamarEstudio<LecturaPlan>("plan").then(setPlan, () => setPlan(null));
+			// Los planes van aparte: si su lectura falla, el menú de espacios y las conversaciones siguen.
+			const plan = llamarEstudio<LecturaPlanes>("planes").then(setPlanes, () => setPlanes(null));
 			const [e, c] = await Promise.all([
 				llamarEstudio<NonNullable<DatosBarraLateral["espacios"]>>("espacios"),
 				llamarEstudio<ConversacionLista[]>("conversaciones"),
@@ -658,7 +728,7 @@ export function BarraLateral() {
 		<BarraLateralEstudio
 			espacios={espacios}
 			conversaciones={conversaciones}
-			plan={plan}
+			planes={planes}
 			ruta={ruta}
 			error={error}
 			atajoPaleta={atajoPaleta}
@@ -672,7 +742,16 @@ export function BarraLateral() {
 				archivarEspacio: (id) => void operar("editar-espacio", { id, expectedRevision: revision(id), archived: true }),
 				recuperarEspacio: (id) => void operar("editar-espacio", { id, expectedRevision: revision(id), archived: false }),
 				traerSinEspacio: () => void operar("traer-sin-espacio", {}),
-				moverPlan: (planId, areaId) => void operar("mover-a-espacio", { kind: "plan", id: planId, areaId }),
+				crearPlan: (objetivo) => void (async () => {
+					setError(null);
+					try {
+						const plan = await llamarEstudio<{ id: string }>("crear-plan", { goal: objetivo });
+						router.push(rutaPlan(plan.id));
+					} catch (e) {
+						setError(e instanceof Error ? e.message : "No se pudo crear el plan.");
+					}
+					await leer();
+				})(),
 				abrirAjustes: () => abrirAjustes(),
 				navegar: (destino) => router.push(destino),
 				abrirPaleta: () => window.dispatchEvent(new CustomEvent(kbdEventForAction("command-palette"))),

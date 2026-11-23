@@ -48,7 +48,8 @@ async function fixture(t: TestContext) {
 type Unit = { id: string; revision: number; title: string };
 type Grupo = 'hecho' | 'pendiente' | 'vacio';
 interface Lectura {
-  id: string; revision: number; titulo: string; estado: string; capacidad: string; criterio: string; planId: string | null;
+  id: string; revision: number; titulo: string; estado: string; capacidad: string; criterio: string; plan: { id: string; objetivo: string } | null;
+  sugerencia: { capacidad: string; criterio: string } | null;
   tipo: string | null; practica: string | null; practicaEfectiva: string;
   etapa: { kind: string; label: string };
   ciclo: { orientar: Grupo; exponer: Grupo; reconstruir: Grupo; mantener: Grupo };
@@ -61,9 +62,10 @@ interface Lectura {
   proximoRepaso: string | null;
   conversaciones: { id: string; title: string }[];
 }
-interface LecturaPlan {
-  plan: { id: string; objetivo: string } | null;
-  unidades: { id: string; titulo: string; propuesta: boolean; fueraDelPlan: boolean; ciclo: Lectura['ciclo'] }[];
+interface ElementoLeido { id: string; tipo: string; titulo: string; hecho: boolean; fecha: string | null; unidad: { id: string; titulo: string; estado: string; ciclo: Lectura['ciclo'] } | null }
+interface LecturaPlanes {
+  planes: { id: string; revision: number; objetivo: string; estado: string; origen: string; hechos: number; total: number; elementos: ElementoLeido[]; cambios: { id: string; descripcion: string[]; motivo: string; caducado: string | null }[] }[];
+  sinPlan: { id: string; titulo: string; propuesta: boolean; ciclo: Lectura['ciclo'] }[];
 }
 
 const hace = (minutos: number) => new Date(Date.now() - minutos * 60_000).toISOString();
@@ -101,12 +103,16 @@ async function espacio(f: Awaited<ReturnType<typeof fixture>>, name: string): Pr
   return area.id;
 }
 
-async function planCon(f: Awaited<ReturnType<typeof fixture>>, titulos: string[]): Promise<Unit[]> {
-  await f.call('crear-plan', { goal: 'Dominar grafos' });
+type F = Awaited<ReturnType<typeof fixture>>;
+
+async function planCon(f: F, titulos: string[], criterio = true): Promise<Unit[]> {
+  const plan = await f.call<{ id: string }>('crear-plan', { goal: 'Dominar grafos' });
+  if (titulos.length) await f.call('cambiar-plan', { id: plan.id, expectedRevision: 1, ops: titulos.map(titulo => ({ op: 'add', tipo: 'tema', titulo })) });
   const units: Unit[] = [];
-  for (const title of titulos) units.push(await f.call<Unit>('crear-unidad', { title, capability: `Explicar ${title}`, criterion: `Lo explico sin mirar` }));
-  const proposal = await f.call<{ id: string }>('proponer-cambio', { ops: units.map(u => ({ op: 'add', unitId: u.id })) });
-  await f.call('aplicar-propuesta', { id: proposal.id });
+  for (const e of f.store.getPlan(plan.id)!.elementos) {
+    const u = await f.call<Unit>('trabajar-tema', { planId: plan.id, elementoId: e.id });
+    units.push(await f.call<Unit>('editar-unidad', { id: u.id, expectedRevision: u.revision, capability: `Explicar ${e.titulo}`, ...(criterio ? { criterion: 'Lo explico sin mirar' } : {}) }));
+  }
   return units;
 }
 
@@ -229,51 +235,60 @@ test('mantener y usar queda pendiente si la unidad está reaprendiendo', async t
   assert.equal(u.ciclo.mantener, 'pendiente');
 });
 
-test('el plan del espacio activo trae sus unidades en orden con su ciclo y después las propuestas del tutor', async t => {
+test('los planes del espacio activo traen sus elementos en orden, el ciclo de cada tema con unidad, el progreso y los cambios pendientes', async t => {
   const f = await fixture(t);
-  await espacio(f, 'Grafos');
+  const area = await espacio(f, 'Grafos');
   const [a, b] = await planCon(f, ['Recorridos', 'Caminos mínimos']);
-  const propuesta = await f.call<{ id: string; revision: number }>('proponer-cambio', { ops: [{ op: 'move', unitId: b!.id, index: 0 }] });
-  await f.call('aplicar-propuesta', { id: propuesta.id });
-  const archivada = await f.call<Unit>('crear-unidad', { title: 'Vieja' });
-  await f.call('archivar-unidad', { id: archivada.id, expectedRevision: archivada.revision });
-  // Las unidades que propone el tutor nacen como «propuesta» y fuera del plan.
-  const area = (await f.call<{ activeAreaId: string }>('espacios')).activeAreaId;
-  f.store.saveUnit({
-    id: 'prop-1', revision: 1, createdAt: hace(5), updatedAt: hace(5), status: 'propuesta', title: 'Flujo máximo', capability: '', criterion: '',
-    kind: null, policy: null, graphNodeIds: [], sources: [], checkIds: [], origin: { kind: 'tutor', chatId: 'c' }, notes: '', areaId: area,
-  }, null);
+  const grafos = f.store.listPlans()[0]!;
+  const temaB = grafos.elementos.find(e => e.unitId === b!.id)!;
+  await f.call('cambiar-plan', { id: grafos.id, expectedRevision: grafos.revision, ops: [
+    { op: 'move', elementoId: temaB.id, index: 0 }, { op: 'add', tipo: 'tarea', titulo: 'Leer el Cormen' }, { op: 'add', tipo: 'hito', titulo: 'Parcial', fecha: '2027-01-20' },
+  ] });
+  const actual = f.store.getPlan(grafos.id)!;
+  await f.call('cambiar-plan', { id: grafos.id, expectedRevision: actual.revision, ops: [{ op: 'edit', elementoId: actual.elementos[2]!.id, hecho: true }] });
+  f.store.saveProposal({ id: 'c-1', revision: 1, planId: grafos.id, baseRevision: actual.revision + 1, ops: [{ op: 'remove', elementoId: temaB.id }], rationale: 'Ya lo dominas', author: 'tutor', status: 'pendiente', createdAt: hace(1) }, null);
+  f.store.savePlan({ id: 'otro', revision: 1, createdAt: hace(9), updatedAt: hace(9), goal: 'Planaridad', estado: 'propuesto', elementos: [{ id: 'k', tipo: 'tema', titulo: 'Kuratowski', hecho: false }], origen: 'tutor', areaId: area }, null);
 
-  const p = await f.call<LecturaPlan>('plan');
-  assert.equal(p.plan?.objetivo, 'Dominar grafos');
-  assert.deepEqual(p.unidades.map(u => [u.titulo, u.propuesta, u.fueraDelPlan]), [
-    ['Caminos mínimos', false, false], ['Recorridos', false, false], ['Flujo máximo', true, true],
+  const { planes } = await f.call<LecturaPlanes>('planes');
+  assert.deepEqual(planes.map(p => [p.objetivo, p.estado, p.hechos, p.total]), [['Dominar grafos', 'activo', 1, 4], ['Planaridad', 'propuesto', 0, 1]]);
+  assert.deepEqual(planes[0]!.elementos.map(e => [e.tipo, e.titulo, e.hecho, e.fecha, e.unidad?.id ?? null]), [
+    ['tema', 'Caminos mínimos', false, null, b!.id], ['tema', 'Recorridos', false, null, a!.id], ['tarea', 'Leer el Cormen', true, null, null], ['hito', 'Parcial', false, '2027-01-20', null],
   ]);
-  assert.deepEqual(p.unidades[0]!.ciclo, { orientar: 'pendiente', exponer: 'vacio', reconstruir: 'vacio', mantener: 'vacio' });
-  assert.ok(a);
+  assert.deepEqual(planes[0]!.elementos[0]!.unidad!.ciclo, { orientar: 'pendiente', exponer: 'vacio', reconstruir: 'vacio', mantener: 'vacio' });
+  assert.deepEqual(planes[0]!.cambios, [{ id: 'c-1', descripcion: ['Quitar el tema «Caminos mínimos»'], motivo: 'Ya lo dominas', caducado: null }]);
 
   await espacio(f, 'Física');
-  assert.deepEqual(await f.call<LecturaPlan>('plan'), { plan: null, unidades: [] });
+  assert.deepEqual(await f.call<LecturaPlanes>('planes'), { planes: [], sinPlan: [] });
 });
 
-test('las unidades activas fuera del plan se listan detrás, marcadas, para no perderlas', async t => {
+test('las unidades activas que no están en ningún plan se listan aparte; las archivadas, no', async t => {
   const f = await fixture(t);
   await espacio(f, 'Grafos');
   await planCon(f, ['Recorridos']);
   await f.call('crear-unidad', { title: 'Suelta' });
-  const p = await f.call<LecturaPlan>('plan');
-  assert.deepEqual(p.unidades.map(u => [u.titulo, u.propuesta, u.fueraDelPlan]), [['Recorridos', false, false], ['Suelta', false, true]]);
+  const vieja = await f.call<Unit>('crear-unidad', { title: 'Vieja' });
+  await f.call('archivar-unidad', { id: vieja.id, expectedRevision: vieja.revision });
+  const p = await f.call<LecturaPlanes>('planes');
+  assert.deepEqual(p.sinPlan.map(u => [u.titulo, u.propuesta]), [['Suelta', false]]);
+  // Archivar el plan deja su unidad sin plan.
+  const plan = f.store.listPlans()[0]!;
+  await f.call('editar-plan', { id: plan.id, expectedRevision: plan.revision, estado: 'archivado' });
+  assert.deepEqual((await f.call<LecturaPlanes>('planes')).sinPlan.map(u => u.titulo), ['Recorridos', 'Suelta']);
 });
 
-test('la lectura de una unidad lleva el plan de su espacio, también con «Todos» activo', async t => {
+test('la lectura de una unidad lleva el plan de su tema, también con «Todos» activo, y la sugerencia pendiente del tutor', async t => {
   const f = await fixture(t);
   await espacio(f, 'Grafos');
   const [unit] = await planCon(f, ['Recorridos']);
-  const planGrafos = (await f.call<LecturaPlan>('plan')).plan!.id;
+  const planGrafos = f.store.listPlans()[0]!.id;
   await espacio(f, 'Física');
-  await f.call('crear-plan', { goal: 'Mecánica' });
+  const suelta = await f.call<Unit>('crear-unidad', { title: 'Suelta' });
   await f.call('activar-espacio', { areaId: null });
-  assert.equal((await f.call<Lectura>('unidad', { id: unit!.id })).planId, planGrafos);
+  assert.deepEqual((await f.call<Lectura>('unidad', { id: unit!.id })).plan, { id: planGrafos, objetivo: 'Dominar grafos' });
+  assert.equal((await f.call<Lectura>('unidad', { id: suelta.id })).plan, null);
+  const u = f.store.getUnit(unit!.id)!;
+  f.store.saveUnit({ ...u, revision: u.revision + 1, sugerencia: { capability: 'Recorrer en anchura', criterion: 'Sin mirar', chatId: 'c', createdAt: hace(1) } }, u.revision);
+  assert.deepEqual((await f.call<Lectura>('unidad', { id: unit!.id })).sugerencia, { capacidad: 'Recorrer en anchura', criterio: 'Sin mirar' });
 });
 
 test('un registro antiguo sin hechos se lee como «sin hechos»: las notas de cuadernos no cuentan como capturas', async t => {
@@ -333,33 +348,11 @@ test('un cuaderno nacido de una unidad es del espacio de la unidad, aunque esté
   assert.deepEqual((await f.call<{ title: string }[]>('cuadernos')).map(n => n.title), ['Ford-Fulkerson']);
 });
 
-interface LugarEnPlan { posicion: number; total: number; subir: number | null; bajar: number | null }
-type ConLugar = Lectura & { areaId: string | null; lugarEnPlan: LugarEnPlan | null };
-
-test('la lectura de una unidad dice su espacio y su lugar en el plan, sin contar las archivadas (ticket 11)', async t => {
+test('la lectura de una unidad dice su espacio (ticket 11)', async t => {
   const f = await fixture(t);
   const grafos = await espacio(f, 'Grafos');
-  const [a, b, c, d] = await planCon(f, ['A', 'B', 'C', 'D']);
-  const suelta = await f.call<Unit>('crear-unidad', { title: 'Suelta' });
-  await f.call('archivar-unidad', { id: b!.id, expectedRevision: (await f.call<Lectura>('unidad', { id: b!.id })).revision });
-  const lugar = async (id: string) => (await f.call<ConLugar>('unidad', { id })).lugarEnPlan;
-  // B archivada sigue en la lista del plan (índice 1): C es la segunda visible y sube al sitio de A, baja al de D.
-  assert.deepEqual(await lugar(c!.id), { posicion: 2, total: 3, subir: 0, bajar: 3 });
-  assert.deepEqual(await lugar(a!.id), { posicion: 1, total: 3, subir: null, bajar: 2 });
-  assert.deepEqual(await lugar(d!.id), { posicion: 3, total: 3, subir: 2, bajar: null });
-  assert.equal(await lugar(suelta.id), null);
-  assert.equal((await f.call<ConLugar>('unidad', { id: a!.id })).areaId, grafos);
-
-  // Los índices sirven tal cual para el cambio del plan: C sube por encima de A.
-  const plan = (await f.call<LecturaPlan>('plan')).plan!.id;
-  const prop = await f.call<{ id: string }>('proponer-cambio', { planId: plan, ops: [{ op: 'move', unitId: c!.id, index: 0 }] });
-  await f.call('aplicar-propuesta', { id: prop.id });
-  assert.deepEqual((await f.call<LecturaPlan>('plan')).unidades.filter(u => !u.fueraDelPlan).map(u => u.titulo), ['C', 'A', 'D']);
-  // A baja al sitio de la siguiente visible, D.
-  const conA = await lugar(a!.id);
-  const prop2 = await f.call<{ id: string }>('proponer-cambio', { planId: plan, ops: [{ op: 'move', unitId: a!.id, index: conA!.bajar! }] });
-  await f.call('aplicar-propuesta', { id: prop2.id });
-  assert.deepEqual((await f.call<LecturaPlan>('plan')).unidades.filter(u => !u.fueraDelPlan).map(u => u.titulo), ['C', 'D', 'A']);
+  const [a] = await planCon(f, ['A']);
+  assert.equal((await f.call<Lectura & { areaId: string | null }>('unidad', { id: a!.id })).areaId, grafos);
 });
 
 test('cada conversación de la unidad trae su resumen (tema, quedó abierto, siguiente) y si es anterior a los últimos mensajes (ticket 11)', async t => {

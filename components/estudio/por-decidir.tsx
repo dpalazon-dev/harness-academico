@@ -15,15 +15,20 @@ import { XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useServerEvent, useServerResync } from "@/components/server-events";
-import { confirmarUnidad, llamarEstudio } from "./llamar";
+import { llamarEstudio } from "./llamar";
 import type { LecturaPorDecidir } from "./tipos";
+import { rutaPlan } from "./plan";
 
-export type UnidadPropuesta = LecturaPorDecidir["unidades"][number];
+export type PlanPropuesto = LecturaPorDecidir["planes"][number];
+export type Sugerencia = LecturaPorDecidir["sugerencias"][number];
 
 export interface AccionesPorDecidir {
 	abrirUnidad(unitId: string): void;
-	confirmarUnidad(u: UnidadPropuesta): void;
-	descartarUnidad(u: UnidadPropuesta): void;
+	abrirPlan(planId: string): void;
+	aceptarPlan(p: PlanPropuesto): void;
+	descartarPlan(p: PlanPropuesto): void;
+	aceptarSugerencia(s: Sugerencia): void;
+	descartarSugerencia(s: Sugerencia): void;
 	aplicarCambio(id: string): void;
 	rechazarCambio(id: string): void;
 	confirmarBorrador(id: string): void;
@@ -32,7 +37,7 @@ export interface AccionesPorDecidir {
 
 /** Cuántas decisiones esperan; sin lectura, ninguna. */
 export const totalPorDecidir = (l: LecturaPorDecidir | null): number =>
-	l ? l.unidades.length + l.cambios.length + l.borradores.length : 0;
+	l ? l.planes.length + l.cambios.length + l.sugerencias.length + l.borradores.length : 0;
 
 const BORRADOR = { hecho: "Hecho", pregunta: "Pregunta", sintesis: "Síntesis" } as const;
 
@@ -52,20 +57,30 @@ export function ListaPorDecidir({ lectura, ocupado, error, acciones }: {
 				<p className="text-sm text-muted-foreground">Nada pendiente de tu decisión.</p>
 			) : (
 				<ul className="space-y-2">
-					{lectura.unidades.map(u => (
-						<Decision key={u.id} ocupado={ocupado} confirmar={() => acciones.confirmarUnidad(u)} descartar={() => acciones.descartarUnidad(u)}>
-							<p className="text-xs text-muted-foreground">Unidad propuesta por el tutor</p>
-							<button type="button" onClick={() => acciones.abrirUnidad(u.id)} className="text-left font-medium hover:underline">{u.titulo}</button>
-							{u.capacidad && <p className="text-muted-foreground">{u.capacidad}</p>}
+					{lectura.planes.map(p => (
+						<Decision key={p.id} ocupado={ocupado} confirmarTexto="Aceptar" confirmar={() => acciones.aceptarPlan(p)} descartar={() => acciones.descartarPlan(p)}>
+							<p className="text-xs text-muted-foreground">Plan propuesto por el tutor · {p.elementos === 1 ? "1 elemento" : `${p.elementos} elementos`}</p>
+							<button type="button" onClick={() => acciones.abrirPlan(p.id)} className="text-left font-medium hover:underline">{p.objetivo}</button>
 						</Decision>
 					))}
 					{lectura.cambios.map(c => (
 						<Decision key={c.id} ocupado={ocupado} confirmarTexto="Aplicar" descartarTexto={c.caducado ? "Descartar" : "Rechazar"}
 							confirmar={c.caducado ? undefined : () => acciones.aplicarCambio(c.id)} descartar={() => acciones.rechazarCambio(c.id)}>
-							<p className="text-xs text-muted-foreground">Cambio del plan</p>
+							<p className="text-xs text-muted-foreground">
+								Cambio del plan <button type="button" onClick={() => acciones.abrirPlan(c.planId)} className="hover:underline">«{c.objetivo}»</button>
+							</p>
 							{c.descripcion.map(d => <p key={d}>{d}</p>)}
 							{c.motivo && <p className="text-muted-foreground">{c.motivo}</p>}
 							{c.caducado && <p className="text-destructive">Ya no se puede aplicar: {c.caducado}.</p>}
+						</Decision>
+					))}
+					{lectura.sugerencias.map(x => (
+						<Decision key={x.unitId} ocupado={ocupado} confirmarTexto="Aceptar" confirmar={() => acciones.aceptarSugerencia(x)} descartar={() => acciones.descartarSugerencia(x)}>
+							<p className="text-xs text-muted-foreground">
+								Capacidad y criterio para <button type="button" onClick={() => acciones.abrirUnidad(x.unitId)} className="hover:underline">«{x.titulo}»</button>
+							</p>
+							<p>{x.capacidad}</p>
+							<p className="text-muted-foreground">Sabrás que puedes cuando: {x.criterio}</p>
 						</Decision>
 					))}
 					{lectura.borradores.map(b => (
@@ -181,8 +196,11 @@ export function usePorDecidir() {
 
 	const acciones: AccionesPorDecidir = {
 		abrirUnidad: (id) => { setAbierto(false); router.push(`/unidad/${id}`); },
-		confirmarUnidad: (u) => decidir(() => confirmarUnidad(u)),
-		descartarUnidad: (u) => decidir(() => llamarEstudio("archivar-unidad", { id: u.id, expectedRevision: u.revision })),
+		abrirPlan: (id) => { setAbierto(false); router.push(rutaPlan(id)); },
+		aceptarPlan: (p) => decidir(() => llamarEstudio("aceptar-plan", { id: p.id, expectedRevision: p.revision })),
+		descartarPlan: (p) => decidir(() => llamarEstudio("descartar-plan", { id: p.id, expectedRevision: p.revision })),
+		aceptarSugerencia: (x) => decidir(() => llamarEstudio("aceptar-sugerencia", { id: x.unitId, expectedRevision: x.revision })),
+		descartarSugerencia: (x) => decidir(() => llamarEstudio("descartar-sugerencia", { id: x.unitId, expectedRevision: x.revision })),
 		aplicarCambio: (id) => decidir(() => llamarEstudio("aplicar-propuesta", { id })),
 		rechazarCambio: (id) => decidir(() => llamarEstudio("rechazar-propuesta", { id })),
 		confirmarBorrador: (id) => decidir(() => llamarEstudio("kb-confirmar", { draftIds: [id] })),

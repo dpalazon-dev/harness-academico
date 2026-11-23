@@ -161,8 +161,8 @@ describe("⌘K en el armazón", () => {
 		const html = renderToStaticMarkup(
 			<SidebarProvider open onOpenChange={nada}>
 				<BarraLateralEstudio
-					espacios={{ areas: [], activeAreaId: null }} conversaciones={[]} plan={{ plan: null, unidades: [] }} ruta="/" atajoPaleta="Ctrl+K"
-					acciones={{ elegirEspacio: nada, crearEspacio: nada, renombrarEspacio: nada, archivarEspacio: nada, recuperarEspacio: nada, traerSinEspacio: nada, moverPlan: nada, abrirAjustes: nada, navegar: nada, abrirPaleta: nada, renombrarConversacion: nada, exportarConversacion: nada, resumirConversacion: nada, borrarConversacion: nada, alternarSeccion: nada, abrirPorDecidir: nada, cambiarFiltros: nada }}
+					espacios={{ areas: [], activeAreaId: null }} conversaciones={[]} planes={{ planes: [], sinPlan: [] }} ruta="/" atajoPaleta="Ctrl+K"
+					acciones={{ elegirEspacio: nada, crearEspacio: nada, renombrarEspacio: nada, archivarEspacio: nada, recuperarEspacio: nada, traerSinEspacio: nada, crearPlan: nada, abrirAjustes: nada, navegar: nada, abrirPaleta: nada, renombrarConversacion: nada, exportarConversacion: nada, resumirConversacion: nada, borrarConversacion: nada, alternarSeccion: nada, abrirPorDecidir: nada, cambiarFiltros: nada }}
 				/>
 			</SidebarProvider>,
 		);

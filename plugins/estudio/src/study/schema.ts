@@ -1,9 +1,11 @@
 import {
-  StudyError, UNIT_KINDS, UNIT_POLICIES, UNIT_STATUSES,
-  type PlanOp, type PlanProposal, type SourceRef, type StudyArea, type StudyPlan, type StudyPreferences, type StudyUnit, type UnitOrigin,
+  PLAN_ESTADOS, StudyError, TIPOS_ELEMENTO, UNIT_KINDS, UNIT_POLICIES, UNIT_STATUSES,
+  type CambioPlan, type ElementoPlan, type PlanOp, type PlanProposal, type SourceRef, type StudyArea, type StudyPlan, type StudyPreferences,
+  type StudyUnit, type SugerenciaUnidad, type UnitOrigin,
 } from './types.ts';
 
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
+const LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
 
 function invalid(message: string): never { throw new StudyError('INVALID_INPUT', message); }
@@ -34,6 +36,14 @@ export function text(value: unknown, max: number, path: string, { required = fal
 
 export function instant(value: unknown, path: string): string {
   if (typeof value !== 'string' || !INSTANT.test(value) || Number.isNaN(Date.parse(value))) invalid(`${path} must be an ISO instant`);
+  return value;
+}
+
+/** A local calendar date, YYYY-MM-DD, that exists. */
+export function fecha(value: unknown, path: string): string {
+  if (typeof value !== 'string' || !LOCAL_DATE.test(value)) invalid(`${path} must be a date YYYY-MM-DD`);
+  const d = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== value) invalid(`${path} must be a date YYYY-MM-DD`);
   return value;
 }
 
@@ -87,7 +97,7 @@ export function parsePreferences(value: unknown): StudyPreferences {
   return { id: 'estudio', revision: revision(r.revision, 'preferences.revision'), activeAreaId: areaRef(r.activeAreaId, 'preferences.activeAreaId') };
 }
 
-export const LIMITS = { areaName: 120, areaDescription: 1000, title: 500, capability: 4000, criterion: 4000, notes: 20000, goal: 4000, rationale: 4000, path: 1000 } as const;
+export const LIMITS = { areaName: 120, areaDescription: 1000, title: 500, capability: 4000, criterion: 4000, notes: 20000, goal: 4000, rationale: 4000, path: 1000, elementoTitulo: 500, elementos: 100 } as const;
 
 export function parseSource(value: unknown, path: string): SourceRef {
   const r = fields(value, ['path', 'locator'], path);
@@ -106,11 +116,21 @@ function parseOrigin(value: unknown, path: string): UnitOrigin {
 }
 
 const UNIT_KEYS = ['id', 'revision', 'createdAt', 'updatedAt', 'status', 'title', 'capability', 'criterion', 'kind', 'policy',
-  'graphNodeIds', 'sources', 'checkIds', 'origin', 'notes', 'areaId'] as const;
+  'graphNodeIds', 'sources', 'checkIds', 'origin', 'notes', 'areaId', 'sugerencia'] as const;
+
+function parseSugerencia(value: unknown, path: string): SugerenciaUnidad {
+  const r = fields(value, ['capability', 'criterion', 'chatId', 'createdAt'], path);
+  return {
+    capability: text(r.capability, LIMITS.capability, `${path}.capability`),
+    criterion: text(r.criterion, LIMITS.criterion, `${path}.criterion`),
+    chatId: text(r.chatId, 200, `${path}.chatId`, { required: true }),
+    createdAt: instant(r.createdAt, `${path}.createdAt`),
+  };
+}
 
 export function parseUnit(value: unknown): StudyUnit {
   const r = fields(value, UNIT_KEYS, 'unit');
-  return {
+  const unit: StudyUnit = {
     id: id(r.id, 'unit.id'),
     revision: revision(r.revision, 'unit.revision'),
     createdAt: instant(r.createdAt, 'unit.createdAt'),
@@ -128,42 +148,91 @@ export function parseUnit(value: unknown): StudyUnit {
     notes: text(r.notes, LIMITS.notes, 'unit.notes'),
     areaId: areaRef(r.areaId, 'unit.areaId'),
   };
+  if (r.sugerencia !== undefined) unit.sugerencia = parseSugerencia(r.sugerencia, 'unit.sugerencia');
+  return unit;
+}
+
+export function elementoTitulo(value: unknown, path: string): string {
+  return text(value, LIMITS.elementoTitulo, path, { required: true }).trim();
+}
+
+export function parseElemento(value: unknown, path: string): ElementoPlan {
+  const r = fields(value, ['id', 'tipo', 'titulo', 'hecho', 'unitId', 'fecha'], path);
+  if (typeof r.hecho !== 'boolean') invalid(`${path}.hecho must be a boolean`);
+  const elemento: ElementoPlan = {
+    id: id(r.id, `${path}.id`), tipo: member(r.tipo, TIPOS_ELEMENTO, `${path}.tipo`),
+    titulo: elementoTitulo(r.titulo, `${path}.titulo`), hecho: r.hecho,
+  };
+  if (r.unitId !== undefined) {
+    if (elemento.tipo !== 'tema') invalid(`${path}.unitId is only allowed on a tema`);
+    elemento.unitId = id(r.unitId, `${path}.unitId`);
+  }
+  if (r.fecha !== undefined) {
+    if (elemento.tipo !== 'hito') invalid(`${path}.fecha is only allowed on a hito`);
+    elemento.fecha = fecha(r.fecha, `${path}.fecha`);
+  }
+  return elemento;
 }
 
 export function parsePlan(value: unknown): StudyPlan {
-  const r = fields(value, ['id', 'revision', 'createdAt', 'updatedAt', 'goal', 'unitIds', 'archived', 'lastAppliedProposalId', 'areaId'], 'plan');
-  if (typeof r.archived !== 'boolean') invalid('plan.archived must be a boolean');
+  const r = fields(value, ['id', 'revision', 'createdAt', 'updatedAt', 'goal', 'estado', 'elementos', 'origen', 'chatId', 'lastAppliedProposalId', 'areaId'], 'plan');
   const plan: StudyPlan = {
     id: id(r.id, 'plan.id'),
     revision: revision(r.revision, 'plan.revision'),
     createdAt: instant(r.createdAt, 'plan.createdAt'),
     updatedAt: instant(r.updatedAt, 'plan.updatedAt'),
     goal: text(r.goal, LIMITS.goal, 'plan.goal', { required: true }),
-    unitIds: unique(list(r.unitIds, 1000, 'plan.unitIds', id), 'plan.unitIds'),
-    archived: r.archived,
+    estado: member(r.estado, PLAN_ESTADOS, 'plan.estado'),
+    elementos: list(r.elementos, LIMITS.elementos, 'plan.elementos', parseElemento),
+    origen: member(r.origen, ['tutor', 'manual'] as const, 'plan.origen'),
     areaId: areaRef(r.areaId, 'plan.areaId'),
   };
+  unique(plan.elementos.map(e => e.id), 'plan.elementos ids');
+  unique(plan.elementos.flatMap(e => e.unitId ? [e.unitId] : []), 'plan.elementos units');
+  if (r.chatId !== undefined) plan.chatId = text(r.chatId, 200, 'plan.chatId', { required: true });
   if (r.lastAppliedProposalId !== undefined) plan.lastAppliedProposalId = id(r.lastAppliedProposalId, 'plan.lastAppliedProposalId');
   return plan;
+}
+
+function parseAdd(r: Record<string, unknown>, path: string): PlanOp {
+  fields(r, ['op', 'tipo', 'titulo', 'fecha', 'index'], path);
+  const tipo = member(r.tipo, TIPOS_ELEMENTO, `${path}.tipo`);
+  const op: PlanOp = { op: 'add', tipo, titulo: elementoTitulo(r.titulo, `${path}.titulo`) };
+  if (r.fecha !== undefined && r.fecha !== null) {
+    if (tipo !== 'hito') invalid(`${path}.fecha is only allowed on a hito`);
+    op.fecha = fecha(r.fecha, `${path}.fecha`);
+  }
+  if (r.index !== undefined) op.index = index(r.index, `${path}.index`);
+  return op;
 }
 
 export function parsePlanOp(value: unknown, path: string): PlanOp {
   const r = object(value, path);
   switch (r.op) {
-    case 'add': {
-      fields(r, ['op', 'unitId', 'index'], path);
-      const op: PlanOp = { op: 'add', unitId: id(r.unitId, `${path}.unitId`) };
-      if (r.index !== undefined) op.index = index(r.index, `${path}.index`);
-      return op;
-    }
+    case 'add': return parseAdd(r, path);
     case 'remove':
-      fields(r, ['op', 'unitId'], path);
-      return { op: 'remove', unitId: id(r.unitId, `${path}.unitId`) };
+      fields(r, ['op', 'elementoId'], path);
+      return { op: 'remove', elementoId: id(r.elementoId, `${path}.elementoId`) };
     case 'move':
-      fields(r, ['op', 'unitId', 'index'], path);
-      return { op: 'move', unitId: id(r.unitId, `${path}.unitId`), index: index(r.index, `${path}.index`) };
+      fields(r, ['op', 'elementoId', 'index'], path);
+      return { op: 'move', elementoId: id(r.elementoId, `${path}.elementoId`), index: index(r.index, `${path}.index`) };
     default: return invalid(`${path}.op must be add, remove or move`);
   }
+}
+
+/** David's direct edits: the proposal ops plus `edit`. */
+export function parseCambioPlan(value: unknown, path: string): CambioPlan {
+  const r = object(value, path);
+  if (r.op !== 'edit') return parsePlanOp(r, path);
+  fields(r, ['op', 'elementoId', 'titulo', 'hecho', 'fecha'], path);
+  const op: CambioPlan = { op: 'edit', elementoId: id(r.elementoId, `${path}.elementoId`) };
+  if (r.titulo !== undefined) op.titulo = elementoTitulo(r.titulo, `${path}.titulo`);
+  if (r.hecho !== undefined) {
+    if (typeof r.hecho !== 'boolean') invalid(`${path}.hecho must be a boolean`);
+    op.hecho = r.hecho;
+  }
+  if (r.fecha !== undefined) op.fecha = r.fecha === null ? null : fecha(r.fecha, `${path}.fecha`);
+  return op;
 }
 
 function index(value: unknown, path: string): number {

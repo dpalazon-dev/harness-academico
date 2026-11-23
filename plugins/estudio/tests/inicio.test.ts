@@ -51,7 +51,6 @@ type Unit = { id: string; revision: number; title: string };
 type TipoPaso = 'decidir' | 'volcado' | 'reconstruir' | 'repasar' | 'tutor';
 interface Paso { tipo: TipoPaso; accion: string; motivo: string; boton: string; unitId: string; titulo: string }
 interface Inicio {
-  plan: { id: string; objetivo: string } | null;
   paso: Paso | null;
   pasos: Paso[];
   repasos: { unitId: string; titulo: string; tarea: string; intentoId: string | null; fecha: string | null }[];
@@ -59,8 +58,9 @@ interface Inicio {
   abierto: { chatId: string; titulo: string; abierto: string[]; siguiente: string } | null;
 }
 interface PorDecidir {
-  unidades: { id: string; revision: number; titulo: string; capacidad: string; planId: string | null }[];
-  cambios: { id: string; descripcion: string[]; motivo: string; caducado: string | null }[];
+  planes: { id: string; revision: number; objetivo: string; elementos: number }[];
+  cambios: { id: string; planId: string; objetivo: string; descripcion: string[]; motivo: string; caducado: string | null }[];
+  sugerencias: { unitId: string; revision: number; titulo: string; capacidad: string; criterio: string }[];
   borradores: { id: string; tipo: string; resumen: string; origen: string; registros: number }[];
 }
 
@@ -91,13 +91,22 @@ async function espacio(f: F, name: string): Promise<string> {
   return area.id;
 }
 
+/** Un plan con un tema por título, cada uno ya convertido en unidad con «Trabajar». */
 async function planCon(f: F, titulos: string[]): Promise<Unit[]> {
-  await f.call('crear-plan', { goal: 'Dominar grafos' });
+  const plan = await f.call<{ id: string }>('crear-plan', { goal: 'Dominar grafos' });
+  if (titulos.length) await f.call('cambiar-plan', { id: plan.id, expectedRevision: 1, ops: titulos.map(titulo => ({ op: 'add', tipo: 'tema', titulo })) });
   const units: Unit[] = [];
-  for (const title of titulos) units.push(await f.call<Unit>('crear-unidad', { title, capability: `Explicar ${title}` }));
-  const proposal = await f.call<{ id: string }>('proponer-cambio', { ops: units.map(u => ({ op: 'add', unitId: u.id })) });
-  await f.call('aplicar-propuesta', { id: proposal.id });
+  for (const e of f.store.getPlan(plan.id)!.elementos) {
+    const u = await f.call<Unit>('trabajar-tema', { planId: plan.id, elementoId: e.id });
+    units.push(await f.call<Unit>('editar-unidad', { id: u.id, expectedRevision: u.revision, capability: `Explicar ${e.titulo}` }));
+  }
   return units;
+}
+
+/** El plan y el tema enlazados a una unidad. */
+function temaDe(f: F, unitId: string) {
+  const plan = f.store.listPlans().find(p => p.elementos.some(e => e.unitId === unitId))!;
+  return { plan, elementoId: plan.elementos.find(e => e.unitId === unitId)!.id };
 }
 
 const volcado = (f: F, u: Unit) => f.call('guardar-volcado', { unitId: u.id, texto: 'Sé que…' });
@@ -168,15 +177,15 @@ test('el inicio lee el espacio activo: paso principal de la primera unidad del p
   await fuente(f, aMedias!, 'doc-4', area, 0);
   intento(f.store, aMedias!.id, 'm1', hace(5), 'open');
 
-  // Pendiente de decidir: una unidad propuesta, un cambio del plan del tutor y un borrador de conocimiento.
-  const prop = await f.call<Unit>('crear-unidad', { title: 'Planaridad', capability: 'Decidir si un grafo es plano' });
-  const p = f.store.getUnit(prop.id)!;
-  f.store.saveUnit({ ...p, revision: p.revision + 1, status: 'propuesta' }, p.revision);
-  const inicial = await f.call<Inicio>('inicio');
+  // Pendiente de decidir: un plan propuesto, un cambio del plan del tutor, una sugerencia de capacidad y un borrador.
+  const { plan: grafos, elementoId: recorridos } = temaDe(f, sinPaso!.id);
+  f.store.savePlan({ id: 'propuesto-1', revision: 1, createdAt: hace(2), updatedAt: hace(2), goal: 'Planaridad', estado: 'propuesto', elementos: [{ id: 'e1', tipo: 'tema', titulo: 'Kuratowski', hecho: false }], origen: 'tutor', chatId: 'c-x', areaId: area }, null);
   f.store.saveProposal({
-    id: 'cambio-1', revision: 1, planId: inicial.plan!.id, baseRevision: f.store.getPlan(inicial.plan!.id)!.revision,
-    ops: [{ op: 'remove', unitId: sinPaso!.id }], rationale: 'Ya lo dominas.', author: 'tutor', status: 'pendiente', createdAt: hace(1),
+    id: 'cambio-1', revision: 1, planId: grafos.id, baseRevision: grafos.revision,
+    ops: [{ op: 'remove', elementoId: recorridos }], rationale: 'Ya lo dominas.', author: 'tutor', status: 'pendiente', createdAt: hace(1),
   }, null);
+  const arboles = f.store.getUnit(sinVolcado!.id)!;
+  f.store.saveUnit({ ...arboles, revision: arboles.revision + 1, sugerencia: { capability: 'Recorrer un árbol', criterion: 'Sin mirar', chatId: 'c-x', createdAt: hace(1) } }, arboles.revision);
   f.store.saveDraft({ id: 'draft-1', revision: 1, kind: 'hecho', summary: 'GDN obtiene F1 0,81 en SWaT.', origin: 'tutor', status: 'pendiente', createdAt: hace(1), commit: null, records: [{ record: { id: 'HE-1', type: 'hecho', title: 'GDN en SWaT' } as never, body: '' }] }, null);
 
   // Lo que quedó abierto: la conversación más reciente del espacio con algo abierto en su resumen.
@@ -192,10 +201,9 @@ test('el inicio lee el espacio activo: paso principal de la primera unidad del p
   conversacion('c-ajena', 'Movimiento', hace(1), ['¿Qué es la aceleración?'], otro);
 
   const inicio = await f.call<Inicio>('inicio');
-  assert.equal(inicio.plan?.objetivo, 'Dominar grafos');
   assert.deepEqual([inicio.paso?.unitId, inicio.paso?.tipo], [sinVolcado!.id, 'volcado'], 'la primera unidad del plan con paso; «Recorridos» no tiene ninguno');
   assert.deepEqual(inicio.pasos.map(x => [x.titulo, x.tipo]), [['Caminos mínimos', 'reconstruir']],
-    'el repaso de «Flujo» va en los repasos; la propuesta, por decidir; nada de otro espacio');
+    'el repaso de «Flujo» va en los repasos; nada de otro espacio');
   assert.deepEqual(inicio.repasos.map(r => [r.titulo, r.intentoId]), [['Emparejamientos', 'm1'], ['Flujo', null]]);
   const lecturaSemana = await f.call<{ proximoRepaso: string }>('unidad', { id: semana!.id });
   assert.deepEqual(inicio.proximos.flatMap(d => d.unidades.map(u => [d.dia, u.titulo])), [[lecturaSemana.proximoRepaso, 'Coloreado']]);
@@ -204,8 +212,9 @@ test('el inicio lee el espacio activo: paso principal de la primera unidad del p
   assert.ok(!JSON.stringify(inicio).includes(ajena!.id), 'nada del otro espacio');
 
   const decidir = await f.call<PorDecidir>('por-decidir');
-  assert.deepEqual(decidir.unidades.map(u => [u.titulo, u.capacidad, u.planId]), [['Planaridad', 'Decidir si un grafo es plano', inicio.plan!.id]]);
-  assert.deepEqual(decidir.cambios, [{ id: 'cambio-1', descripcion: ['Quitar «Recorridos»'], motivo: 'Ya lo dominas.', caducado: null }]);
+  assert.deepEqual(decidir.planes, [{ id: 'propuesto-1', revision: 1, objetivo: 'Planaridad', elementos: 1 }]);
+  assert.deepEqual(decidir.cambios, [{ id: 'cambio-1', planId: grafos.id, objetivo: 'Dominar grafos', descripcion: ['Quitar el tema «Recorridos»'], motivo: 'Ya lo dominas.', caducado: null }]);
+  assert.deepEqual(decidir.sugerencias.map(x => [x.titulo, x.capacidad, x.criterio]), [['Árboles', 'Recorrer un árbol', 'Sin mirar']]);
   assert.deepEqual(decidir.borradores, [{ id: 'draft-1', tipo: 'hecho', resumen: 'GDN obtiene F1 0,81 en SWaT.', origen: 'tutor', registros: 1 }]);
   assert.ok(!JSON.stringify(decidir).includes(ajena!.id), 'nada del otro espacio');
 });
@@ -229,8 +238,8 @@ test('un espacio vacío no propone nada ni tiene nada por decidir; una unidad nu
   const f = await fixture(t);
   await espacio(f, 'Vacío');
   const vacio = await f.call<Inicio>('inicio');
-  assert.deepEqual([vacio.plan, vacio.paso, vacio.pasos, vacio.repasos, vacio.proximos, vacio.abierto], [null, null, [], [], [], null]);
-  assert.deepEqual(await f.call<PorDecidir>('por-decidir'), { unidades: [], cambios: [], borradores: [] });
+  assert.deepEqual([vacio.paso, vacio.pasos, vacio.repasos, vacio.proximos, vacio.abierto], [null, [], [], [], null]);
+  assert.deepEqual(await f.call<PorDecidir>('por-decidir'), { planes: [], cambios: [], sugerencias: [], borradores: [] });
 
   await planCon(f, ['Nueva']);
   const nueva = await f.call<Inicio>('inicio');
@@ -242,10 +251,10 @@ test('confirmar y descartar lo pendiente usan las operaciones de propuestas y bo
   const f = await fixture(t);
   await espacio(f, 'Grafos');
   const [u] = await planCon(f, ['Recorridos']);
-  const plan = (await f.call<Inicio>('inicio')).plan!;
+  const { plan, elementoId } = temaDe(f, u!.id);
   for (const id of ['c-1', 'c-2']) f.store.saveProposal({
-    id, revision: 1, planId: plan.id, baseRevision: f.store.getPlan(plan.id)!.revision,
-    ops: [{ op: 'remove', unitId: u!.id }], rationale: '', author: 'tutor', status: 'pendiente', createdAt: hace(1),
+    id, revision: 1, planId: plan.id, baseRevision: plan.revision,
+    ops: [{ op: 'remove', elementoId }], rationale: '', author: 'tutor', status: 'pendiente', createdAt: hace(1),
   }, null);
   f.store.saveDraft({ id: 'd-1', revision: 1, kind: 'hecho', summary: 's', origin: 'tutor', status: 'pendiente', createdAt: hace(1), commit: null, records: [{ record: { id: 'HE-1', type: 'hecho', title: 'x' } as never, body: '' }] }, null);
   await f.call('rechazar-propuesta', { id: 'c-1' });
@@ -257,21 +266,21 @@ test('confirmar y descartar lo pendiente usan las operaciones de propuestas y bo
   assert.deepEqual((await f.call<PorDecidir>('por-decidir')).cambios, []);
 });
 
-test('un cambio del tutor sobre una unidad que otro cambio ya tocó sale caducado, se explica en español y solo cabe descartarlo', async t => {
+test('un cambio del tutor sobre un tema que otro cambio ya tocó sale caducado, se explica en español y solo cabe descartarlo', async t => {
   const f = await fixture(t);
   await espacio(f, 'Grafos');
   const [u] = await planCon(f, ['Recorridos']);
-  const plan = (await f.call<Inicio>('inicio')).plan!;
+  const { plan, elementoId } = temaDe(f, u!.id);
   const proponer = (id: string, index: number) => f.store.saveProposal({
-    id, revision: 1, planId: plan.id, baseRevision: f.store.getPlan(plan.id)!.revision,
-    ops: [{ op: 'move', unitId: u!.id, index }], rationale: '', author: 'tutor', status: 'pendiente', createdAt: hace(1),
+    id, revision: 1, planId: plan.id, baseRevision: plan.revision,
+    ops: [{ op: 'move', elementoId, index }], rationale: '', author: 'tutor', status: 'pendiente', createdAt: hace(1),
   }, null);
   proponer('c-1', 0);
   proponer('c-2', 0);
   await f.call('aplicar-propuesta', { id: 'c-1' });
   const [cambio] = (await f.call<PorDecidir>('por-decidir')).cambios;
-  assert.deepEqual([cambio?.id, cambio?.caducado], ['c-2', 'otro cambio del plan ya tocó «Recorridos»']);
-  await assert.rejects(async () => f.call('aplicar-propuesta', { id: 'c-2' }), /Este cambio del plan ya no encaja, porque otro cambio del plan ya tocó «Recorridos». Se ha retirado sin tocar el plan./);
+  assert.deepEqual([cambio?.id, cambio?.caducado], ['c-2', 'otro cambio del plan ya tocó el tema «Recorridos»']);
+  await assert.rejects(async () => f.call('aplicar-propuesta', { id: 'c-2' }), /Este cambio del plan ya no encaja, porque otro cambio del plan ya tocó el tema «Recorridos». Se ha retirado sin tocar el plan./);
   assert.deepEqual((await f.call<PorDecidir>('por-decidir')).cambios, [], 'retirado, deja de estar por decidir');
 });
 

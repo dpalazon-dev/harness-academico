@@ -1,4 +1,4 @@
-/** Lo que el armazón lee de las operaciones `plan` y `unidad` del plugin Estudio
+/** Lo que el armazón lee de las operaciones `planes` y `unidad` del plugin Estudio
  * (`plugins/estudio/src/armazon.ts`); el núcleo no importa el código del plugin. */
 
 export type EstadoGrupo = "hecho" | "pendiente" | "vacio";
@@ -8,8 +8,34 @@ export type TipoUnidad = "concepto" | "procedimiento" | "argumento" | "modelo";
 export type PracticaUnidad = "recordar" | "reconstruir" | "ejecutar" | "localizar";
 export type Tarea = "guiada" | "libre" | "estructural" | "aplicada" | "comparacion" | "transferencia";
 
-export interface UnidadDelPlan { id: string; titulo: string; propuesta: boolean; fueraDelPlan: boolean; ciclo: CicloUnidad }
-export interface LecturaPlan { plan: { id: string; objetivo: string } | null; unidades: UnidadDelPlan[] }
+export type TipoElemento = "tema" | "tarea" | "hito";
+export type EstadoPlan = "propuesto" | "activo" | "archivado";
+/** Un elemento de un plan; un tema que David decidió trabajar lleva su unidad. */
+export interface ElementoPlan {
+	id: string;
+	tipo: TipoElemento;
+	titulo: string;
+	hecho: boolean;
+	/** Solo en un hito con fecha: `AAAA-MM-DD`. */
+	fecha: string | null;
+	unidad: { id: string; titulo: string; estado: "propuesta" | "activa" | "archivada"; ciclo: CicloUnidad } | null;
+}
+/** Un cambio del plan que propuso el tutor; `caducado`: por qué ya no se puede aplicar, solo cabe descartarlo. */
+export interface CambioPendiente { id: string; descripcion: string[]; motivo: string; caducado: string | null }
+export interface PlanLeido {
+	id: string;
+	revision: number;
+	objetivo: string;
+	estado: EstadoPlan;
+	origen: "tutor" | "manual";
+	hechos: number;
+	total: number;
+	elementos: ElementoPlan[];
+	cambios: CambioPendiente[];
+}
+export interface UnidadSinPlan { id: string; titulo: string; propuesta: boolean; ciclo: CicloUnidad }
+/** Los planes vivos del espacio activo (propuestos y activos, el último actualizado primero) y las unidades sin plan. */
+export interface LecturaPlanes { planes: PlanLeido[]; sinPlan: UnidadSinPlan[] }
 
 export interface LecturaUnidad {
 	id: string;
@@ -18,10 +44,10 @@ export interface LecturaUnidad {
 	estado: "propuesta" | "activa" | "archivada";
 	/** El espacio de la unidad, o null si no tiene. */
 	areaId: string | null;
-	/** El plan actual del espacio de la unidad; null si no tiene. */
-	planId: string | null;
-	/** Su lugar en ese plan sin contar las archivadas; `subir` y `bajar`, el índice de la op `move` (null en un extremo). */
-	lugarEnPlan: { posicion: number; total: number; subir: number | null; bajar: number | null } | null;
+	/** El plan con un tema enlazado a la unidad, o null si no está en ninguno. */
+	plan: { id: string; objetivo: string } | null;
+	/** La capacidad y el criterio que sugirió el tutor, pendientes de aceptar o descartar. */
+	sugerencia: { capacidad: string; criterio: string } | null;
 	capacidad: string;
 	criterio: string;
 	tipo: TipoUnidad | null;
@@ -55,7 +81,6 @@ export interface PasoDeUnidad extends Paso { unitId: string; titulo: string }
 
 /** La lectura `inicio` (`plugins/estudio/src/inicio.ts`). */
 export interface LecturaInicio {
-	plan: { id: string; objetivo: string } | null;
 	paso: PasoDeUnidad | null;
 	pasos: PasoDeUnidad[];
 	repasos: { unitId: string; titulo: string; tarea: Tarea; intentoId: string | null; fecha: string | null }[];
@@ -63,12 +88,14 @@ export interface LecturaInicio {
 	abierto: { chatId: string; titulo: string; fecha: string; abierto: string[]; siguiente: string } | null;
 }
 
-/** La lectura `por-decidir` (`plugins/estudio/src/inicio.ts`): unidades y cambios del plan propuestos por el tutor en
- * el espacio activo y borradores de conocimiento sin confirmar, que son de la base, común a todos los espacios. */
+/** La lectura `por-decidir` (`plugins/estudio/src/inicio.ts`): planes, cambios de planes y sugerencias de capacidad
+ * que propuso el tutor en el espacio activo, y borradores de conocimiento sin confirmar, que son de la base, común a
+ * todos los espacios. */
 export interface LecturaPorDecidir {
-	unidades: { id: string; revision: number; titulo: string; capacidad: string; notas: string; planId: string | null }[];
+	planes: { id: string; revision: number; objetivo: string; elementos: number }[];
 	/** `caducado`: por qué ya no se puede aplicar; solo cabe descartarlo. */
-	cambios: { id: string; descripcion: string[]; motivo: string; caducado: string | null }[];
+	cambios: { id: string; planId: string; objetivo: string; descripcion: string[]; motivo: string; caducado: string | null }[];
+	sugerencias: { unitId: string; revision: number; titulo: string; capacidad: string; criterio: string }[];
 	borradores: { id: string; tipo: "hecho" | "pregunta" | "sintesis"; resumen: string; origen: "david" | "tutor"; registros: number }[];
 }
 

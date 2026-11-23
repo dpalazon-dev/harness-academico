@@ -13,12 +13,13 @@ import type { LecturaPorDecidir } from "../components/estudio/tipos.ts";
 
 const nada = () => {};
 const acciones = {
-	abrirUnidad: nada, confirmarUnidad: nada, descartarUnidad: nada, aplicarCambio: nada, rechazarCambio: nada, confirmarBorrador: nada, descartarBorrador: nada,
+	abrirUnidad: nada, abrirPlan: nada, aceptarPlan: nada, descartarPlan: nada, aceptarSugerencia: nada, descartarSugerencia: nada, aplicarCambio: nada, rechazarCambio: nada, confirmarBorrador: nada, descartarBorrador: nada,
 };
-const VACIA: LecturaPorDecidir = { unidades: [], cambios: [], borradores: [] };
+const VACIA: LecturaPorDecidir = { planes: [], cambios: [], sugerencias: [], borradores: [] };
 const UNA_DE_CADA: LecturaPorDecidir = {
-	unidades: [{ id: "u7", revision: 1, titulo: "Planaridad", capacidad: "Decidir si un grafo es plano", notas: "", planId: "p1" }],
-	cambios: [{ id: "cp1", descripcion: ["Quitar «Recorridos BFS y DFS»"], motivo: "Ya lo dominas.", caducado: null }],
+	planes: [{ id: "p7", revision: 1, objetivo: "Planaridad", elementos: 4 }],
+	cambios: [{ id: "cp1", planId: "p1", objetivo: "Dominar grafos", descripcion: ["Quitar el tema «Recorridos BFS y DFS»"], motivo: "Ya lo dominas.", caducado: null }],
+	sugerencias: [{ unitId: "u1", revision: 2, titulo: "Dijkstra", capacidad: "Explicar la relajación", criterio: "Sin mirar" }],
 	borradores: [{ id: "d1", tipo: "pregunta", resumen: "¿Por qué GDN falla en WADI?", origen: "david", registros: 1 }],
 };
 const lista = (props: Partial<React.ComponentProps<typeof ListaPorDecidir>> = {}) =>
@@ -26,17 +27,18 @@ const lista = (props: Partial<React.ComponentProps<typeof ListaPorDecidir>> = {}
 const tarjetas = (html: string) => html.match(/<li[\s\S]*?<\/li>/g) ?? [];
 
 describe("ListaPorDecidir", () => {
-	it("una tarjeta por decisión: unidad propuesta, cambio del plan y borrador, en ese orden", () => {
-		const [unidad, cambio, borrador, ...resto] = tarjetas(lista());
+	it("una tarjeta por decisión: plan propuesto, cambio de un plan, sugerencia de capacidad y borrador, en ese orden", () => {
+		const [plan, cambio, sugerencia, borrador, ...resto] = tarjetas(lista());
 		assert.equal(resto.length, 0);
-		assert.match(unidad!, /Unidad propuesta por el tutor[\s\S]*>Planaridad<[\s\S]*Decidir si un grafo es plano[\s\S]*>Confirmar<[\s\S]*>Descartar</);
-		assert.match(cambio!, /Cambio del plan[\s\S]*Quitar «Recorridos BFS y DFS»[\s\S]*Ya lo dominas\.[\s\S]*>Aplicar<[\s\S]*>Rechazar</);
+		assert.match(plan!, /Plan propuesto por el tutor · 4 elementos[\s\S]*>Planaridad<[\s\S]*>Aceptar<[\s\S]*>Descartar</);
+		assert.match(cambio!, /Cambio del plan[\s\S]*«Dominar grafos»[\s\S]*Quitar el tema «Recorridos BFS y DFS»[\s\S]*Ya lo dominas\.[\s\S]*>Aplicar<[\s\S]*>Rechazar</);
+		assert.match(sugerencia!, /Capacidad y criterio para[\s\S]*«Dijkstra»[\s\S]*Explicar la relajación[\s\S]*Sabrás que puedes cuando: Sin mirar[\s\S]*>Aceptar<[\s\S]*>Descartar</);
 		assert.match(borrador!, /Pregunta sin confirmar<[\s\S]*¿Por qué GDN falla en WADI\?[\s\S]*>Confirmar<[\s\S]*>Descartar</, "de David, sin «del tutor»");
 	});
 
 	it("un cambio caducado dice por qué y solo deja descartarlo", () => {
-		const [cambio] = tarjetas(lista({ lectura: { ...VACIA, cambios: [{ id: "cp2", descripcion: ["Añadir «Flujo»"], motivo: "", caducado: "otro cambio del plan ya tocó «Flujo»" }] } }));
-		assert.match(cambio!, /Ya no se puede aplicar: otro cambio del plan ya tocó «Flujo»\.[\s\S]*>Descartar</);
+		const [cambio] = tarjetas(lista({ lectura: { ...VACIA, cambios: [{ id: "cp2", planId: "p1", objetivo: "Grafos", descripcion: ["Añadir el tema «Flujo»"], motivo: "", caducado: "otro cambio del plan ya tocó el tema «Flujo»" }] } }));
+		assert.match(cambio!, /Ya no se puede aplicar: otro cambio del plan ya tocó el tema «Flujo»\.[\s\S]*>Descartar</);
 		assert.doesNotMatch(cambio!, />Aplicar<|>Rechazar</);
 	});
 
@@ -46,8 +48,8 @@ describe("ListaPorDecidir", () => {
 	});
 
 	it("mientras opera, los botones esperan", () => {
-		const botones = lista({ ocupado: true }).match(/<button[^>]*>(Confirmar|Descartar|Aplicar|Rechazar)</g) ?? [];
-		assert.equal(botones.length, 6);
+		const botones = lista({ ocupado: true }).match(/<button[^>]*>(Confirmar|Descartar|Aplicar|Rechazar|Aceptar)</g) ?? [];
+		assert.equal(botones.length, 8);
 		for (const b of botones) assert.match(b, /disabled/);
 	});
 
@@ -71,8 +73,8 @@ describe("ListaPorDecidir", () => {
 });
 
 describe("totalPorDecidir", () => {
-	it("suma unidades, cambios y borradores; sin lectura, cero", () => {
-		assert.equal(totalPorDecidir(UNA_DE_CADA), 3);
+	it("suma planes, cambios, sugerencias y borradores; sin lectura, cero", () => {
+		assert.equal(totalPorDecidir(UNA_DE_CADA), 4);
 		assert.equal(totalPorDecidir(VACIA), 0);
 		assert.equal(totalPorDecidir(null), 0);
 	});

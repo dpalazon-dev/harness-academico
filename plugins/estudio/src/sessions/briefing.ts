@@ -3,8 +3,10 @@ import type { ConversationSummary } from './types.ts';
 export interface BriefingInput {
   /** The space David is studying in; null when he works across all of them. */
   area: { name: string; description: string } | null;
-  plan: { goal: string; units: string[] } | null;
-  outsidePlan: string[];
+  /** Live plans of the space, the most recently updated first; `items` are already worded ("tema: X (done)"). */
+  plans: { goal: string; proposed: boolean; items: string[] }[];
+  /** Active units not linked to a tema of any plan. */
+  withoutPlan: string[];
   due: { title: string; taskKind: string; lastFailure: string | null; needsVerification: boolean }[];
   openAttempts: number;
   recent: { title: string; taskKind: string; fidelity: number | null; failureType: string | null; at: string }[];
@@ -33,10 +35,13 @@ export function composeBriefing(input: BriefingInput): string {
   if (input.area) {
     out.push('', `Study space: «${input.area.name}»${input.area.description ? ` (${input.area.description})` : ''}. Plan, units, reviews and previous conversations below belong to this space only; the knowledge base search covers every space.`);
   }
-  if (input.plan) {
-    out.push('', `Study plan, goal: ${input.plan.goal}`, ...(input.plan.units.length ? bullets(input.plan.units, 12) : ['- (no units yet)']));
+  if (input.plans.length) {
+    for (const plan of input.plans.slice(0, 4)) {
+      out.push('', `Study plan${plan.proposed ? ' (proposed, not accepted yet)' : ''}, goal: ${plan.goal}`, ...(plan.items.length ? bullets(plan.items, 12) : ['- (no elements yet)']));
+    }
+    if (input.plans.length > 4) out.push('', `… and ${input.plans.length - 4} more plan(s).`);
   } else out.push('', 'No study plan yet.');
-  if (input.outsidePlan.length) out.push('', 'Active units outside the plan:', ...bullets(input.outsidePlan));
+  if (input.withoutPlan.length) out.push('', 'Active units not in any plan:', ...bullets(input.withoutPlan));
 
   if (input.due.length || input.openAttempts) {
     out.push('', `Due today: ${input.due.length} task(s)${input.openAttempts ? `, ${input.openAttempts} attempt(s) left unfinished` : ''}.`,

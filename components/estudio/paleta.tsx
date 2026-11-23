@@ -34,7 +34,8 @@ import { destinoDelPaso } from "./paso";
 import { rutaLector } from "./documentos";
 import { sinBarraLateral } from "./barra-lateral";
 import { crearCuaderno, rutaCuaderno } from "./cuadernos";
-import type { LecturaInicio, LecturaPlan, PasoDeUnidad } from "./tipos";
+import type { LecturaInicio, LecturaPlanes, PasoDeUnidad } from "./tipos";
+import { unidadesEnOrden } from "./planes";
 import type { DocumentoEstudio } from "./documentos";
 import type { ConversacionLista } from "./conversaciones";
 
@@ -310,12 +311,12 @@ export function Paleta() {
 	const cargar = useCallback(async (actual: string) => {
 		setDatos(null);
 		const [plan, inicio, documentos, conversaciones] = await Promise.allSettled([
-			llamarEstudio<LecturaPlan>("plan"),
+			llamarEstudio<LecturaPlanes>("planes"),
 			llamarEstudio<LecturaInicio>("inicio"),
 			llamarEstudio<DocumentoEstudio[]>("documentos"),
 			llamarEstudio<ConversacionLista[]>("conversaciones"),
 		]);
-		const unidades = plan.status === "fulfilled" ? plan.value.unidades : [];
+		const unidades = plan.status === "fulfilled" ? unidadesEnOrden(plan.value) : [];
 		const enUnidad = /^\/unidad\/([^/?#]+)/.exec(actual)?.[1];
 		const actualId = enUnidad ? decodeURIComponent(enUnidad) : null;
 		const unidadActual = unidades.find(u => u.id === actualId) ?? null;

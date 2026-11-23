@@ -34,10 +34,9 @@ afterEach(async () => {
 	restore = null;
 });
 
-const SIN_PLAN: LecturaInicio = { plan: null, paso: null, pasos: [], repasos: [], proximos: [], abierto: null };
+const SIN_PLAN: LecturaInicio = { paso: null, pasos: [], repasos: [], proximos: [], abierto: null };
 const CON_PLAN: LecturaInicio = {
 	...SIN_PLAN,
-	plan: { id: "p1", objetivo: "Dominar los algoritmos de grafos" },
 	paso: { unitId: "u2", titulo: "Árboles de expansión", tipo: "volcado", accion: "Escribe lo que ya sabes", motivo: "Sin volcado inicial no podrás ver después qué cambió.", boton: "Escribir volcado" },
 	repasos: [
 		{ unitId: "u4", titulo: "Flujo máximo", tarea: "libre", intentoId: "a1", fecha: null },
@@ -47,7 +46,7 @@ const CON_PLAN: LecturaInicio = {
 };
 const UNIDADES: UnidadActiva[] = [{ id: "u1", titulo: "Recorridos BFS y DFS" }, { id: "u2", titulo: "Árboles de expansión" }];
 
-async function montar(lectura: LecturaInicio, unidades: UnidadActiva[] = []) {
+async function montar(lectura: LecturaInicio, unidades: UnidadActiva[] = [], sinPlanes = lectura.paso === null) {
 	const dom = parseHTML("<html><head></head><body><div id='root'></div></body></html>");
 	const globals: Record<string, unknown> = {
 		window: dom.window, document: dom.document, HTMLElement: dom.window.HTMLElement, Element: dom.window.Element,
@@ -82,9 +81,9 @@ async function montar(lectura: LecturaInicio, unidades: UnidadActiva[] = []) {
 	};
 	root = createRoot(dom.document.querySelector("#root")!);
 	/** Pinta el inicio con una lectura; volver a llamarla es la relectura tras una operación. */
-	const pintar = async (l: LecturaInicio) => {
+	const pintar = async (l: LecturaInicio, sinPl = sinPlanes) => {
 		await act(async () => {
-			root!.render(<InicioEstudio espacio="Grafos" lectura={l} unidades={unidades} agenda={{ datos: null, onRangos: () => {} }} ritmo={null} ocupado={false} error={null} acciones={acciones} />);
+			root!.render(<InicioEstudio espacio="Grafos" lectura={l} unidades={unidades} sinPlanes={sinPl} agenda={{ datos: null, onRangos: () => {} }} ritmo={null} ocupado={false} error={null} acciones={acciones} />);
 		});
 	};
 	await pintar(lectura);
@@ -117,11 +116,11 @@ it("«Crear plan» despliega el campo del objetivo, que crea el plan con lo escr
 	assert.deepEqual(m.llamadas, ["crear-plan Entender las GNN"]);
 });
 
-it("con el plan ya creado, el campo del objetivo desaparece con su ficha", async () => {
+it("con un plan ya creado, el campo del objetivo desaparece con su ficha: otro se crea con el «+» de la barra", async () => {
 	const m = await montar(SIN_PLAN);
 	await m.pulsar("crear-plan");
 	assert.ok(m.dom.document.querySelector('[data-testid="nuevo-plan"]'));
-	await m.pintar({ ...SIN_PLAN, plan: { id: "p1", objetivo: "Entender las GNN" } });
+	await m.pintar(SIN_PLAN, false);
 	assert.equal(m.ficha("crear-plan"), null);
 	assert.equal(m.dom.document.querySelector('[data-testid="nuevo-plan"]'), null);
 });
