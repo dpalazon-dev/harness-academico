@@ -25,6 +25,8 @@ $env:LH_DEV_URL="http://localhost:3000"; npx electron .   # terminal 2
 
 In development, usage data goes to `data/` in the checkout unless `LH_DATA_DIR` is set. The knowledge base defaults to `%USERPROFILE%\Learning` and imported PDFs to `%USERPROFILE%\.kbol\learning\almacen`; point `ESTUDIO_KB_DIR` and `KBOL_ALMACEN` at test folders in terminal 1 to keep them apart from any real data.
 
+Alternatively, `scripts/windows/arrancar.ps1 -Datos <dir> -Conocimiento <dir> -Almacen <dir>` builds the plugins and opens the managed development window in one step (Electron starts and stops its own Next server). `scripts/windows/compilar.ps1 [commit] [-SoloCompilar]` builds the Windows installer in a separate worktree (by default `../compilado`) and, unless `-SoloCompilar` is given, installs it and warms up the first launch with a temporary profile.
+
 (`npm run desktop:dev` uses POSIX environment syntax and only works in a POSIX shell.) To stop the dev server completely on Windows, close every `node.exe` started from your checkout; see "Arranque en Windows" in [divergencias.md](docs/sistema-comun/divergencias.md).
 
 Before opening a pull request, run:
