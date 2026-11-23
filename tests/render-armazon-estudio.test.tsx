@@ -463,4 +463,11 @@ describe("InicioEstudio", () => {
 			assert.doesNotMatch(html, new RegExp(fuera), fuera);
 		}
 	});
+
+	it("si la agenda no se pudo leer, lo dice dentro de la agenda con «Reintentar», no arriba del inicio", () => {
+		const html = inicio({ agenda: { datos: null, error: "Estudio no respondió (500)", refrescar: () => {}, onRangos: () => {} } });
+		assert.match(html, /data-agenda="lista"[\s\S]*data-error-lectura[^>]*>No se pudo leer la agenda\.[\s\S]*>Reintentar<\/button>/);
+		assert.doesNotMatch(html, /Leyendo la agenda…/);
+		assert.doesNotMatch(html, /Estudio no respondió/);
+	});
 });

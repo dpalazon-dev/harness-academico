@@ -563,7 +563,7 @@ export function AgentSection({
 			type="button"
 			data-testid={`engine-option-${id}`}
 			onClick={onPick}
-			className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted ${
+			className={`anillo-foco flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted ${
 				active ? "bg-muted/60 text-card-foreground" : "text-card-foreground"
 			}`}
 		>
@@ -615,7 +615,7 @@ export function AgentSection({
 						setOpenSegment(open ? null : info.path);
 						setSegmentStatus(null);
 					}}
-					className="text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
+					className="anillo-foco text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
 				>
 					{open ? "Ocultar texto" : "Ver texto"}
 				</button>
@@ -645,11 +645,11 @@ export function AgentSection({
 								type="button"
 								disabled={!dirty}
 								onClick={() => void saveSegment(info.path, segmentDraft[info.path] ?? "")}
-								className={
+								className={`anillo-foco ${
 									dirty
 										? "text-xs text-foreground underline-offset-2 hover:underline"
 										: "cursor-not-allowed text-xs text-muted-foreground/40 underline-offset-2"
-								}
+								}`}
 							>
 								Guardar
 							</button>
@@ -657,7 +657,7 @@ export function AgentSection({
 								<button
 									type="button"
 									onClick={() => void deleteSegment(info.path)}
-									className="text-xs text-muted-foreground/70 underline-offset-2 hover:text-error hover:underline"
+									className="anillo-foco text-xs text-muted-foreground/70 underline-offset-2 hover:text-error hover:underline"
 								>
 									Borrar
 								</button>
@@ -702,9 +702,9 @@ export function AgentSection({
 					data-testid="models-advanced"
 					aria-expanded={advancedModels}
 					onClick={() => { setAdvancedModels(!advancedModels); setOpenMenu(null); }}
-					className="mb-1 self-start text-xs text-muted-foreground hover:text-foreground"
+					className="anillo-foco mb-1 self-start text-xs text-muted-foreground hover:text-foreground"
 				>{advancedModels ? "Ocultar ajustes avanzados" : "Ver ajustes avanzados"}</button>
-				{catalogFailed && <p role="alert" className="text-xs text-error">No se pudo cargar el catálogo de modelos. Comprueba la conexión y reinténtalo. <button type="button" className="underline" onClick={refreshCatalog}>Reintentar</button></p>}
+				{catalogFailed && <p role="alert" className="text-xs text-error">No se pudo cargar el catálogo de modelos. Comprueba la conexión y reinténtalo. <button type="button" className="anillo-foco underline" onClick={refreshCatalog}>Reintentar</button></p>}
 				{MODEL_SLOTS.map((slot) => {
 					const override = models?.[slot];
 					const modelId = override?.model?.id ?? "";
@@ -924,7 +924,7 @@ export function AgentSection({
 											data-testid={`quiz-mechanics-${m}`}
 											onClick={() => onSectionChange(composeQuizMechanics(agent, m))}
 											className={cn(
-												"h-8 rounded-md px-3 text-sm font-medium transition-colors",
+												"anillo-foco h-8 rounded-md px-3 text-sm font-medium transition-colors",
 												active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
 											)}
 										>
@@ -977,7 +977,7 @@ export function AgentSection({
 									onChange={(event) => { setFolderInput(event.target.value); setFolderError(null); }}
 									onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addFolder(); } }}
 									className="min-w-0 flex-1 rounded-sm border border-border bg-background px-2 py-1 font-ui text-xs" />
-								<button type="button" data-testid="file-access-add-button" disabled={!folderInput.trim()} onClick={addFolder} className="rounded-sm border border-border px-2 text-xs disabled:opacity-40">Añadir carpeta</button>
+								<button type="button" data-testid="file-access-add-button" disabled={!folderInput.trim()} onClick={addFolder} className="anillo-foco rounded-sm border border-border px-2 text-xs disabled:opacity-40">Añadir carpeta</button>
 							</div>
 							{folderError && <p role="alert" data-testid="file-access-input-error" className="pl-3 text-xs text-error">{folderError}</p>}
 							{folders.map((folder) => (
@@ -985,7 +985,7 @@ export function AgentSection({
 									<span title={folder} className="min-w-0 truncate font-ui text-muted-foreground">{folder}</span>
 									<button type="button" aria-label={`Quitar ${folder}`} data-testid="file-access-remove"
 										onClick={() => onSectionChange(composeRemoveFolder(effectiveAgent, folder))}
-										className="rounded-sm px-1.5 text-muted-foreground hover:text-foreground">Quitar</button>
+										className="anillo-foco rounded-sm px-1.5 text-muted-foreground hover:text-foreground">Quitar</button>
 								</div>
 							))}
 						</div>

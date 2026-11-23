@@ -87,7 +87,7 @@ describe("EditorCuadernoEstudio", () => {
 	it("un cuaderno nuevo muestra el título y la página vacía con una indicación discreta, con un solo hueco donde escribir", () => {
 		const html = editor({ cuaderno: SUELTO, enfocarTitulo: true });
 		assert.match(html, /placeholder="Título del cuaderno"/);
-		assert.match(html, /placeholder="Escribe aquí\. «\/» inserta un error o una pregunta"/);
+		assert.match(html, /placeholder="Escribe aquí\. «\/» inserta un error o una pregunta\. Selecciona texto para pedirle algo al tutor\."/);
 		assert.equal((html.match(/<textarea/g) ?? []).length, 1);
 		assert.match(html, /data-hueco=""/);
 		assert.doesNotMatch(html, /aria-label="Acciones del bloque"/);

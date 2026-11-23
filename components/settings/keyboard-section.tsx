@@ -144,7 +144,7 @@ export function KeyboardSection() {
 												<button
 													type="button"
 													onClick={() => setRebinding(null)}
-													className="text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
+													className="anillo-foco text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
 												>
 													Cancelar
 												</button>
@@ -154,7 +154,7 @@ export function KeyboardSection() {
 														type="button"
 														onClick={() => beginRebind(def.id)}
 														data-testid={`kbd-rebind-${def.id}`}
-														className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+														className="anillo-foco text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
 													>
 														Cambiar
 													</button>
@@ -163,7 +163,7 @@ export function KeyboardSection() {
 															type="button"
 															onClick={() => resetOne(def.id)}
 															data-testid={`kbd-reset-${def.id}`}
-															className="text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
+															className="anillo-foco text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
 														>
 															Restablecer
 														</button>
@@ -184,10 +184,10 @@ export function KeyboardSection() {
 					hint={`${pluginShortcutScopeLabel(row)}${row.reason ? ` · Inactivo: ${row.reason}` : ""}`} testid={`kbd-row-${row.id}`}>
 					<span className="flex items-center gap-2">
 						<kbd className="rounded-sm border border-border bg-muted px-1.5 py-0.5 font-ui text-xs">{rebinding === row.id ? "Pulsa las teclas…" : row.binding ? formatBinding(row.binding) : "Sin atajo"}</kbd>
-						{rebinding === row.id ? <button type="button" onClick={() => { setRebinding(null); setRebindError(null); }} className="text-xs text-muted-foreground">Cancelar</button> : <>
-							<button type="button" data-testid={`kbd-rebind-${row.id}`} onClick={() => beginRebind(row.id)} className="text-xs text-muted-foreground hover:underline">Cambiar</button>
-							{row.binding && <button type="button" data-testid={`kbd-clear-${row.id}`} onClick={() => { saveOverrides(nextOverrides(loadOverrides(), row.id, "")); setNonce(n => n + 1); }} className="text-xs text-muted-foreground hover:underline">Quitar</button>}
-							{overrides[row.id] !== undefined && <button type="button" data-testid={`kbd-reset-${row.id}`} onClick={() => { saveOverrides(nextOverrides(loadOverrides(), row.id, null)); setNonce(n => n + 1); }} className="text-xs text-muted-foreground hover:underline">Restablecer</button>}
+						{rebinding === row.id ? <button type="button" onClick={() => { setRebinding(null); setRebindError(null); }} className="anillo-foco text-xs text-muted-foreground">Cancelar</button> : <>
+							<button type="button" data-testid={`kbd-rebind-${row.id}`} onClick={() => beginRebind(row.id)} className="anillo-foco text-xs text-muted-foreground hover:underline">Cambiar</button>
+							{row.binding && <button type="button" data-testid={`kbd-clear-${row.id}`} onClick={() => { saveOverrides(nextOverrides(loadOverrides(), row.id, "")); setNonce(n => n + 1); }} className="anillo-foco text-xs text-muted-foreground hover:underline">Quitar</button>}
+							{overrides[row.id] !== undefined && <button type="button" data-testid={`kbd-reset-${row.id}`} onClick={() => { saveOverrides(nextOverrides(loadOverrides(), row.id, null)); setNonce(n => n + 1); }} className="anillo-foco text-xs text-muted-foreground hover:underline">Restablecer</button>}
 						</>}
 					</span>
 				</SettingsRow>)}</div>
@@ -198,7 +198,7 @@ export function KeyboardSection() {
 					type="button"
 					onClick={resetAll}
 					data-testid="kbd-reset-all"
-					className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+					className="anillo-foco text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
 				>
 					Restablecer todos
 				</button>

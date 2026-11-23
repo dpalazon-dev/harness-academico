@@ -413,7 +413,7 @@ export function AppearanceSection({
 						type="button"
 						data-testid="colors-reset"
 						onClick={() => onSectionChange(clearColorOverrides(appearance))}
-						className="h-6 shrink-0 rounded-sm px-2 font-ui text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+						className="anillo-foco h-6 shrink-0 rounded-sm px-2 font-ui text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 					>
 						Restablecer todos
 					</button>

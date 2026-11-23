@@ -60,8 +60,11 @@ describe("ProgresoEstudio", () => {
 		assert.doesNotMatch(html, /<table/);
 	});
 
-	it("explica el Brier con su escala y el veredicto", () => {
+	it("primero el veredicto; el Brier, con su escala, plegado en «Cómo se calcula»", () => {
 		const html = pintar();
+		assert.ok(html.indexOf("Confías más de lo que recuperas sin ayuda") < html.indexOf("<details"), "el veredicto va antes que el cálculo");
+		assert.match(html, /<details[^>]*data-calculo-calibracion[^>]*><summary[^>]*>Cómo se calcula<\/summary>[\s\S]*Brier 0,18[\s\S]*<\/details>/);
+		assert.doesNotMatch(html, /<details[^>]*open/, "plegado"); 
 		assert.match(html, /Brier 0,18/);
 		assert.match(html, /5 intentos que cuentan como evidencia/);
 		assert.match(html, /\(confianza − resultado\)²/);
@@ -115,6 +118,20 @@ describe("ProgresoEstudio", () => {
 		const html = pintar({ progreso: null, error: "Estudio no respondió (500)" });
 		assert.match(html, /role="alert"[^>]*>Estudio no respondió/);
 		assert.doesNotMatch(html, /Cargando/);
+	});
+
+	it("sin jerga del diseño: ni «regulador» ni dobles negaciones; el atajo, como en Windows", () => {
+		const todas: LecturaProgreso = {
+			...PROGRESO,
+			units: (["nueva", "practicada", "reaprendiendo", "intervalo", "mantenimiento", "fuera"] as const)
+				.map((kind, i) => ({ unitId: `u${i}`, title: `Unidad ${i}`, stage: { kind, label: kind, days: null }, needsVerification: false })),
+		};
+		const html = pintar({ progreso: todas });
+		assert.doesNotMatch(html, /regulador/i);
+		assert.match(html, /Has practicado, pero aún ningún intento cuenta como evidencia\./);
+		const vacio = pintar({ progreso: { units: [], calibration: null, failures: {} } });
+		assert.match(vacio, /crea otra con (<!-- -->)?Ctrl\+K/);
+		assert.doesNotMatch(vacio, /⌘K/);
 	});
 
 	it("nunca dice «aprendido» ni «dominado»", () => {

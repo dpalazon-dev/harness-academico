@@ -99,7 +99,7 @@ export function ListaCuadernosEstudio({ cuadernos, unidades, documentos, ocupado
 									<a
 										href={rutaCuaderno(c.id)}
 										onClick={(e) => { e.preventDefault(); acciones.abrir(c.id); }}
-										className="flex items-start gap-3 rounded-lg px-2 py-3 hover:bg-accent/60"
+										className="anillo-foco flex items-start gap-3 rounded-lg px-2 py-3 hover:bg-accent/60"
 									>
 										<NotebookPenIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
 										<span className="min-w-0 flex-1">
@@ -232,7 +232,7 @@ export function PropiedadesCuaderno({ cuaderno: c, unidades, documentos, ocupado
 					{opcionesUnidad.map(u => <option key={u.id} value={u.id}>{u.titulo}</option>)}
 				</select>
 				<span className="text-sm text-muted-foreground">Con una unidad vinculada, las preguntas de recuperación de este cuaderno se pueden practicar.</span>
-				{rutaUnidad && <a href={rutaUnidad} onClick={ir(rutaUnidad)} className="text-sm underline-offset-2 hover:underline">Abrir la unidad</a>}
+				{rutaUnidad && <a href={rutaUnidad} onClick={ir(rutaUnidad)} className="anillo-foco rounded-sm text-sm underline-offset-2 hover:underline">Abrir la unidad</a>}
 			</label>
 			<label className="grid gap-1.5">
 				<span className={etiqueta}>Fuente</span>
@@ -241,7 +241,7 @@ export function PropiedadesCuaderno({ cuaderno: c, unidades, documentos, ocupado
 					{opcionesFuente.map(d => <option key={d.id} value={d.id}>{d.titulo}</option>)}
 				</select>
 				<span className="text-sm text-muted-foreground">El documento de la biblioteca del que salen tus notas.</span>
-				{rutaFuente && <a href={rutaFuente} onClick={ir(rutaFuente)} className="text-sm underline-offset-2 hover:underline">Abrir la fuente</a>}
+				{rutaFuente && <a href={rutaFuente} onClick={ir(rutaFuente)} className="anillo-foco rounded-sm text-sm underline-offset-2 hover:underline">Abrir la fuente</a>}
 			</label>
 		</div>
 	);
@@ -437,7 +437,7 @@ export function EditorCuadernoEstudio({ cuaderno: c, unidades, documentos, guard
 			<div className={COLUMNAS_PAGINA}>
 			<div className={COLUMNA_TEXTO}>
 			<div className="flex items-center gap-1 text-sm">
-				<a href={RUTA_CUADERNOS} onClick={(e) => { e.preventDefault(); acciones.navegar(RUTA_CUADERNOS); }} className="mr-2 text-muted-foreground hover:text-foreground">Cuadernos</a>
+				<a href={RUTA_CUADERNOS} onClick={(e) => { e.preventDefault(); acciones.navegar(RUTA_CUADERNOS); }} className="anillo-foco mr-2 rounded-sm text-muted-foreground hover:text-foreground">Cuadernos</a>
 				<span
 					role="status"
 					data-estado={guardado.tipo}
@@ -630,7 +630,7 @@ function Parrafo({ nota: b, primera, escribir, enfocar, tecla, marcas, resaltado
 					ref={area} name="text" data-campo="texto" rows={1} value={textoDeNota(b)}
 					{...(menu ? { role: "combobox", "aria-haspopup": "listbox", "aria-expanded": true, "aria-controls": ID_MENU_INSERTAR, "aria-activedescendant": menu.opcionActiva } : {})}
 					aria-label={b.symbol ? `Párrafo (${significado(b.symbol)})` : "Párrafo"}
-					placeholder={primera ? "Escribe aquí. «/» inserta un error o una pregunta" : ""}
+					placeholder={primera ? "Escribe aquí. «/» inserta un error o una pregunta. Selecciona texto para pedirle algo al tutor." : ""}
 					onChange={(e) => { setSeleccion(null); escribir(e.target.value, e.target.selectionStart); }}
 					onKeyDown={tecla}
 					onSelect={(e) => {

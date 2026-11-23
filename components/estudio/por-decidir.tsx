@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import { llamarEstudio } from "./llamar";
+import { ErrorDeLectura } from "./error-lectura";
 import type { LecturaPorDecidir } from "./tipos";
 import { rutaPlan } from "./plan";
 
@@ -41,18 +42,22 @@ export const totalPorDecidir = (l: LecturaPorDecidir | null): number =>
 
 const BORRADOR = { hecho: "Hecho", pregunta: "Pregunta", sintesis: "Síntesis" } as const;
 
-export function ListaPorDecidir({ lectura, ocupado, error, acciones }: {
+export function ListaPorDecidir({ lectura, ocupado, error, errorLectura = false, reintentar, acciones }: {
 	/** null mientras se lee. */
 	lectura: LecturaPorDecidir | null;
 	ocupado: boolean;
 	/** El error de la última decisión, si falló. */
 	error: string | null;
+	/** La última lectura falló; si había una anterior, se sigue enseñando debajo. */
+	errorLectura?: boolean;
+	reintentar?(): void;
 	acciones: AccionesPorDecidir;
 }) {
 	return (
 		<div className="space-y-3">
 			{error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-			{!lectura && !error && <p className="text-sm text-muted-foreground">Cargando…</p>}
+			{errorLectura && <ErrorDeLectura que="lo pendiente de decidir" reintentar={reintentar} />}
+			{!lectura && !error && !errorLectura && <p className="text-sm text-muted-foreground">Cargando…</p>}
 			{lectura && (totalPorDecidir(lectura) === 0 ? (
 				<p className="text-sm text-muted-foreground">Nada pendiente de tu decisión.</p>
 			) : (
@@ -60,7 +65,7 @@ export function ListaPorDecidir({ lectura, ocupado, error, acciones }: {
 					{lectura.planes.map(p => (
 						<Decision key={p.id} ocupado={ocupado} confirmarTexto="Aceptar" confirmar={() => acciones.aceptarPlan(p)} descartar={() => acciones.descartarPlan(p)}>
 							<p className="text-xs text-muted-foreground">Plan propuesto por el tutor · {p.elementos === 1 ? "1 elemento" : `${p.elementos} elementos`}</p>
-							<button type="button" onClick={() => acciones.abrirPlan(p.id)} className="text-left font-medium hover:underline">{p.objetivo}</button>
+							<button type="button" onClick={() => acciones.abrirPlan(p.id)} className="anillo-foco text-left font-medium hover:underline">{p.objetivo}</button>
 						</Decision>
 					))}
 					{lectura.cambios.map(c => (
@@ -158,20 +163,23 @@ export function usePorDecidir() {
 	const [abierto, setAbierto] = useState(false);
 	const [ocupado, setOcupado] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [errorLectura, setErrorLectura] = useState(false);
 	const ultima = useRef(0);
 	const enCurso = useRef(false);
 
+	// Si la lectura falla, la anterior se queda (mejor algo viejo que nada) y el panel lo dice con «Reintentar».
 	const leer = useCallback(async () => {
 		const esta = ++ultima.current;
 		try {
 			const l = await llamarEstudio<LecturaPorDecidir>("por-decidir");
-			if (esta === ultima.current) setLectura(l);
-		} catch {
 			if (esta !== ultima.current) return;
-			setLectura(null);
-			setError("No se pudo leer lo pendiente de decidir.");
+			setLectura(l);
+			setErrorLectura(false);
+		} catch {
+			if (esta === ultima.current) setErrorLectura(true);
 		}
 	}, []);
+	const reintentar = () => { setErrorLectura(false); void leer(); };
 	useEffect(() => { void leer(); }, [leer, ruta]);
 	useServerEvent("plugin-message", (m) => { if (m.pluginId === "estudio") void leer(); });
 	useServerResync(() => void leer());
@@ -208,7 +216,7 @@ export function usePorDecidir() {
 	};
 	return {
 		total: totalPorDecidir(lectura),
-		abrir: () => { if (!enCurso.current) setError(null); setAbierto(true); },
-		panel: <PanelPorDecidir abierto={abierto} onAbierto={setAbierto} lectura={lectura} ocupado={ocupado} error={error} acciones={acciones} />,
+		abrir: () => { if (!enCurso.current) setError(null); if (errorLectura) reintentar(); setAbierto(true); },
+		panel: <PanelPorDecidir abierto={abierto} onAbierto={setAbierto} lectura={lectura} ocupado={ocupado} error={error} errorLectura={errorLectura} reintentar={reintentar} acciones={acciones} />,
 	};
 }

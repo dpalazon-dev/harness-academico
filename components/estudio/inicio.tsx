@@ -67,7 +67,7 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 	/** El espacio activo no tiene ningún plan vivo: el inicio ofrece crear uno. */
 	sinPlanes?: boolean;
 	/** Lo leído de la agenda y a quién avisar de los rangos que pide. */
-	agenda: { datos: DatosAgenda | null; onRangos(r: { visible: Rango; seleccion: Rango }): void };
+	agenda: { datos: DatosAgenda | null; error?: string | null; refrescar?(): void; onRangos(r: { visible: Rango; seleccion: Rango }): void };
 	/** La lectura `ritmo`; null mientras se lee. */
 	ritmo: LecturaRitmo | null;
 	ahora?: Date;
@@ -121,7 +121,7 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 						{contexto ? (
 							<span className="inline-flex max-w-[70%] items-center gap-1 rounded-full bg-secondary py-0.5 pl-2.5 pr-1 text-xs text-secondary-foreground" data-contexto={contexto.unitId}>
 								<span className="truncate">{contexto.titulo}</span>
-								<button type="button" aria-label="Quitar la unidad de contexto" onClick={() => setSinContexto(true)} className="rounded-full p-0.5 hover:bg-background">
+								<button type="button" aria-label="Quitar la unidad de contexto" onClick={() => setSinContexto(true)} className="anillo-foco rounded-full p-0.5 hover:bg-background">
 									<XIcon className="size-3" />
 								</button>
 							</span>
@@ -145,6 +145,8 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 						<div className="mb-3"><LineaRitmo ritmo={ritmo} /></div>
 						<AgendaInicio
 							datos={agenda.datos}
+							error={agenda.error}
+							reintentar={agenda.refrescar}
 							ahora={ahora}
 							ocupado={ocupado}
 							onRangos={agenda.onRangos}
@@ -264,7 +266,7 @@ function FichaBoton({ ficha, destacada, children, className, ...props }: React.C
 			data-ficha={ficha}
 			data-destacada={destacada || undefined}
 			className={cn(
-				"inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[13px] transition-colors hover:border-primary disabled:opacity-60",
+				"anillo-foco inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[13px] transition-colors hover:border-primary disabled:opacity-60",
 				destacada && "border-primary bg-primary/10",
 				className,
 			)}
@@ -385,7 +387,7 @@ export function Inicio({ initialConfigured }: { initialConfigured: boolean }) {
 				agenda={agenda}
 				ritmo={ritmo}
 				ocupado={ocupado || conversacion.abriendo}
-				error={error ?? conversacion.error ?? agenda.error}
+				error={error ?? conversacion.error}
 				acciones={{
 					enviar: (t, u) => void enviar(t, u),
 					paso: (p) => {
