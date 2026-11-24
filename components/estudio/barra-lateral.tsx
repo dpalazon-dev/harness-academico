@@ -18,12 +18,12 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3Icon, CheckIcon, ChevronRightIcon, ChevronsUpDownIcon, GraduationCapIcon, HomeIcon, InboxIcon, LibraryIcon, Loader2Icon, MessageSquareIcon, MoreHorizontalIcon, NotebookPenIcon, PlusIcon, QuoteIcon, SearchIcon, SettingsIcon, TargetIcon } from "lucide-react";
+import { BarChart3Icon, CheckIcon, ChevronRightIcon, ChevronsUpDownIcon, GraduationCapIcon, HomeIcon, InboxIcon, LibraryIcon, ListFilterIcon, Loader2Icon, MessageSquareIcon, MoreHorizontalIcon, NotebookPenIcon, PlusIcon, QuoteIcon, SearchIcon, SettingsIcon, TargetIcon, XIcon } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd";
 import { bindingForAction, formatBinding, kbdEventForAction } from "@/src/core";
 import {
-	DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuShortcut,
-	DropdownMenuTrigger,
+	DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem,
+	DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
 	Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu,
@@ -142,6 +142,8 @@ export function BarraLateralEstudio({
 	const [creandoPlan, setCreandoPlan] = useState(false);
 	// Harness conversacional (diseño 1A): búsqueda, Fijadas arriba y Archivadas aparte; el resto, en los grupos de siempre.
 	const [busqueda, setBusqueda] = useState("");
+	// Variante A de los filtros (24-nov-2026): el buscador solo se ve tras pulsar la lupa o mientras tiene texto.
+	const [buscando, setBuscando] = useState(false);
 	const [verArchivadas, setVerArchivadas] = useState(false);
 	const reparto = conversaciones ? repartir(conversaciones, meta, busqueda) : null;
 	const grupos = reparto ? agruparConversaciones(reparto.resto, filtros, { ahora, planes, todos }) : [];
@@ -452,25 +454,51 @@ export function BarraLateralEstudio({
 					</SidebarMenu>
 				</SeccionBarra>
 
-				<SeccionBarra {...propsSeccion("conversaciones")} titulo="Conversaciones" className="group-data-[collapsible=icon]:hidden">
+				<SeccionBarra
+					{...propsSeccion("conversaciones")}
+					titulo="Conversaciones"
+					className="group-data-[collapsible=icon]:hidden"
+					accion={conversaciones && conversaciones.length > 0 ? (
+						<AccionesConversaciones
+							buscando={buscando || busqueda !== ""}
+							onBuscar={() => {
+								if (buscando || busqueda !== "") { setBusqueda(""); setBuscando(false); } else setBuscando(true);
+							}}
+							filtros={filtros}
+							todos={todos}
+							onCambiar={acciones.cambiarFiltros}
+						/>
+					) : undefined}
+				>
 					{conversaciones === null ? (
 						<p className="px-2 text-xs text-muted-foreground">Cargando…</p>
 					) : conversaciones.length === 0 ? (
 						<p className="px-2 text-xs text-muted-foreground">Aún no hay conversaciones en este espacio.</p>
 					) : <>
-					<div className="px-2 pt-1">
-						<input
-							type="search"
-							value={busqueda}
-							onChange={(e) => setBusqueda(e.target.value)}
-							onKeyDown={(e) => { if (e.key === "Escape" && busqueda) { e.preventDefault(); e.stopPropagation(); setBusqueda(""); } }}
-							placeholder="Buscar conversaciones"
-							aria-label="Buscar conversaciones por título"
-							data-testid="buscar-conversaciones"
-							className="h-7 w-full rounded-md border border-sidebar-border bg-background px-2 text-xs text-sidebar-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-						/>
-					</div>
-					<SelectoresConversaciones filtros={filtros} todos={todos} onCambiar={acciones.cambiarFiltros} />
+					{(buscando || busqueda !== "") && (
+						<div className="px-2 pt-1">
+							<div className="flex h-7 items-center gap-1.5 rounded-md bg-sidebar-accent px-2 text-sidebar-foreground focus-within:ring-[3px] focus-within:ring-ring/50">
+								<SearchIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+								<input
+									type="search"
+									autoFocus
+									value={busqueda}
+									onChange={(e) => setBusqueda(e.target.value)}
+									onBlur={() => { if (!busqueda) setBuscando(false); }}
+									onKeyDown={(e) => {
+										if (e.key !== "Escape") return;
+										e.preventDefault(); e.stopPropagation();
+										setBusqueda(""); setBuscando(false);
+									}}
+									placeholder="Buscar por título"
+									aria-label="Buscar conversaciones por título"
+									data-testid="buscar-conversaciones"
+									className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
+								/>
+							</div>
+						</div>
+					)}
+					<FichasFiltros filtros={filtros} onCambiar={acciones.cambiarFiltros} />
 					{reparto && reparto.activas.length > 0 && (
 						<div className="mb-2" data-testid="conversaciones-activas">
 							<p className="truncate px-2 pb-1 pt-2 text-xs text-muted-foreground">Activas</p>
@@ -551,22 +579,85 @@ function IconoEstado({ estado, origen }: { estado: MetaConversacion["estado"]; o
 	return <IconoActividad origen={origen} />;
 }
 
-/** Agrupar, actividad y fecha: tres selectores nativos compactos bajo la cabecera, como en el prototipo. */
-function SelectoresConversaciones({ filtros, todos, onCambiar }: { filtros: FiltrosConversaciones; todos: boolean; onCambiar(filtros: FiltrosConversaciones): void }) {
-	const clase = "h-6 min-w-0 rounded-md border border-sidebar-border bg-background px-1 text-[11px] text-sidebar-foreground outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring";
+const claseIcono = "relative flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[state=open]:bg-sidebar-accent aria-pressed:bg-sidebar-accent aria-pressed:text-sidebar-foreground";
+
+/** Filtros que recortan la lista (no cuenta cómo se agrupa). */
+const filtrosActivos = (f: FiltrosConversaciones) => f.actividad !== FILTROS_INICIALES.actividad || f.fecha !== FILTROS_INICIALES.fecha;
+
+/** Variante A (elegida por David el 24-nov-2026): lupa y filtro en la cabecera de «Conversaciones», en lugar de un
+ * buscador fijo y tres selectores nativos. El filtro abre un menú con agrupar, actividad y fecha; un punto avisa de
+ * que hay filtros puestos. */
+function AccionesConversaciones({ buscando, onBuscar, filtros, todos, onCambiar }: {
+	buscando: boolean;
+	onBuscar(): void;
+	filtros: FiltrosConversaciones;
+	todos: boolean;
+	onCambiar(filtros: FiltrosConversaciones): void;
+}) {
+	const activos = filtrosActivos(filtros);
 	return (
-		<div className="flex flex-wrap gap-1 px-2 pb-1 pt-1">
-			<select aria-label="Agrupar" className={clase} value={filtros.agrupar} onChange={(e) => onCambiar({ ...filtros, agrupar: e.target.value as FiltrosConversaciones["agrupar"] })}>
-				<option value="fecha">Por fecha</option>
-				<option value="unidad">{todos ? "Por plan" : "Por unidad del plan"}</option>
-			</select>
-			<select aria-label="Actividad" className={clase} value={filtros.actividad} onChange={(e) => onCambiar({ ...filtros, actividad: e.target.value as FiltrosConversaciones["actividad"] })}>
-				<option value="toda">Toda actividad</option>
-				{ACTIVIDADES.map(a => <option key={a.id} value={a.id}>{a.etiqueta}</option>)}
-			</select>
-			<select aria-label="Fecha" className={clase} value={filtros.fecha} onChange={(e) => onCambiar({ ...filtros, fecha: e.target.value as FiltrosConversaciones["fecha"] })}>
-				{FECHAS.map(f => <option key={f.id} value={f.id}>{f.etiqueta}</option>)}
-			</select>
+		<div className="flex shrink-0 items-center gap-0.5 group-data-[collapsible=icon]:hidden">
+			<button type="button" onClick={onBuscar} aria-pressed={buscando} aria-label="Buscar conversaciones" title="Buscar conversaciones" data-testid="lupa-conversaciones" className={claseIcono}>
+				<SearchIcon className="size-3.5" />
+			</button>
+			<DropdownMenu>
+				<DropdownMenuTrigger
+					aria-label={activos ? "Filtrar conversaciones (hay filtros puestos)" : "Filtrar conversaciones"}
+					title="Agrupar y filtrar"
+					data-testid="filtro-conversaciones"
+					data-filtros-activos={activos || undefined}
+					className={claseIcono}
+				>
+					<ListFilterIcon className="size-3.5" />
+					{activos && <span aria-hidden className="absolute right-1 top-1 size-1.5 rounded-full bg-primary" />}
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end" className="w-52">
+					<DropdownMenuLabel className="text-xs text-muted-foreground">Agrupar</DropdownMenuLabel>
+					<DropdownMenuRadioGroup value={filtros.agrupar} onValueChange={(v) => onCambiar({ ...filtros, agrupar: v as FiltrosConversaciones["agrupar"] })}>
+						<DropdownMenuRadioItem value="fecha">Por fecha</DropdownMenuRadioItem>
+						<DropdownMenuRadioItem value="unidad">{todos ? "Por plan" : "Por unidad del plan"}</DropdownMenuRadioItem>
+					</DropdownMenuRadioGroup>
+					<DropdownMenuSeparator />
+					<DropdownMenuLabel className="text-xs text-muted-foreground">Actividad</DropdownMenuLabel>
+					<DropdownMenuRadioGroup value={filtros.actividad} onValueChange={(v) => onCambiar({ ...filtros, actividad: v as FiltrosConversaciones["actividad"] })}>
+						<DropdownMenuRadioItem value="toda">Toda</DropdownMenuRadioItem>
+						{ACTIVIDADES.map(a => <DropdownMenuRadioItem key={a.id} value={a.id}>{a.etiqueta}</DropdownMenuRadioItem>)}
+					</DropdownMenuRadioGroup>
+					<DropdownMenuSeparator />
+					<DropdownMenuLabel className="text-xs text-muted-foreground">Fecha</DropdownMenuLabel>
+					<DropdownMenuRadioGroup value={filtros.fecha} onValueChange={(v) => onCambiar({ ...filtros, fecha: v as FiltrosConversaciones["fecha"] })}>
+						{FECHAS.map(f => <DropdownMenuRadioItem key={f.id} value={f.id}>{f.etiqueta}</DropdownMenuRadioItem>)}
+					</DropdownMenuRadioGroup>
+					{activos && <>
+						<DropdownMenuSeparator />
+						<DropdownMenuItem onSelect={() => onCambiar({ ...filtros, actividad: FILTROS_INICIALES.actividad, fecha: FILTROS_INICIALES.fecha })}>Quitar filtros</DropdownMenuItem>
+					</>}
+				</DropdownMenuContent>
+			</DropdownMenu>
+		</div>
+	);
+}
+
+/** Los filtros puestos, como fichas que se quitan con ✕; sin filtros no ocupa nada. */
+function FichasFiltros({ filtros, onCambiar }: { filtros: FiltrosConversaciones; onCambiar(filtros: FiltrosConversaciones): void }) {
+	const fichas: { clave: string; etiqueta: string; quitar(): void }[] = [];
+	if (filtros.actividad !== FILTROS_INICIALES.actividad) {
+		fichas.push({ clave: "actividad", etiqueta: ETIQUETA_ACTIVIDAD[filtros.actividad as OrigenConversacion], quitar: () => onCambiar({ ...filtros, actividad: FILTROS_INICIALES.actividad }) });
+	}
+	if (filtros.fecha !== FILTROS_INICIALES.fecha) {
+		fichas.push({ clave: "fecha", etiqueta: FECHAS.find(f => f.id === filtros.fecha)?.etiqueta ?? filtros.fecha, quitar: () => onCambiar({ ...filtros, fecha: FILTROS_INICIALES.fecha }) });
+	}
+	if (fichas.length === 0) return null;
+	return (
+		<div className="flex flex-wrap gap-1 px-2 pb-1 pt-1" data-testid="fichas-filtros">
+			{fichas.map(f => (
+				<span key={f.clave} data-ficha-filtro={f.clave} className="inline-flex items-center gap-0.5 rounded-full bg-sidebar-accent py-0.5 pl-2 pr-0.5 text-[11px] text-sidebar-foreground">
+					{f.etiqueta}
+					<button type="button" onClick={f.quitar} aria-label={`Quitar el filtro ${f.etiqueta}`} className="anillo-foco rounded-full p-0.5 text-muted-foreground hover:text-sidebar-foreground">
+						<XIcon className="size-3" />
+					</button>
+				</span>
+			))}
 		</div>
 	);
 }

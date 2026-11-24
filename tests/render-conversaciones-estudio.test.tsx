@@ -129,27 +129,37 @@ function barra(datos: Partial<DatosBarraLateral> = {}) {
 	);
 }
 
-/** El marcado de un selector, por su etiqueta accesible. */
-const selector = (html: string, etiqueta: string) => html.match(new RegExp(`<select[^>]*aria-label="${etiqueta}"[\\s\\S]*?</select>`))?.[0] ?? "";
-const elegido = (html: string, etiqueta: string) => selector(html, etiqueta).match(/<option[^>]*selected=""[^>]*>([^<]*)</)?.[1];
-const opciones = (html: string, etiqueta: string) => [...selector(html, etiqueta).matchAll(/<option[^>]*>([^<]*)</g)].map(m => m[1]);
-
 describe("BarraLateralEstudio: conversaciones agrupables y filtrables", () => {
-	it("bajo «Conversaciones», tres selectores con sus opciones y la elección actual", () => {
+	// Variante A (24-nov-2026): lupa y filtro en la cabecera; ni buscador fijo ni selectores nativos.
+	it("en la cabecera de «Conversaciones», la lupa y el filtro; sin filtros, ni fichas ni punto", () => {
 		const html = barra();
-		assert.deepEqual(opciones(html, "Agrupar"), ["Por fecha", "Por unidad del plan"]);
-		assert.deepEqual(opciones(html, "Actividad"), ["Toda actividad", "Estudio de unidad", "Pasaje", "Intento", "Libre"]);
-		assert.deepEqual(opciones(html, "Fecha"), ["Siempre", "7 días", "30 días"]);
-		assert.deepEqual([elegido(html, "Agrupar"), elegido(html, "Actividad"), elegido(html, "Fecha")], ["Por fecha", "Toda actividad", "Siempre"]);
-		// Dentro de la sección, que los pliega con ella.
+		assert.match(html, /data-testid="lupa-conversaciones"[^>]*>|aria-label="Buscar conversaciones"/);
+		assert.match(html, /data-testid="filtro-conversaciones"/);
+		assert.doesNotMatch(html, /<select/);
+		assert.doesNotMatch(html, /data-testid="buscar-conversaciones"/, "el buscador solo sale al pulsar la lupa");
+		assert.doesNotMatch(html, /data-filtros-activos/);
+		assert.doesNotMatch(html, /data-testid="fichas-filtros"/);
+		// Fuera de la sección plegable: la cabecera sigue a la vista con la sección plegada.
 		const seccion = html.slice(html.indexOf('data-elementos="conversaciones"'));
-		assert.ok(seccion.includes('aria-label="Agrupar"'));
+		assert.ok(!seccion.includes('data-testid="filtro-conversaciones"'));
 	});
 
-	it("con «Todos», agrupar ofrece «Por plan»", () => {
+	it("con filtros puestos, el punto en el filtro y una ficha por filtro que se quita con ✕", () => {
+		const html = barra({ filtros: filtros({ actividad: "pasaje", fecha: "7" }) });
+		assert.match(html, /data-testid="filtro-conversaciones"[^>]*data-filtros-activos="true"|data-filtros-activos="true"[^>]*data-testid="filtro-conversaciones"/);
+		const fichas = [...html.matchAll(/data-ficha-filtro="([^"]+)"[^>]*>([^<]*)</g)].map(m => [m[1], m[2]]);
+		assert.deepEqual(fichas, [["actividad", "Pasaje"], ["fecha", "7 días"]]);
+		assert.match(html, /aria-label="Quitar el filtro Pasaje"/);
+	});
+
+	it("agrupar no cuenta como filtro", () => {
+		const html = barra({ filtros: filtros({ agrupar: "unidad" }) });
+		assert.doesNotMatch(html, /data-filtros-activos/);
+		assert.doesNotMatch(html, /data-testid="fichas-filtros"/);
+	});
+
+	it("con «Todos», agrupar por plan", () => {
 		const html = barra({ espacios: { areas: [{ id: "a1", name: "Grafos", archived: false }], activeAreaId: null }, filtros: filtros({ agrupar: "unidad" }) });
-		assert.deepEqual(opciones(html, "Agrupar"), ["Por fecha", "Por plan"]);
-		assert.equal(elegido(html, "Agrupar"), "Por plan");
 		assert.match(html, /Dominar grafos/);
 		assert.match(html, /Sin plan/);
 	});
@@ -171,17 +181,18 @@ describe("BarraLateralEstudio: conversaciones agrupables y filtrables", () => {
 		assert.match(fila("mes-intento-u1"), /data-actividad="intento"/);
 	});
 
-	it("sin resultados con los filtros lo dice y deja los selectores para cambiarlos", () => {
+	it("sin resultados con los filtros lo dice y deja el filtro y las fichas para cambiarlos", () => {
 		const html = barra({ filtros: filtros({ actividad: "intento", fecha: "7" }) });
 		assert.match(html, /Ninguna conversación con estos filtros\./);
-		assert.ok(selector(html, "Agrupar"));
+		assert.match(html, /data-testid="filtro-conversaciones"/);
+		assert.match(html, /data-testid="fichas-filtros"/);
 		assert.doesNotMatch(html, /data-testid="conversacion"/);
 	});
 
-	it("sin ninguna conversación en el espacio, ni selectores ni filtros", () => {
+	it("sin ninguna conversación en el espacio, ni lupa ni filtro", () => {
 		const html = barra({ conversaciones: [] });
 		assert.match(html, /Aún no hay conversaciones en este espacio/);
-		assert.equal(selector(html, "Agrupar"), "");
+		assert.doesNotMatch(html, /data-testid="(lupa|filtro)-conversaciones"/);
 	});
 
 	it("en ambas agrupaciones, cada fila conserva su menú de acciones", () => {
