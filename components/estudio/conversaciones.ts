@@ -1,4 +1,5 @@
-import type { LecturaPlan } from "./tipos";
+import type { LecturaPlanes } from "./tipos";
+import { unidadesEnOrden } from "./planes";
 
 /** De dónde se abrió una conversación (ticket 03 de la segunda ronda); las antiguas sin registro, por su unidad. */
 export type OrigenConversacion = "unidad" | "pasaje" | "intento" | "libre";
@@ -90,16 +91,15 @@ function agruparPor(
 export function agruparConversaciones(
 	conversaciones: readonly ConversacionLista[],
 	filtros: FiltrosConversaciones,
-	{ ahora = new Date(), plan, todos }: { ahora?: Date; plan: LecturaPlan | null; todos: boolean },
+	{ ahora = new Date(), planes, todos }: { ahora?: Date; planes: LecturaPlanes | null; todos: boolean },
 ): GrupoConversaciones[] {
 	const desde = filtros.fecha === "siempre" ? -Infinity : inicioDeHoy(ahora) - Number(filtros.fecha) * DIA;
 	const visibles = conversaciones.filter(c =>
 		(filtros.actividad === "toda" || c.origen === filtros.actividad) && new Date(c.updatedAt).getTime() >= desde);
 	if (filtros.agrupar === "fecha") return agruparPorFecha(visibles, ahora);
 	if (todos) return agruparPor(visibles, c => c.plan && { id: c.plan.id, etiqueta: c.plan.objetivo }, [], "Sin plan");
-	// Las del plan con su número; las de fuera del plan, tras ellas y sin número, como en la sección «Plan».
-	let n = 0;
-	const orden = (plan?.unidades ?? []).map(u => ({ id: u.id, numero: u.fueraDelPlan ? null : ++n }));
+	// En el orden de la sección «Planes»: las de los temas de cada plan y, detrás, las que no están en ninguno.
+	const orden = unidadesEnOrden(planes).map(u => ({ id: u.id, numero: null }));
 	return agruparPor(visibles, c => c.unidad && { id: c.unidad.id, etiqueta: c.unidad.titulo }, orden, "Sin unidad");
 }
 

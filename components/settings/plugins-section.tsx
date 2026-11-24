@@ -16,7 +16,7 @@ export function PluginsSection({ onOpenSettings, origin = "community" }: { onOpe
 		{!core && <>
 		<p className="font-prose text-sm text-muted-foreground">{PLUGIN_TRUST_WARNING}</p>
 		<details data-testid="plugin-install-help" className="text-xs text-muted-foreground">
-			<summary className="w-fit cursor-pointer list-none text-muted-foreground underline underline-offset-2 hover:text-foreground [&::-webkit-details-marker]:hidden">Cómo instalar un plugin</summary>
+			<summary className="anillo-foco w-fit cursor-pointer list-none text-muted-foreground underline underline-offset-2 hover:text-foreground [&::-webkit-details-marker]:hidden">Cómo instalar un plugin</summary>
 			<ol className="mt-2 list-decimal space-y-2 pl-5">
 				<li>Clona o copia el plugin en la carpeta de abajo, con su identificador como nombre de carpeta.</li>
 				<li>Si es código fuente, instala sus dependencias como indique el repositorio y ejecuta <code>npm run build</code>. Un paquete ya construido trae <code>dist/manifest.json</code> y no necesita construirse.</li>
@@ -27,7 +27,7 @@ export function PluginsSection({ onOpenSettings, origin = "community" }: { onOpe
 		<div data-testid="plugin-authoring-help" className="space-y-2 border-t border-border/60 pt-3">
 			<h3 className="text-xs uppercase tracking-widest">Crear un plugin</h3>
 			<p className="font-prose text-sm text-muted-foreground">Descarga la skill de autoría para tu agente de programación.</p>
-			<Button variant="outline" size="sm" asChild><a href="/plugin-authoring/learnharness-plugins.zip" download={`learnharness-plugins-${process.env.LH_VERSION ?? "authoring"}.zip`} data-testid="download-plugin-authoring">Descargar la skill de autoría</a></Button>
+			<Button variant="outline" size="sm" asChild><a className="anillo-foco" href="/plugin-authoring/learnharness-plugins.zip" download={`learnharness-plugins-${process.env.LH_VERSION ?? "authoring"}.zip`} data-testid="download-plugin-authoring">Descargar la skill de autoría</a></Button>
 		</div>
 		<div data-testid="plugin-directory" className="border-t border-border/60 pt-3">
 			<p className="text-xs text-muted-foreground">Carpeta de plugins</p>
@@ -57,7 +57,7 @@ function PluginRow({ plugin, onSettings }: { plugin: FrontendPlugin; onSettings:
 		<SettingsRow label={name} hint={[info.origin === "community" ? info.manifest?.version : undefined, plugin.busy ? "Guardando…" : plugin.error ? "Error" : plugin.phase === "loading" ? "Cargando…" : info.enabled ? "Activado" : "Desactivado"].filter(Boolean).join(" · ")}>
 			<div className="flex shrink-0 items-center gap-2">
 				{info.enabled && <button type="button" aria-label={`Ajustes de ${name}`} title={`Ajustes de ${name}`}
-					className="flex size-7 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+					className="anillo-foco flex size-7 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 					onClick={onSettings}><Settings className="size-3.5" aria-hidden="true" /></button>}
 				<Toggle label={`Activar ${name}`} checked={info.enabled} disabled={!manager || plugin.busy || snapshot.refreshing || (!info.manifest && !info.enabled)} onChange={enabled => void manager?.setEnabled(info.id, enabled)} />
 			</div>

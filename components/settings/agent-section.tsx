@@ -81,6 +81,8 @@ import { SettingsGroup, SettingsRow, SettingsMenuTrigger, Toggle, CommitInput } 
 import { ModelMenuList, ThinkingMenuList, thinkingLevelLabel } from "./model-menu";
 import { ChatGPTBackgroundAccess } from "./chatgpt-connection";
 import { NativeSubscriptionBackgroundAccess } from "./subscription-connections";
+import { AYUDA_INSTRUCCIONES, cadenaDeAgente, fichaInstruccion } from "@/components/estudio/instrucciones-sistema";
+import { ListaAportacion, useAportacion, VistaAportacion } from "@/components/estudio/aportacion";
 
 /** One slot's display identity — the tier's roster as the row hint rides
  *  with the resolved default (owner: the hint ALWAYS names the default). */
@@ -291,6 +293,13 @@ export function sectionedSegments(view: PromptView): PromptSection[] {
 	];
 }
 
+/** Las tarjetas de «Instrucciones del sistema», en el orden en que actúan los agentes. */
+const PROMPT_CARDS = [
+	{ id: "prober", label: "Sondeador" },
+	{ id: "teacher", label: "Tutor" },
+	{ id: "practice", label: "Práctica" },
+] as const;
+
 /** The search row's reason line, in Spanish. /api/search sends its own
  *  English `reason`; the line is rebuilt here from the same state so the
  *  server text stays as it is. Pure — exported for tests. */
@@ -407,6 +416,9 @@ export function AgentSection({
 	const [engineKeys, setEngineKeys] = useState<Partial<Record<SearchEngineId, boolean>>>({});
 	const [prompts, setPrompts] = useState<PromptView | null>(null);
 	const [openSegment, setOpenSegment] = useState<string | null>(null);
+	/** La tarjeta de agente abierta en «Instrucciones del sistema» (una a la vez). */
+	const [openCard, setOpenCard] = useState<keyof PromptView | null>(null);
+	const aportacion = useAportacion();
 	const [segmentDraft, setSegmentDraft] = useState<Record<string, string>>({});
 	const [segmentStatus, setSegmentStatus] = useState<string | null>(null);
 	/** One open dropdown for the whole section: which slot (or the search
@@ -551,7 +563,7 @@ export function AgentSection({
 			type="button"
 			data-testid={`engine-option-${id}`}
 			onClick={onPick}
-			className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted ${
+			className={`anillo-foco flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted ${
 				active ? "bg-muted/60 text-card-foreground" : "text-card-foreground"
 			}`}
 		>
@@ -575,14 +587,14 @@ export function AgentSection({
 		return (
 			<div key={info.path} data-testid={`prompt-segment-${info.path}`}>
 				<SettingsRow
-					label={info.path}
+					label={fichaInstruccion(info.path).nombre}
 					// Overhaul rulings (2026-09-26, refined): the small text
 					// states WHICH VERSION IS IN USE — nothing when the
 					// default composes (even with a saved override sitting
 					// on disk unused), "Your version is in use" when the
 					// switch is on. The switch's meaning becomes legible
 					// through this line.
-					hint={[info.usageHint, info.enabled ? PROMPT_IN_USE_HINT : undefined].filter(Boolean).join(" · ") || undefined}
+					hint={[fichaInstruccion(info.path).proposito, info.usageHint, info.enabled ? PROMPT_IN_USE_HINT : undefined].filter(Boolean).join(" · ") || undefined}
 					testid={`prompt-row-${info.path}`}
 				>
 					{/* Graying ruling: ONLY the toggle dims without an
@@ -603,14 +615,14 @@ export function AgentSection({
 						setOpenSegment(open ? null : info.path);
 						setSegmentStatus(null);
 					}}
-					className="text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
+					className="anillo-foco text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
 				>
 					{open ? "Ocultar texto" : "Ver texto"}
 				</button>
 				{open && (
 					<div className="mt-1 flex flex-col gap-2">
 						<div>
-							<p className="mb-1 text-xs uppercase tracking-widest text-muted-foreground/70">Original</p>
+							<p className="mb-1 text-xs uppercase tracking-widest text-muted-foreground/70">Original · {info.path}</p>
 							<textarea
 								readOnly
 								value={info.sourceText}
@@ -633,11 +645,11 @@ export function AgentSection({
 								type="button"
 								disabled={!dirty}
 								onClick={() => void saveSegment(info.path, segmentDraft[info.path] ?? "")}
-								className={
+								className={`anillo-foco ${
 									dirty
 										? "text-xs text-foreground underline-offset-2 hover:underline"
 										: "cursor-not-allowed text-xs text-muted-foreground/40 underline-offset-2"
-								}
+								}`}
 							>
 								Guardar
 							</button>
@@ -645,7 +657,7 @@ export function AgentSection({
 								<button
 									type="button"
 									onClick={() => void deleteSegment(info.path)}
-									className="text-xs text-muted-foreground/70 underline-offset-2 hover:text-error hover:underline"
+									className="anillo-foco text-xs text-muted-foreground/70 underline-offset-2 hover:text-error hover:underline"
 								>
 									Borrar
 								</button>
@@ -673,6 +685,10 @@ export function AgentSection({
 	// Resolved through the SAME core resolver the server's effective
 	// settings use (the GraphSection precedent): the hint and placeholder
 	// report exactly the number the trigger waits for.
+	// «Las usa: …» de cada fragmento compartido, para mostrarlo dentro de cada tarjeta de agente.
+	const sharedUsage = new Map<string, string | undefined>(
+		prompts ? (sectionedSegments(prompts).at(-1)?.segments ?? []).map((s) => [s.path, s.usageHint]) : [],
+	);
 	const resolvedAgent = resolveSettings(agent === undefined ? null : { version: 1, agent }).agent;
 	const resolvedCompaction = resolveSettings(
 		compaction === undefined ? null : { version: 1, compaction },
@@ -686,9 +702,9 @@ export function AgentSection({
 					data-testid="models-advanced"
 					aria-expanded={advancedModels}
 					onClick={() => { setAdvancedModels(!advancedModels); setOpenMenu(null); }}
-					className="mb-1 self-start text-xs text-muted-foreground hover:text-foreground"
+					className="anillo-foco mb-1 self-start text-xs text-muted-foreground hover:text-foreground"
 				>{advancedModels ? "Ocultar ajustes avanzados" : "Ver ajustes avanzados"}</button>
-				{catalogFailed && <p role="alert" className="text-xs text-error">No se pudo cargar el catálogo de modelos. Comprueba la conexión y reinténtalo. <button type="button" className="underline" onClick={refreshCatalog}>Reintentar</button></p>}
+				{catalogFailed && <p role="alert" className="text-xs text-error">No se pudo cargar el catálogo de modelos. Comprueba la conexión y reinténtalo. <button type="button" className="anillo-foco underline" onClick={refreshCatalog}>Reintentar</button></p>}
 				{MODEL_SLOTS.map((slot) => {
 					const override = models?.[slot];
 					const modelId = override?.model?.id ?? "";
@@ -908,7 +924,7 @@ export function AgentSection({
 											data-testid={`quiz-mechanics-${m}`}
 											onClick={() => onSectionChange(composeQuizMechanics(agent, m))}
 											className={cn(
-												"h-8 rounded-md px-3 text-sm font-medium transition-colors",
+												"anillo-foco h-8 rounded-md px-3 text-sm font-medium transition-colors",
 												active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
 											)}
 										>
@@ -961,7 +977,7 @@ export function AgentSection({
 									onChange={(event) => { setFolderInput(event.target.value); setFolderError(null); }}
 									onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addFolder(); } }}
 									className="min-w-0 flex-1 rounded-sm border border-border bg-background px-2 py-1 font-ui text-xs" />
-								<button type="button" data-testid="file-access-add-button" disabled={!folderInput.trim()} onClick={addFolder} className="rounded-sm border border-border px-2 text-xs disabled:opacity-40">Añadir carpeta</button>
+								<button type="button" data-testid="file-access-add-button" disabled={!folderInput.trim()} onClick={addFolder} className="anillo-foco rounded-sm border border-border px-2 text-xs disabled:opacity-40">Añadir carpeta</button>
 							</div>
 							{folderError && <p role="alert" data-testid="file-access-input-error" className="pl-3 text-xs text-error">{folderError}</p>}
 							{folders.map((folder) => (
@@ -969,7 +985,7 @@ export function AgentSection({
 									<span title={folder} className="min-w-0 truncate font-ui text-muted-foreground">{folder}</span>
 									<button type="button" aria-label={`Quitar ${folder}`} data-testid="file-access-remove"
 										onClick={() => onSectionChange(composeRemoveFolder(effectiveAgent, folder))}
-										className="rounded-sm px-1.5 text-muted-foreground hover:text-foreground">Quitar</button>
+										className="anillo-foco rounded-sm px-1.5 text-muted-foreground hover:text-foreground">Quitar</button>
 								</div>
 							))}
 						</div>
@@ -1071,18 +1087,49 @@ export function AgentSection({
 					<p className="text-xs text-muted-foreground/70">Cargando instrucciones…</p>
 				) : (
 					<div className="flex flex-col gap-4">
-						{/* Teacher, Prober, Practice, Shared — shared chunks once,
-						    each agent's own section in prompt-assembly order. */}
-						{sectionedSegments(prompts).map((section) => (
-							<div key={section.id} data-testid={`prompt-section-${section.id}`}>
-								<p className="mb-1 text-xs uppercase tracking-widest text-muted-foreground/70">
-									{section.label}
-								</p>
-								<div className="flex flex-col gap-2">
-									{section.segments.map((info) => segmentRow(info))}
+						<p className="text-xs text-muted-foreground/70" data-testid="prompts-help">{AYUDA_INSTRUCCIONES}</p>
+						{/* HarnessAcademico (maqueta 23-nov-2026, variante C): una tarjeta por agente con su cadena de
+						    instrucciones en el orden en que las recibe, las de Estudio al final; el detalle, al abrirla. */}
+						{PROMPT_CARDS.map(({ id, label }) => {
+							const estudio = aportacion !== null && "aportacion" in aportacion ? aportacion.aportacion.instrucciones : [];
+							const cadena = cadenaDeAgente(prompts[id].map((s) => s.path), estudio, id);
+							const abierta = openCard === id;
+							return (
+								<div key={id} data-testid={`prompt-card-${id}`} className="rounded-lg border border-border bg-card p-3">
+									<p className="text-xs uppercase tracking-widest text-muted-foreground/70">
+										{label} · {cadena.length} instrucciones
+									</p>
+									<p className="mt-1 font-prose text-sm text-card-foreground">
+										{cadena.map((paso) => (paso.deEstudio ? `${paso.nombre} (Estudio)` : paso.nombre)).join(" → ")}
+									</p>
+									<button
+										type="button"
+										onClick={() => { setOpenCard(abierta ? null : id); setOpenSegment(null); }}
+										className="mt-1 text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
+									>
+										{abierta ? "Ocultar" : "Ver una a una"}
+									</button>
+									{abierta && (
+										<div className="mt-2 flex flex-col gap-2">
+											{prompts[id].map((info) => segmentRow({ ...info, usageHint: sharedUsage.get(info.path) }))}
+											{id !== "practice" && (
+												<div data-testid="prompt-section-estudio">
+													<p className="mb-1 text-xs uppercase tracking-widest text-muted-foreground/70">Añadidas por Estudio</p>
+													{aportacion !== null && "aportacion" in aportacion ? (
+														<ListaAportacion
+															soloInstrucciones
+															aportacion={{ ...aportacion.aportacion, instrucciones: aportacion.aportacion.instrucciones.filter((i) => i.agentes.includes(id)) }}
+														/>
+													) : (
+														<VistaAportacion estado={aportacion} soloInstrucciones />
+													)}
+												</div>
+											)}
+										</div>
+									)}
 								</div>
-							</div>
-						))}
+							);
+						})}
 					</div>
 				)}
 			</SettingsGroup>

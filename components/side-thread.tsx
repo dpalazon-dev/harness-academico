@@ -47,7 +47,7 @@ export interface SideThreadHandlers {
 }
 function Passage({ text, chatId, sourceMessageId, selector, citation: savedCitation }: { text: string; chatId?: string; sourceMessageId?: string; selector?: Omit<TextSelector, "text">; citation?: TutorCitation }) {
 	const actions = useContext(CitationActionsContext);
-	const quote = <blockquote className="line-clamp-3 border-l-2 border-border pl-2 text-xs italic text-muted-foreground">{text}</blockquote>;
+	const quote = <blockquote className="line-clamp-3 rounded-md bg-muted px-2 py-1 text-xs italic text-muted-foreground">{text}</blockquote>;
 	if (!actions?.openSource || (!savedCitation && (!chatId || !sourceMessageId))) return quote;
 	const citation: TutorCitation = savedCitation ?? { version: 1, chatId: chatId!, messageId: sourceMessageId!, text,
 		...(selector ?? { start: 0, end: text.length, prefix: "", suffix: "" }) };

@@ -55,7 +55,24 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
 	const { id } = await params;
 	if (!getChat(id)) return Response.json({ error: "Not found" }, { status: 404 });
-	const body = (await req.json().catch(() => null)) as { title?: unknown } | null;
+	const body = (await req.json().catch(() => null)) as { title?: unknown; pinned?: unknown; archived?: unknown; pinnedMessages?: unknown } | null;
+	// HarnessAcademico (harness conversacional): mensajes fijados de la conversación.
+	if (body && body.title === undefined && body.pinnedMessages !== undefined) {
+		const ids = body.pinnedMessages;
+		if (!Array.isArray(ids) || ids.length > 200 || !ids.every((x) => typeof x === "string" && x.length > 0 && x.length <= 200)) {
+			return Response.json({ error: "pinnedMessages must be a list of message ids" }, { status: 400 });
+		}
+		const record = stores.chatStore.setPinnedMessages(id, ids as string[]);
+		return Response.json({ pinnedMessages: record.pinnedMessages ?? [] });
+	}
+	// HarnessAcademico (harness conversacional): fijar y archivar, sin título.
+	if (body && body.title === undefined && (body.pinned !== undefined || body.archived !== undefined)) {
+		if ((body.pinned !== undefined && typeof body.pinned !== "boolean") || (body.archived !== undefined && typeof body.archived !== "boolean")) {
+			return Response.json({ error: "pinned and archived must be booleans" }, { status: 400 });
+		}
+		const record = stores.chatStore.setChatFlags(id, { pinned: body.pinned as boolean | undefined, archived: body.archived as boolean | undefined });
+		return Response.json({ pinned: record.pinned === true, archived: record.archived === true });
+	}
 	if (typeof body?.title !== "string" || body.title.trim() === "") {
 		return Response.json({ error: "title must be a non-empty string" }, { status: 400 });
 	}

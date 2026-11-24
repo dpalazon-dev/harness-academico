@@ -61,9 +61,10 @@ describe("the thinking pill suffix — ⇧⇥ via the registry", () => {
 describe("the Alt session cycle is RETIRED (owner, 2026-10-10)", () => {
 	// Barely used, felt laggy — session navigation lives IN the search
 	// now (↑/↓ walk the filtered list, Enter opens; sidebar.tsx).
-	it("⌥↑ / ⌥↓ / ⌥↵ bind to NOTHING — no stray action fires", () => {
-		assert.equal(actionForBinding("alt+arrowup") ?? null, null);
-		assert.equal(actionForBinding("alt+arrowdown") ?? null, null);
+	// HarnessAcademico (23-nov-2026): ⌥↑/⌥↓ pasan a ir al mensaje anterior o siguiente (navegar-mensajes.tsx).
+	it("⌥↑ / ⌥↓ no longer cycle sessions — they move between messages; ⌥↵ binds to nothing", () => {
+		assert.equal(actionForBinding("alt+arrowup"), "message-prev");
+		assert.equal(actionForBinding("alt+arrowdown"), "message-next");
 		assert.equal(actionForBinding("alt+enter") ?? null, null);
 	});
 

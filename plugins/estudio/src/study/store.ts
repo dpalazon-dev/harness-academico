@@ -26,6 +26,8 @@ export interface StudyStore {
   getPlan(id: string): StudyPlan | null;
   listPlans(): StudyPlan[];
   savePlan(plan: StudyPlan, expectedRevision: number | null): StudyPlan;
+  /** Moves a discarded plan to `plans/.papelera`. */
+  trashPlan(id: string, expectedRevision: number): void;
   getProposal(id: string): PlanProposal | null;
   listProposals(planId?: string): PlanProposal[];
   saveProposal(proposal: PlanProposal, expectedRevision: number | null): PlanProposal;
@@ -134,6 +136,7 @@ export function openStudyStore(root: string): StudyStore {
     getPlan: id => read('plans', id, parsePlan),
     listPlans: () => list('plans', parsePlan),
     savePlan: (plan, expected) => save('plans', plan, expected, parsePlan),
+    trashPlan: (id, expected) => trash('plans', id, expected, parsePlan),
     getProposal: id => read('proposals', id, parseProposal),
     listProposals: planId => list('proposals', parseProposal).filter(p => planId === undefined || p.planId === planId),
     saveProposal: (proposal, expected) => save('proposals', proposal, expected, parseProposal),

@@ -10,7 +10,7 @@ import { afterEach, describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot, type Root } from "react-dom/client";
 import { parseHTML } from "linkedom";
-import { ModoProactivo, motivoDelAviso, type ModoProactivoProps } from "../components/estudio/modo-proactivo.tsx";
+import { ModoProactivo, TopeDiario, motivoDelAviso, type ModoProactivoProps } from "../components/estudio/modo-proactivo.tsx";
 import { EditorCuadernoEstudio } from "../components/estudio/editor-cuadernos.tsx";
 import type { Cuaderno } from "../components/estudio/cuadernos.ts";
 
@@ -21,11 +21,12 @@ const modo = (props: Partial<ModoProactivoProps> = {}) => renderToStaticMarkup(
 );
 
 describe("ModoProactivo, pintado", () => {
-	it("por defecto dice «Lee y comenta solo», está activado y cuenta lo gastado hoy frente al tope", () => {
+	it("por defecto dice «Lee y comenta solo» y está activado; el gasto de hoy no está en la cabecera, sino en Propiedades", () => {
 		const html = modo();
 		assert.match(html, /role="switch"[^>]*aria-checked="true"/);
 		assert.match(html, />Lee y comenta solo</);
-		assert.match(html, />3 de 40 hoy</);
+		assert.doesNotMatch(html, /de 40/);
+		assert.doesNotMatch(html, /data-tope/);
 		assert.doesNotMatch(html, /data-aviso/);
 	});
 
@@ -34,6 +35,12 @@ describe("ModoProactivo, pintado", () => {
 		assert.match(html, /aria-checked="false"/);
 		assert.match(html, />Cuando se lo pido</);
 		assert.doesNotMatch(html, /de 40 hoy/);
+	});
+
+	it("el gasto de hoy frente al tope, en Propiedades, se puede pulsar para cambiar el tope", () => {
+		const html = renderToStaticMarkup(<TopeDiario estado={ESTADO} fijarTope={nada} />);
+		assert.match(html, /<button[^>]*data-tope[^>]*>3 de 40<\/button>/);
+		assert.match(html, /aria-label="El tutor ha leído 3 de 40 veces hoy por su cuenta\. Cambiar el tope diario\."/);
 	});
 
 	it("mientras el tutor lee lo dice", () => {
@@ -55,7 +62,15 @@ describe("ModoProactivo, pintado", () => {
 	it("sin modelo económico avisa y manda a Ajustes, sin enseñar un gasto que no existe", () => {
 		const html = modo({ estado: { ...ESTADO, modeloEconomico: false } });
 		assert.match(html, /data-aviso="sin-modelo"[^>]*>No hay modelo económico configurado[^<]*Ajustes/);
+		assert.match(html, /<button[^>]*data-abrir-ajustes[^>]*>Abrir Ajustes<\/button>/);
 		assert.doesNotMatch(html, /de 40 hoy/);
+	});
+
+	it("sin modelo económico el interruptor no sale encendido: dice lo mismo que el aviso", () => {
+		const html = modo({ estado: { ...ESTADO, modeloEconomico: false } });
+		assert.match(html, /role="switch"[^>]*aria-checked="false"/);
+		assert.match(html, />Cuando se lo pido</);
+		assert.doesNotMatch(html, />Lee y comenta solo</);
 	});
 
 	it("un error al cambiar el modo (por ejemplo, el tope agotado) se muestra tal como lo dice el plugin", () => {
@@ -149,11 +164,31 @@ async function pintar(props: Partial<ModoProactivoProps> = {}) {
 	return { ...f, llamadas, q, clic, tecla, evento };
 }
 
+async function pintarTope() {
+	const f = montar();
+	const llamadas: string[] = [];
+	await act(async () => { root!.render(<TopeDiario estado={ESTADO} fijarTope={n => llamadas.push(`tope ${n}`)} />); });
+	const q = <E extends Element>(sel: string) => f.dom.document.querySelector<E>(sel);
+	const evento = (tipo: string, extra: Record<string, unknown> = {}) =>
+		Object.assign(new f.dom.window.Event(tipo, { bubbles: true, cancelable: true }), { key: "", detail: 1, button: 0, ...extra });
+	const clic = async (el: Element) => { await act(async () => { el.dispatchEvent(evento("click")); }); };
+	const tecla = async (el: Element, key: string) => { await act(async () => { el.dispatchEvent(evento("focusin")); el.dispatchEvent(evento("keydown", { key })); }); };
+	return { ...f, llamadas, q, clic, tecla, evento };
+}
+
 describe("ModoProactivo, montado", () => {
 	it("pulsar el interruptor pide cambiar al otro modo", async () => {
 		const f = await pintar();
 		await f.clic(f.q("[data-modo-interruptor]")!);
 		assert.deepEqual(f.llamadas, ["modo a-peticion"]);
+	});
+
+	it("«Abrir Ajustes» del aviso sin modelo abre Ajustes en la pestaña del agente, donde se elige el modelo económico", async () => {
+		const secciones: string[] = [];
+		const f = await pintar({ estado: { ...ESTADO, modeloEconomico: false }, abrirAjustes: s => secciones.push(s) });
+		await f.clic(f.q("[data-abrir-ajustes]")!);
+		assert.deepEqual(secciones, ["agent"]);
+		assert.deepEqual(f.llamadas, []);
 	});
 
 	it("apagado, pulsarlo pide volver a «Lee y comenta solo»", async () => {
@@ -163,7 +198,7 @@ describe("ModoProactivo, montado", () => {
 	});
 
 	it("el contador abre el tope; Intro lo guarda", async () => {
-		const f = await pintar();
+		const f = await pintarTope();
 		await f.clic(f.q("[data-tope]")!);
 		const campo = f.q<HTMLInputElement>('input[aria-label="Tope diario de lecturas del tutor"]')!;
 		assert.ok(campo, "aparece el campo del tope");
@@ -175,7 +210,7 @@ describe("ModoProactivo, montado", () => {
 	});
 
 	it("Escape deja el tope como estaba, aunque el cierre desenfoque el campo", async () => {
-		const f = await pintar();
+		const f = await pintarTope();
 		await f.clic(f.q("[data-tope]")!);
 		const campo = f.q<HTMLInputElement>('input[aria-label="Tope diario de lecturas del tutor"]')!;
 		(campo as unknown as { value: string }).value = "99";
@@ -186,7 +221,7 @@ describe("ModoProactivo, montado", () => {
 
 	it("un tope igual al actual, vacío o negativo no se manda", async () => {
 		for (const valor of ["40", "", "-3", "2.5"]) {
-			const f = await pintar();
+			const f = await pintarTope();
 			await f.clic(f.q("[data-tope]")!);
 			const campo = f.q<HTMLInputElement>('input[aria-label="Tope diario de lecturas del tutor"]')!;
 			(campo as unknown as { value: string }).value = valor;

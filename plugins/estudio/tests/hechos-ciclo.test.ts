@@ -108,9 +108,9 @@ test('el volcado se guarda desde la página, se lee como «lo que sabía antes»
   assert.match(u.volcado?.fecha ?? '', /^\d{4}-\d{2}-\d{2}T/);
   assert.equal(u.ciclo.orientar, 'hecho');
   assert.equal(u.ciclo.exponer, 'pendiente', 'con volcado y sin capturas, exponer y capturar queda pendiente');
-  // El plan de la barra lateral lee el mismo ciclo.
-  const plan = await f.call<{ unidades: { id: string; ciclo: Lectura['ciclo'] }[] }>('plan');
-  assert.equal(plan.unidades.find(x => x.id === unit.id)?.ciclo.orientar, 'hecho');
+  // La barra lateral lee el mismo ciclo (aquí, entre las unidades sin plan).
+  const planes = await f.call<{ sinPlan: { id: string; ciclo: Lectura['ciclo'] }[] }>('planes');
+  assert.equal(planes.sinPlan.find(x => x.id === unit.id)?.ciclo.orientar, 'hecho');
 });
 
 test('el volcado es el «antes»: no se reescribe, no puede estar vacío y no se escribe en una unidad archivada', async t => {

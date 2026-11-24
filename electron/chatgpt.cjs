@@ -13,23 +13,31 @@ const AUTHORIZE = `${ISSUER}/api/accounts/authorize`;
 const TOKEN = `${ISSUER}/api/accounts/oauth/token`;
 const JWKS = `${ISSUER}/.well-known/jwks.json`;
 const SCOPES = ["openid", "profile", "email", "offline_access", "resource.invoke", "chatgpt.tokens.use.direct"];
-const REVOCATION_WARNING = "Account disconnected locally. Remote revocation could not be confirmed.";
 const random = () => crypto.randomBytes(32).toString("base64url");
 const fail = (code) => Object.assign(new Error(code), { code });
-const publicError = (err) => ({
-	cancelled: "ChatGPT sign-in cancelled.",
-	timeout: "ChatGPT sign-in timed out. Try again.",
-	storage: "ChatGPT credentials could not be read or saved. Check local file access, then reconnect before making requests.",
-	identity: "ChatGPT sign-in could not be verified. Select the intended saved account and try again.",
-	scope: "ChatGPT plan permission is missing. Reconnect and authorize ChatGPT plan use.",
-	disconnected: "This ChatGPT connection is disconnected. Reconnect in Providers.",
-	background: "ChatGPT background use is off in this app. Enable Allow background use for all ChatGPT accounts in Providers, or explicitly select an API-key model for that workload.",
-	catalog: "The ChatGPT account model catalog is unavailable. Retry the connection; no API-key fallback was used.",
-	expired: "The ChatGPT session expired. Reconnect in Providers.",
-	network: "ChatGPT could not be reached. Check your connection and try again.",
-	pending: "A ChatGPT sign-in is already pending.",
-	unavailable: "ChatGPT sign-in is unavailable in browser-only mode.",
-}[err?.code] || "ChatGPT sign-in failed. Try again; no API-key fallback was used.");
+/** Lo que ve David por cada código de error. El código es lo que viaja y lo que se compara (estado, IPC y clasificación de
+ * errores en el agente); el texto solo se enseña. `revocation` es un aviso, no un fallo: la cuenta sí se desconectó aquí. */
+const TEXTOS_ERROR = {
+	cancelled: "Se canceló el inicio de sesión en ChatGPT.",
+	timeout: "El inicio de sesión en ChatGPT tardó demasiado. Inténtalo de nuevo.",
+	storage: "No se pudieron leer ni guardar las credenciales de ChatGPT. Comprueba el acceso a los archivos de este equipo y vuelve a conectar antes de usarlo.",
+	identity: "No se pudo verificar el inicio de sesión en ChatGPT. Elige la cuenta guardada que querías e inténtalo de nuevo.",
+	scope: "Falta el permiso para usar tu plan de ChatGPT. Vuelve a conectar y autoriza el uso del plan.",
+	disconnected: "Esta conexión con ChatGPT está desconectada. Vuelve a conectar en Ajustes › Proveedores.",
+	background: "El uso en segundo plano de ChatGPT está desactivado en esta app. Activa «Permitir el uso en segundo plano en todas las cuentas de ChatGPT» en Ajustes › Proveedores o elige un modelo con clave de API para ese trabajo.",
+	catalog: "No está disponible el catálogo de modelos de tu cuenta de ChatGPT. Vuelve a intentar la conexión; no se ha usado ninguna clave de API en su lugar.",
+	expired: "La sesión de ChatGPT ha caducado. Vuelve a conectar en Ajustes › Proveedores.",
+	network: "No se pudo contactar con ChatGPT. Comprueba tu conexión e inténtalo de nuevo.",
+	pending: "Ya hay un inicio de sesión en ChatGPT en curso.",
+	unavailable: "El inicio de sesión en ChatGPT no está disponible en el modo solo navegador.",
+	revocation: "La cuenta se ha desconectado en este equipo, pero no se ha podido confirmar que OpenAI haya revocado el acceso.",
+	failed: "No se pudo iniciar sesión en ChatGPT. Inténtalo de nuevo; no se ha usado ninguna clave de API en su lugar.",
+};
+/** El código público de un error: uno de `TEXTOS_ERROR`, o `failed` si no es de los conocidos. */
+const publicCode = (err) => (typeof err?.code === "string" && Object.hasOwn(TEXTOS_ERROR, err.code) && err.code !== "revocation" ? err.code : "failed");
+const publicError = (err) => TEXTOS_ERROR[publicCode(err)];
+/** El texto de un código ya público (el que guarda `lastError`). */
+const textoDe = (code) => (code ? TEXTOS_ERROR[code] ?? TEXTOS_ERROR.failed : null);
 
 const nonempty = (v) => typeof v === "string" && v.length > 0 && !/[\x00-\x20\x7f]/.test(v);
 const planScopes = (tokens) => !!tokens?.accessToken && SCOPES.every((scope) => tokens.scopes.includes(scope));
@@ -169,13 +177,13 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 		try { await init; } catch (err) { denyStorage(err); throw err; }
 	}
 	function denyStorage(err) {
-		if (!storageDenied) { storageDenied = true; lastError = publicError(err); stop(); }
+		if (!storageDenied) { storageDenied = true; lastError = publicCode(err); stop(); }
 	}
 	async function save(next) {
 		try { validateState(next); await store.write(next); } catch (err) {
 			// A rotated token may already have invalidated its predecessor. Fail closed.
 			denyStorage(err);
-			lastError = publicError(err);
+			lastError = publicCode(err);
 			notify();
 			throw err;
 		}
@@ -194,7 +202,7 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 				const r = members.find((r) => r.id === state.activeId) ?? members.find((r) => !r.reconnectRequired && planScopes(r.tokens)) ?? members[0];
 				return {
 					id: r.id,
-					email: r.email || "ChatGPT account",
+					email: r.email || "Cuenta de ChatGPT",
 					registration: r.clientId,
 					connected: !storageDenied && !closed && !paused && !suspended && !r.reconnectRequired && planScopes(r.tokens),
 					planEnabled: !storageDenied && !r.reconnectRequired && planScopes(r.tokens),
@@ -203,12 +211,14 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 					canSignInAgain: !storageDenied && !closed && !paused && (r.reconnectRequired === true || !planScopes(r.tokens)),
 				};
 			}),
-			error: lastError,
+			error: textoDe(lastError),
+			/** El código del error o aviso, para reconocerlo sin leer su texto. */
+			errorCode: lastError,
 			catalogError,
 		};
 	}
 	async function status() {
-		try { await ready(); } catch (err) { return { ...snapshot(), available: false, error: publicError(err) }; }
+		try { await ready(); } catch (err) { return { ...snapshot(), available: false, error: publicError(err), errorCode: publicCode(err) }; }
 		return snapshot();
 	}
 	async function json(url, options = {}) {
@@ -273,7 +283,7 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 			abort.abort();
 			cleanup();
 			if (pending?.abort === abort) pending = null;
-			lastError = publicError(fail(code));
+			lastError = publicCode(fail(code));
 			finish();
 			notify();
 		};
@@ -296,9 +306,9 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 				if (req.method !== "GET" || callback.origin !== new URL(redirectUri).origin || callback.pathname !== "/auth/callback" || req.headers.host !== new URL(redirectUri).host || consumed) { res.writeHead(404).end(); return; }
 				const params = callback.searchParams;
 				// Reject duplicate parameters and unsolicited callbacks without consuming a valid pending attempt.
-				if (["state", "code", "client_id", "error"].some((key) => params.getAll(key).length > 1) || params.get("state") !== expectedState) { res.writeHead(400).end("Sign-in could not be verified."); return; }
+				if (["state", "code", "client_id", "error"].some((key) => params.getAll(key).length > 1) || params.get("state") !== expectedState) { res.writeHead(400, { "content-type": "text/plain; charset=utf-8" }).end("No se pudo verificar el inicio de sesión."); return; }
 				consumed = true;
-				res.writeHead(200, { "content-type": "text/plain; charset=utf-8" }).end("Return to HarnessAcademico to view the sign-in result. You may close this tab.");
+				res.writeHead(200, { "content-type": "text/plain; charset=utf-8" }).end("Vuelve a HarnessAcademico para ver el resultado del inicio de sesión. Ya puedes cerrar esta pestaña.");
 				cleanup();
 				try {
 					if (params.has("error")) throw fail(params.get("error") === "access_denied" ? "cancelled" : "identity");
@@ -332,8 +342,8 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 						suspended = false;
 						retryRegistration = undefined;
 					});
-					lastError = planScopes(tokens) ? null : publicError(fail("scope"));
-				} catch (err) { if (!abort.signal.aborted) lastError = publicError(err); }
+					lastError = planScopes(tokens) ? null : publicCode(fail("scope"));
+				} catch (err) { if (!abort.signal.aborted) lastError = publicCode(err); }
 				finally { if (pending?.abort === abort) pending = null; finish(); notify(); }
 			});
 			timer = setTimeout(() => cancel("timeout"), timeoutMs);
@@ -397,7 +407,7 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 					record.reconnectRequired = true;
 					if (nonempty(body.refresh_token)) record.tokens.refreshToken = body.refresh_token;
 					await save(restricted);
-					lastError = publicError(fail("identity")); notify();
+					lastError = publicCode(fail("identity")); notify();
 					throw err;
 				}
 				// A successful remote rotation must be durably retained even when
@@ -513,7 +523,7 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 			await save(next);
 			if (members.some((r) => r.clientId === retryRegistration?.clientId)) retryRegistration = undefined;
 			if (stopped && !closed && epoch === disconnectEpoch) suspended = false;
-			lastError = revoked ? null : REVOCATION_WARNING;
+			lastError = revoked ? null : "revocation";
 			notify();
 			return snapshot();
 		});
@@ -532,7 +542,7 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 			const logoutEpoch = epoch;
 			await save(next);
 			if (!closed && epoch === logoutEpoch) suspended = false;
-			lastError = revoked ? null : REVOCATION_WARNING;
+			lastError = revoked ? null : "revocation";
 			notify();
 			return snapshot();
 		});
@@ -543,4 +553,4 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 	return { status, login, cancelLogin, lease, models, select, consent, disconnect, logout, close, pause, resume, stamp };
 }
 
-module.exports = { createChatGPT, fileStore, publicError, allowedAuthEndpoint, SCOPES, validateState };
+module.exports = { createChatGPT, fileStore, publicError, publicCode, allowedAuthEndpoint, SCOPES, validateState };

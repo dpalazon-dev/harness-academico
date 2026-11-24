@@ -6,7 +6,7 @@ import { BRIEFING_MAX, composeBriefing } from '../src/sessions/briefing.ts';
 import { CATCH_UP_MAX, createSessionService, IDLE_MS } from '../src/sessions/service.ts';
 import { clip, transcriptText } from '../src/sessions/transcript.ts';
 import type { ChatRecord } from '../src/probe.ts';
-import { plan, tempStore, unit } from './study-fixtures.ts';
+import { plan, tema, tempStore, unit } from './study-fixtures.ts';
 import type { StudyArea } from '../src/study/types.ts';
 import { nombreEstudiante } from '../src/identidad.ts';
 
@@ -132,7 +132,7 @@ test('the briefing stays within its size whatever the state', () => {
   const many = Array.from({ length: 200 }, (_, i) => `Elemento ${i} ${'x'.repeat(80)}`);
   const text = composeBriefing({
     area: null,
-    plan: { goal: 'Meta', units: many }, outsidePlan: many, due: [], openAttempts: 0, recent: [], questions: many, drafts: 3,
+    plans: [{ goal: 'Meta', proposed: false, items: many }], withoutPlan: many, due: [], openAttempts: 0, recent: [], questions: many, drafts: 3,
     previous: [{ date: '2026-11-10', title: 'T', summary: { ...SUMMARY, abierto: many.slice(0, 8) } }], summariesOff: false,
   });
   assert.ok(text.length <= BRIEFING_MAX);
@@ -189,8 +189,8 @@ test('in a space, the briefing names it and carries only its plan, units and con
   const f = setup(t, { chats: [chat('fis', '2026-11-10T10:00:00.000Z'), chat('mat', '2026-11-10T11:00:00.000Z'), first], area: () => area });
   f.store.saveUnit(unit({ id: 'u-fis', title: 'Leyes de Newton', areaId: 'a-fis' }), null);
   f.store.saveUnit(unit({ id: 'u-mat', title: 'Regla de la cadena', areaId: 'a-mat' }), null);
-  f.store.savePlan(plan({ id: 'p-fis', goal: 'Dinámica', unitIds: ['u-fis'], areaId: 'a-fis', updatedAt: '2026-11-10T09:00:00.000Z' }), null);
-  f.store.savePlan(plan({ id: 'p-mat', goal: 'Cálculo', unitIds: ['u-mat'], areaId: 'a-mat', updatedAt: '2026-11-11T09:00:00.000Z' }), null);
+  f.store.savePlan(plan({ id: 'p-fis', goal: 'Dinámica', elementos: [tema('e1', { titulo: 'Leyes de Newton', unitId: 'u-fis' })], areaId: 'a-fis', updatedAt: '2026-11-10T09:00:00.000Z' }), null);
+  f.store.savePlan(plan({ id: 'p-mat', goal: 'Cálculo', elementos: [tema('e2', { titulo: 'Regla de la cadena', unitId: 'u-mat' })], areaId: 'a-mat', updatedAt: '2026-11-11T09:00:00.000Z' }), null);
   const record = (id: string, areaId: string) => ({ id, revision: 1, briefing: null, briefedAt: null, summary: null, summaryOf: null, summarizedAt: null, summaryError: null, areaId, unitId: null, origen: null });
   f.store.saveConversation(record('fis', 'a-fis'), null);
   f.store.saveConversation(record('mat', 'a-mat'), null);

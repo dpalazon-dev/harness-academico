@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { TestContext } from 'node:test';
 import { openStudyStore, type StudyStore } from '../src/study/store.ts';
-import type { PlanProposal, StudyPlan, StudyUnit } from '../src/study/types.ts';
+import type { ElementoPlan, PlanProposal, StudyPlan, StudyUnit } from '../src/study/types.ts';
 
 export const NOW = '2026-11-11T10:00:00.000Z';
 export const LATER = '2026-11-11T11:00:00.000Z';
@@ -24,12 +24,17 @@ export function unit(overrides: Partial<StudyUnit> = {}): StudyUnit {
 }
 
 export function plan(overrides: Partial<StudyPlan> = {}): StudyPlan {
-  return { id: 'p1', revision: 1, createdAt: NOW, updatedAt: NOW, goal: 'Cálculo diferencial', unitIds: [], archived: false, areaId: null, ...overrides };
+  return { id: 'p1', revision: 1, createdAt: NOW, updatedAt: NOW, goal: 'Cálculo diferencial', estado: 'activo', elementos: [], origen: 'manual', areaId: null, ...overrides };
+}
+
+/** A tema; with `unitId` it is linked to that unit. */
+export function tema(id: string, overrides: Partial<ElementoPlan> = {}): ElementoPlan {
+  return { id, tipo: 'tema', titulo: `Tema ${id}`, hecho: false, ...overrides };
 }
 
 export function proposal(overrides: Partial<PlanProposal> = {}): PlanProposal {
   return {
-    id: 'q1', revision: 1, planId: 'p1', baseRevision: 1, ops: [{ op: 'add', unitId: 'u1' }], rationale: 'Base necesaria',
+    id: 'q1', revision: 1, planId: 'p1', baseRevision: 1, ops: [{ op: 'add', tipo: 'tema', titulo: 'Límites' }], rationale: 'Base necesaria',
     author: 'tutor', status: 'pendiente', createdAt: NOW, ...overrides,
   };
 }

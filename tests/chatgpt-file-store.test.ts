@@ -68,7 +68,7 @@ for (const bytes of ["{broken-json", "null", "[]", '{"version":1,"encrypted":"ZX
 			connection = service(fileStore(file));
 			const status = await connection.status();
 			assert.equal(status.available, false); assert.equal(status.activeId, null);
-			assert.match(status.error, /could not be read or saved/);
+			assert.equal(status.errorCode, "storage"); assert.match(status.error, /No se pudieron leer ni guardar las credenciales/);
 			assert.deepEqual((await connection.models()).models, []);
 			await assert.rejects(connection.login(), /storage/);
 			assert.equal(await fs.readFile(file, "utf8"), bytes);

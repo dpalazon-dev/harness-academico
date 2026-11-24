@@ -66,11 +66,11 @@ describe("PantallaIntentoEstudio", () => {
 		const html = intento(ABIERTO);
 		assert.match(html, /data-pantalla="intento"/);
 		assert.match(html, /<li[^>]*aria-current="step"[^>]*>.*Respuesta<\/li>/);
-		assert.match(html, /Confianza declarada: 60/);
+		assert.match(html, /Confianza declarada: 60(<!-- -->)? %/);
 		assert.match(html, /Explica por qué Dijkstra no admite pesos negativos\./);
 		assert.match(html, /Piensa en cuándo se fija una distancia\./);
 		assert.match(html, /<textarea[^>]*aria-label="Tu respuesta"[^>]*>Usa una cola<\/textarea>/);
-		for (const boton of ["Congelar respuesta", "Necesito una pista", "Me rindo: ver la referencia", "Abandonar", "Salir y seguir luego"]) assert.match(html, new RegExp(`>${boton}</button>`), boton);
+		for (const boton of ["Terminar y comparar", "Necesito una pista", "Me rindo: ver la referencia", "Abandonar", "Salir y seguir luego"]) assert.match(html, new RegExp(`>${boton}</button>`), boton);
 		assert.doesNotMatch(html, /Referencia|Discutir/);
 		sinFuentes(html);
 	});
@@ -135,13 +135,13 @@ describe("PantallaIntentoEstudio", () => {
 	it("un intento abandonado no se discute ni se valora", () => {
 		const html = intento({ ...ABIERTO, attempt: { ...ABIERTO.attempt, status: "abandoned" } });
 		assert.match(html, /Abandonaste este intento/);
-		assert.doesNotMatch(html, /Discutir|<textarea|Congelar/);
+		assert.doesNotMatch(html, /Discutir|<textarea|Terminar y comparar/);
 	});
 
 	it("mientras una operación está en curso, los controles esperan y se dice qué pasa", () => {
-		const html = intento(ABIERTO, { ocupado: true, mensaje: "Respuesta congelada. El modelo está preparando el contraste…" });
+		const html = intento(ABIERTO, { ocupado: true, mensaje: "Respuesta terminada; ya no se puede cambiar. El modelo está preparando el contraste…" });
 		assert.match(html, /<textarea[^>]*disabled=""/);
-		assert.match(html, /disabled=""[^>]*>Congelar respuesta/);
+		assert.match(html, /disabled=""[^>]*>Terminar y comparar/);
 		assert.match(html, /El modelo está preparando el contraste…/);
 	});
 

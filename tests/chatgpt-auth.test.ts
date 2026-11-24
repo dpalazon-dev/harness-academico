@@ -441,7 +441,7 @@ test("scope-disabled credentials remain revocable and unconfirmed revoke never c
 	try {
 		await assert.rejects(f.service.lease(false));
 		const status = await f.service.logout(f.saved.activeId);
-		assert.equal(status.error, "Account disconnected locally. Remote revocation could not be confirmed.");
+		assert.equal(status.error, "La cuenta se ha desconectado en este equipo, pero no se ha podido confirmar que OpenAI haya revocado el acceso.");
 		assert.equal(f.requests.filter((r) => r.form?.get("token") === "scope-disabled-refresh").length, 2);
 		assert.equal(f.saved.registrations[0].tokens, undefined);
 	} finally { f.service.close(); }
@@ -574,12 +574,12 @@ test("signed-out legacy registrations can be explicitly forgotten; failed revoca
 		const status = await f.service.status(); assert.equal(status.accounts.length, 1); assert.equal(status.accounts[0].connected, false);
 		const result = await f.service.disconnect(status.accounts[0].id);
 		assert.equal(result.accounts.length, 0); assert.equal(result.activeId, null); assert.equal(f.saved.registrations.length, 0);
-		assert.equal(result.error, "Account disconnected locally. Remote revocation could not be confirmed.");
+		assert.equal(result.error, "La cuenta se ha desconectado en este equipo, pero no se ha podido confirmar que OpenAI haya revocado el acceso.");
 	} finally { f.service.close(); }
 	const unconfirmed = await loggedIn({ provider: async (url) => url.endsWith("/revoke") ? new Response(null, { status: 400 }) : undefined });
 	try {
 		const result = await unconfirmed.service.disconnect(unconfirmed.saved.activeId);
-		assert.equal(result.error, "Account disconnected locally. Remote revocation could not be confirmed."); assert.deepEqual(unconfirmed.saved.registrations, []);
+		assert.equal(result.error, "La cuenta se ha desconectado en este equipo, pero no se ha podido confirmar que OpenAI haya revocado el acceso."); assert.deepEqual(unconfirmed.saved.registrations, []);
 		assert.equal(unconfirmed.saved.activeId, null); assert.equal(JSON.stringify(unconfirmed.saved).includes("scratch-refresh"), false);
 	} finally { unconfirmed.service.close(); }
 });

@@ -548,15 +548,16 @@ export const FACTORY_SETTINGS: FactorySettings = {
 	general: { autoUpdate: true },
 	dictation: { language: "en" },
 	appearance: {
-		theme: "default",
+		// HarnessAcademico (guía de diseño): «papel tranquilo» y prosa a 17 px por defecto.
+		theme: "limpio",
 		background: null, // null = the active theme's background
 		colors: {}, // no overrides: every color is the theme's
-		fontFamily: null, // Source Sans 3
-		proseFontSize: 16,
+		fontFamily: null, // Atkinson Hyperlegible Next (HarnessAcademico)
+		proseFontSize: 17, // HarnessAcademico: 17 px (chat estilo assistant-ui, variante B de David)
 		codeLigatures: false,
 		sessionNameSerif: true,
 		titleFont: null, // Computer Modern (or the reading font, toggle off)
-		mdRendering: { headingWeight: 900, boldColor: null, italicColor: null },
+		mdRendering: { headingWeight: 700, boldColor: null, italicColor: null }, // HarnessAcademico: encabezados en negrita, no en Black
 	},
 	graph: { enabled: true, rendering: true, extractionChunkTokens: 4096 },
 	compaction: { thresholdTokens: 150_000, includeReasoning: false },

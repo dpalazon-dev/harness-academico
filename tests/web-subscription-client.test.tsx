@@ -69,13 +69,13 @@ test("Electron dev uses its narrow external-browser bridge, without attempting a
 test("web notices identify the server machine and same-machine ChatGPT sign-in; desktop copy stays unchanged", async () => {
 	const { CHATGPT_NOTICE, chatGPTNotice } = await import("../components/settings/chatgpt-connection.tsx");
 	const { subscriptionNotice, subscriptionDisconnectCopy } = await import("../components/settings/subscription-connections.tsx");
-	assert.equal(chatGPTNotice(), CHATGPT_NOTICE); assert(CHATGPT_NOTICE.includes("on this device"));
-	assert(chatGPTNotice(true).includes("on the machine running HarnessAcademico"));
-	assert(chatGPTNotice(true).endsWith("Complete ChatGPT sign-in in a browser on that same machine."));
+	assert.equal(chatGPTNotice(), CHATGPT_NOTICE); assert(CHATGPT_NOTICE.includes("en este equipo"));
+	assert(chatGPTNotice(true).includes("en el equipo donde se ejecuta HarnessAcademico"));
+	assert(chatGPTNotice(true).endsWith("Inicia sesión en ChatGPT con un navegador de ese mismo equipo."));
 	for (const label of ["GitHub Copilot", "Grok"]) {
-		assert(subscriptionNotice(label).includes("stored locally")); assert(subscriptionDisconnectCopy(label).includes("from this device"));
-		assert(subscriptionNotice(label, true).includes("on the machine running HarnessAcademico"));
-		assert(subscriptionDisconnectCopy(label, true).includes("from the machine running HarnessAcademico"));
+		assert(subscriptionNotice(label).includes("se guardan en este equipo")); assert(subscriptionDisconnectCopy(label).includes("de este equipo"));
+		assert(subscriptionNotice(label, true).includes("en el equipo donde se ejecuta HarnessAcademico"));
+		assert(subscriptionDisconnectCopy(label, true).includes("del equipo donde se ejecuta HarnessAcademico"));
 	}
 });
 

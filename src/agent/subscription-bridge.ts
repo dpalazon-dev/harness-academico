@@ -2,6 +2,7 @@ import type { Api, Model, ModelAuth } from "@earendil-works/pi-ai";
 import { onWebSubscriptionPacket, webSubscriptionRequest, webSubscriptionsEnabled } from "./subscription-runtime.ts";
 import { NATIVE_SUBSCRIPTIONS, type NativeSubscriptionProviderId, type NativeSubscriptionScope, type NativeSubscriptionSnapshot, type NativeSubscriptionStatus } from "../core/contracts/subscriptions.ts";
 import type { AdmissionScope, NoDispatchKind } from "./chatgpt-request-cycle.ts";
+import { errorDeRespuesta } from "./error-de-conexion.ts";
 
 interface Pending { op: string; resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }
 interface State {
@@ -52,7 +53,7 @@ function bridge(): State {
 		const state: State = { statuses: new Map(), models: new Map(), pending: new Map(), controllers: new Map(), listeners: new Set(), counter: 0 };
 		global[KEY] = state;
 		process.on("message", (raw: unknown) => {
-			const message = raw as { channel?: string; op?: string; id?: string; ok?: boolean; value?: unknown; error?: string; snapshot?: NativeSubscriptionSnapshot };
+			const message = raw as { channel?: string; op?: string; id?: string; ok?: boolean; value?: unknown; error?: string; code?: string; snapshot?: NativeSubscriptionSnapshot };
 			if (!desktopConnected() || message?.channel !== "lh:subscriptions") return;
 			if (message.op === "changed" && message.snapshot) accept(state, message.snapshot);
 			if (!message.id) return;
@@ -60,7 +61,7 @@ function bridge(): State {
 			if (!pending || pending.op !== message.op) return;
 			clearTimeout(pending.timer); state.pending.delete(message.id);
 			if (message.ok) pending.resolve(message.value);
-			else pending.reject(new Error(message.error ?? "Subscription connection failed."));
+			else pending.reject(errorDeRespuesta(message.error, message.code, "Subscription connection failed."));
 		});
 		onWebSubscriptionPacket("lh:subscriptions", (packet) => {
 			if (webSubscriptionsEnabled() && packet.snapshot) accept(state, packet.snapshot as NativeSubscriptionSnapshot);

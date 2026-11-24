@@ -90,7 +90,7 @@ export function UpdateSettings({
 					<>
 						{status && <span className="block" role="status" data-testid="update-status">{status}</span>}
 						{active && <span className="block">{MANUAL_UPDATE_HINT}</span>}
-						{releaseNotes && <a href={releaseNotes} target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:text-foreground hover:underline" data-testid="release-notes">Notas de la versión</a>}
+						{releaseNotes && <a href={releaseNotes} target="_blank" rel="noopener noreferrer" className="anillo-foco underline-offset-2 hover:text-foreground hover:underline" data-testid="release-notes">Notas de la versión</a>}
 					</>
 				}
 			>

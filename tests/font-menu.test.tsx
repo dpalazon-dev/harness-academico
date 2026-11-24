@@ -11,6 +11,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { renderWithInteractionLayers as renderToStaticMarkup } from "./interaction-layer-render.tsx";
 import { describe, it } from "node:test";
+import { FACTORY_THEME } from "../src/core/themes.ts";
 import { FontMenuList, customFamilyFor, fontMenuResults } from "../components/settings/model-menu";
 import {
 	CURATED_FALLBACK_FONTS,
@@ -147,15 +148,14 @@ describe("the emphasis-ink factory ruling (globals.css)", () => {
 		assert.ok(css.includes(`--lh-ink-italic: ${text};`), "italic ink = text");
 	});
 
-	it("the bold and italic override rows' empty-state hints name the text color", () => {
+	// HarnessAcademico: el tema de fábrica es Papel, cuyas tintas de énfasis tienen color propio.
+	it("the bold and italic override rows' empty-state hints name the factory theme's inks", () => {
 		const html = renderToStaticMarkup(
 			<AppearanceSection appearance={undefined} onSectionChange={() => true} />,
 		);
-		const text = html.match(/data-testid="row-color-text"[\s\S]*?Vacío = (#[0-9a-f]{6})/)?.[1];
-		assert.ok(text, "the text row's hint");
-		for (const key of ["bold", "italic"]) {
+		for (const key of ["bold", "italic"] as const) {
 			const hint = html.match(new RegExp(`data-testid="row-color-${key}"[\\s\\S]*?Vacío = (#[0-9a-f]{6})`))?.[1];
-			assert.equal(hint, text, `${key} row`);
+			assert.equal(hint, FACTORY_THEME.colors[key], `${key} row`);
 		}
 		assert.ok(!html.includes("#ee928c"));
 		assert.ok(!html.includes("#6fa9d6"));

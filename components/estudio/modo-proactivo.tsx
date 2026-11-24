@@ -2,13 +2,15 @@
 
 /**
  * El modo del tutor en la cabecera del cuaderno (ticket 12e): un interruptor entre «Lee y comenta solo» y «Cuando se lo
- * pido», lo que ha gastado hoy el tutor por su cuenta frente a su tope diario (que se cambia ahí mismo) y, debajo, el aviso
- * cuando dejó de comentar solo por algo que David debe saber. Es la forma de la línea de modo de riddled.ai, con la tinta
+ * pido» y, debajo, el aviso cuando dejó de comentar solo por algo que David debe saber. Lo que ha gastado hoy frente a su
+ * tope diario (`TopeDiario`) vive en Propiedades desde la revisión de la cabecera (23-nov-2026): la cabecera solo enseña lo
+ * esencial. Es la forma de la línea de modo de riddled.ai, con la tinta
  * del margen en el punto; ni su marca ni sus textos.
  */
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import type { AvisoModo, EstadoProactivo, ModoCuaderno } from "./cuadernos";
 import { ETIQUETA_MODO, textoAviso, type MotivoAviso } from "./proactivo";
 import { TINTA_MARGEN } from "./margen-cuaderno";
@@ -25,7 +27,9 @@ export interface ModoProactivoProps {
 	error?: string | null;
 	cambiarModo(modo: ModoCuaderno): void;
 	fijarTope(tope: number): void;
-	/** Lo que va al final de la línea del modo: el propósito del cuaderno (ticket 12f). */
+	/** Abre Ajustes en una sección; por defecto, el diálogo de Ajustes de la app. */
+	abrirAjustes?(seccion: string): void;
+	/** Lo que va detrás del interruptor en la misma línea: el personaje (ticket 12g). */
 	children?: ReactNode;
 }
 
@@ -42,49 +46,68 @@ export function motivoDelAviso({ modo, estado, aviso }: Pick<ModoProactivoProps,
 export function ModoProactivo(props: ModoProactivoProps) {
 	const { modo, estado, leyendo, error, cambiarModo, fijarTope, children } = props;
 	const motivo = motivoDelAviso(props);
-	/** Lo que el tutor hace de verdad: con el tope agotado no comenta solo, diga lo que diga el modo guardado. */
-	const activo = modo === "proactivo" && motivo !== "tope";
+	/** Lo que el tutor hace de verdad: con el tope agotado o sin modelo económico no comenta solo, diga lo que diga el modo guardado. */
+	const activo = modo === "proactivo" && motivo === null;
 	const [editando, setEditando] = useState(false);
+	const ajustes = useSettingsDialog();
+	const abrirAjustes = props.abrirAjustes ?? ajustes.open;
 	return (
-		<div className="min-w-0" data-modo={modo}>
-			<div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-sans text-xs">
-				<button
-					type="button" role="switch" aria-checked={activo} data-modo-interruptor
-					title="Que el tutor lea mientras escribes y comente cuando paras"
-					// Lo que se pide es lo contrario del modo guardado, no del que se ve: con el tope agotado el cuaderno se ve apagado pero sigue
-					// guardado como «Lee y comenta solo», y pulsar debe dejarlo apagado de verdad.
-					onClick={() => cambiarModo(modo === "proactivo" ? "a-peticion" : "proactivo")}
-					className="inline-flex h-7 items-center gap-2 rounded-full border border-border px-2.5 text-foreground/90 outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
-				>
-					<span
-						aria-hidden="true"
-						className={cn("size-2 rounded-full transition-opacity", activo ? "opacity-100" : "bg-muted-foreground/40 opacity-60", leyendo && "motion-safe:animate-pulse")}
-						style={activo ? { backgroundColor: TINTA_MARGEN } : undefined}
-					/>
-					<span>{ETIQUETA_MODO[activo ? "proactivo" : "a-peticion"]}</span>
-				</button>
-				{leyendo && <span role="status" className="text-muted-foreground">Leyendo…</span>}
-				{activo && estado && !motivo && (editando ? (
-					<CampoTope valor={estado.tope} guardar={fijarTope} cerrar={() => setEditando(false)} />
-				) : (
-					<button
-						type="button" onClick={() => setEditando(true)} data-tope
-						title="Lecturas del tutor por su cuenta hoy, de todos tus cuadernos. Pulsa para cambiar el tope diario."
-						aria-label={`El tutor ha leído ${estado.usadas} de ${estado.tope} veces hoy por su cuenta. Cambiar el tope diario.`}
-						className="rounded-md px-1 tabular-nums text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-					>{estado.usadas} de {estado.tope} hoy</button>
-				))}
-				{children}
-			</div>
+		// Sin caja propia: el interruptor y lo que le acompaña entran en la línea de la cabecera, y el aviso baja a su propio renglón
+		// al final de ella (`basis-full`, `order-last`).
+		<div className="contents" data-modo={modo}>
+			<button
+				type="button" role="switch" aria-checked={activo} data-modo-interruptor
+				title="Que el tutor lea mientras escribes y comente cuando paras"
+				// Lo que se pide es lo contrario del modo guardado, no del que se ve: con el tope agotado o sin modelo económico el cuaderno
+				// se ve apagado pero sigue guardado como «Lee y comenta solo», y pulsar debe dejarlo apagado de verdad.
+				onClick={() => cambiarModo(modo === "proactivo" ? "a-peticion" : "proactivo")}
+				className="inline-flex h-7 items-center gap-2 rounded-full border border-border px-2.5 font-sans text-xs text-foreground/90 outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
+			>
+				<span
+					aria-hidden="true"
+					className={cn("size-2 rounded-full transition-opacity", activo ? "opacity-100" : "bg-muted-foreground/40 opacity-60", leyendo && "motion-safe:animate-pulse")}
+					style={activo ? { backgroundColor: TINTA_MARGEN } : undefined}
+				/>
+				<span>{ETIQUETA_MODO[activo ? "proactivo" : "a-peticion"]}</span>
+			</button>
+			{leyendo && <span role="status" className="font-sans text-xs text-muted-foreground">Leyendo…</span>}
+			{children}
 			{(motivo || error) && (
-				<p role="status" data-aviso={motivo ?? "error"} className={cn("mt-1.5 max-w-[34rem] font-sans text-xs leading-5", error && !motivo ? "text-destructive" : "text-muted-foreground")}>
+				<p role="status" data-aviso={motivo ?? "error"} className={cn("order-last basis-full max-w-[34rem] font-sans text-xs leading-5", error && !motivo ? "text-destructive" : "text-muted-foreground")}>
 					{error ?? textoAviso(motivo!, estado?.tope ?? 0)}
 					{motivo === "tope" && estado && (
 						<> <button type="button" onClick={() => setEditando(true)} className="rounded-sm underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring">Cambiar el tope</button></>
 					)}
+					{motivo === "sin-modelo" && (
+						// El modelo económico se elige en la pestaña «Agente» de Ajustes.
+						<> <button type="button" data-abrir-ajustes onClick={() => abrirAjustes("agent")} className="anillo-foco rounded-sm underline underline-offset-2">Abrir Ajustes</button></>
+					)}
 				</p>
 			)}
-			{motivo === "tope" && editando && estado && <div className="mt-1"><CampoTope valor={estado.tope} guardar={fijarTope} cerrar={() => setEditando(false)} /></div>}
+			{motivo === "tope" && editando && estado && <div className="order-last basis-full"><CampoTope valor={estado.tope} guardar={fijarTope} cerrar={() => setEditando(false)} /></div>}
+		</div>
+	);
+}
+
+/**
+ * Lo que el tutor ha gastado hoy por su cuenta frente a su tope diario, que se cambia pulsándolo. Vive en Propiedades: es un
+ * dato de gasto, no algo que se decida al escribir. Sin modo proactivo activo no hay gasto que enseñar.
+ */
+export function TopeDiario({ estado, fijarTope }: { estado: EstadoProactivo; fijarTope(tope: number): void }) {
+	const [editando, setEditando] = useState(false);
+	return (
+		<div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 font-sans text-sm">
+			<span className="text-muted-foreground">Hoy:</span>
+			{editando ? (
+				<><span className="tabular-nums">{estado.usadas} de</span><CampoTope valor={estado.tope} guardar={fijarTope} cerrar={() => setEditando(false)} /></>
+			) : (
+				<button
+					type="button" onClick={() => setEditando(true)} data-tope
+					title="Pulsa para cambiar el tope diario."
+					aria-label={`El tutor ha leído ${estado.usadas} de ${estado.tope} veces hoy por su cuenta. Cambiar el tope diario.`}
+					className="rounded-md px-1 tabular-nums underline decoration-dotted underline-offset-4 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+				>{estado.usadas} de {estado.tope}</button>
+			)}
 		</div>
 	);
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import { ArrowRightIcon, CornerDownLeftIcon, SquareIcon } from "lucide-react";
+import { ArrowRightIcon, ArrowUpIcon, SquareIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PathInput } from "@/components/path-input";
 import { AttachFilesButton } from "@/components/attach-files-button";
@@ -228,13 +228,14 @@ export function Composer({
 						aria-label={busy && !canSend ? "Detener" : "Enviar"}
 						disabled={!busy && !canSend}
 						className={cn(
-							"flex size-10 shrink-0 items-center justify-center rounded-[10px] transition-colors",
+							// HarnessAcademico (estilo assistant-ui): botón circular.
+							"flex size-10 shrink-0 items-center justify-center rounded-full transition-colors",
 							busy && !canSend
 								? "bg-secondary text-foreground hover:bg-accent"
 								: "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40",
 						)}
 					>
-						{busy && !canSend ? <SquareIcon className="size-4" /> : <CornerDownLeftIcon className="size-5" />}
+						{busy && !canSend ? <SquareIcon className="size-4" /> : <ArrowUpIcon className="size-5" />}
 					</button>
 				)}
 		</form>

@@ -196,10 +196,10 @@ for (const primera of ['aceptar', 'descartar'] as const) {
     assert.equal(fact.estado, accepted ? 'aceptada' : 'descartada');
     const inbox = leerPorDecidir({
       estado: () => ({ units: store.listUnits(), proposals: [], plans: [] }),
-      planActual: () => null, caducidad: () => null, borradores: () => store.listDrafts(),
+      caducidad: () => null, borradores: () => store.listDrafts(),
     }, null);
     assert.deepEqual(inbox.borradores.map(draft => draft.id), accepted ? [fact.borradorId] : []);
-    assert.equal(inbox.unidades.length + inbox.cambios.length + inbox.borradores.length, accepted ? 1 : 0);
+    assert.equal(inbox.planes.length + inbox.cambios.length + inbox.sugerencias.length + inbox.borradores.length, accepted ? 1 : 0);
   });
 }
 

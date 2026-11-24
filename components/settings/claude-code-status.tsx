@@ -110,7 +110,7 @@ export function ClaudeCodeInstallationStatus() {
 				<Button type="button" size="xs" variant="outline" className="cursor-pointer disabled:cursor-not-allowed" disabled={busy} onClick={() => void refresh()} data-testid="claude-code-check-again">Volver a comprobar</Button>
 			</div>
 			<p className="text-xs leading-relaxed text-muted-foreground"><strong className="font-medium">Instala Claude Code e inicia sesión en tu terminal; después elige aquí un modelo de Claude Code.</strong> La app lo arranca cuando hace falta, sin procesos en segundo plano.</p>
-			<p className="text-xs leading-relaxed text-muted-foreground">Solo comprueba la instalación y la versión, no el inicio de sesión, el acceso a modelos ni la cuota. El coste lo controla Claude Code. Necesita la versión {CLAUDE_CODE_MINIMUM_VERSION} o posterior. <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-foreground">Instalación ↗</a></p>
+			<p className="text-xs leading-relaxed text-muted-foreground">Solo comprueba la instalación y la versión, no el inicio de sesión, el acceso a modelos ni la cuota. El coste lo controla Claude Code. Necesita la versión {CLAUDE_CODE_MINIMUM_VERSION} o posterior. <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noreferrer" className="anillo-foco underline underline-offset-2 hover:text-foreground">Instalación ↗</a></p>
 			<p className="text-xs leading-relaxed text-muted-foreground">Comprueba por tu cuenta lo que afirme la IA: puede ser inexacto, incompleto, engañoso o estar desfasado.</p>
 		</>}
 	</div>;

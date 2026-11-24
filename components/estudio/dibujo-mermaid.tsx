@@ -108,8 +108,8 @@ export function DibujoMarco({ id, estado, codigo, firma, quitar, compacto = fals
 	return (
 		<figure
 			ref={marco} data-dibujo={id} data-estado={estado === null ? "pintando" : "svg" in estado ? "listo" : "error"}
-			style={{ borderLeftColor: estado && "error" in estado ? "var(--lh-error)" : TINTA }}
-			className={cn("group/dibujo relative border-l-2 pl-3 font-prose", compacto ? "my-2" : "my-3")}
+			style={{ backgroundColor: `color-mix(in oklab, ${TINTA} 8%, var(--card))`, ...(estado && "error" in estado ? { outline: "1px solid var(--lh-error)" } : {}) }}
+			className={cn("group/dibujo relative rounded-lg px-3 py-2 font-prose", compacto ? "my-2" : "my-3")}
 		>
 			<figcaption className="flex items-center gap-1.5 font-sans text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
 				<span>Dibujo</span>

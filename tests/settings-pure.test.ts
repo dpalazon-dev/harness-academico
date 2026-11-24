@@ -31,13 +31,13 @@ const mocha = BUILTIN_THEMES.find((t) => t.id === "catppuccin-mocha")!;
 describe("resolveAppearance — delta over factory", () => {
 	it("absent everything = the factory view", () => {
 		const a = resolveAppearance(undefined);
-		assert.equal(a.theme, "default");
+		assert.equal(a.theme, "limpio"); // HarnessAcademico
 		assert.equal(a.background, null);
 		assert.deepEqual(a.colors, {});
 		assert.equal(a.fontFamily, null);
-		assert.equal(a.proseFontSize, 16);
+		assert.equal(a.proseFontSize, 17); // HarnessAcademico
 		assert.equal(a.sessionNameSerif, true);
-		assert.deepEqual(a.mdRendering, { headingWeight: 900, boldColor: null, italicColor: null });
+		assert.deepEqual(a.mdRendering, { headingWeight: 700, boldColor: null, italicColor: null }); // HarnessAcademico
 	});
 
 	it("explicit deltas win field-by-field", () => {
@@ -55,8 +55,8 @@ describe("appearanceVars — the mapping the provider applies", () => {
 		assert.equal(vars["--background"], "#141414");
 		assert.equal(vars["--accent"], "#2a2a2a", "the hover surface keeps its hand-picked value");
 		assert.equal(vars["--lh-ink-strong"], "#e6e6e6", "emphasis = text on Default");
-		assert.equal(vars["--lh-prose-size"], "16px");
-		assert.equal(vars["--lh-heading-weight"], "900");
+		assert.equal(vars["--lh-prose-size"], "17px"); // HarnessAcademico
+		assert.equal(vars["--lh-heading-weight"], "700");
 		assert.equal(vars["--font-prose"], undefined, "no font override at factory");
 		assert.equal(vars["--font-title"], undefined, "CMU stays");
 	});
@@ -65,7 +65,7 @@ describe("appearanceVars — the mapping the provider applies", () => {
 		const vars = appearanceVars(resolveAppearance({ fontFamily: "JetBrains Mono" }), mocha);
 		assert.equal(
 			vars["--font-prose"],
-			`"JetBrains Mono", var(--font-jetbrains), var(--font-sans3), ui-sans-serif, system-ui, sans-serif`,
+			`"JetBrains Mono", var(--font-jetbrains), var(--font-inter), ui-sans-serif, system-ui, sans-serif`,
 		);
 	});
 
@@ -84,7 +84,7 @@ describe("appearanceVars — the mapping the provider applies", () => {
 		assert.equal(vars["--background"], "#101820");
 		assert.equal(vars["--card"], mocha.colors.surface, "un-overridden colors stay the theme's");
 		assert.equal(vars["--lh-warning"], "#fab387");
-		assert.equal(vars["--font-prose"], `"Georgia", var(--font-sans3), ui-sans-serif, system-ui, sans-serif`);
+		assert.equal(vars["--font-prose"], `"Georgia", var(--font-inter), ui-sans-serif, system-ui, sans-serif`);
 		assert.equal(vars["--lh-prose-size"], "18px");
 		assert.equal(vars["--font-title"], "var(--font-prose)", "serif off → titles follow the prose font");
 		assert.equal(vars["--lh-heading-weight"], "700");

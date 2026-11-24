@@ -1,46 +1,42 @@
 "use client";
 
 /**
- * «Escuchar» en la cabecera del cuaderno y en cada comentario (ticket 12j). El interruptor sigue la forma del del modo del 12e
- * (un punto de tinta y una palabra), discreto, con la tinta del margen cuando está encendido. El botón de un comentario lo lee
- * a demanda, con el interruptor como esté. Ni la marca ni los textos de riddled.ai: solo su forma.
+ * «Escuchar» en el menú «⋯» del cuaderno y en cada comentario (ticket 12j). Desde la revisión de la cabecera (23-nov-2026) el
+ * interruptor es una casilla del menú, no una píldora más junto al modo; los avisos de la voz siguen en la cabecera. El botón de
+ * un comentario lo lee a demanda, con la casilla como esté. Ni la marca ni los textos de riddled.ai: solo su forma.
  */
 import { SquareIcon, Volume2Icon } from "lucide-react";
+import { DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { VozVista } from "./escuchar";
-import { colorDeTinta } from "./tintas";
-
-const TINTA = `var(--tinta-margen, ${colorDeTinta(undefined)})`;
 
 const TEXTO_AVISO = {
 	"sin-espanol": "Sin voz en español: se usa la predeterminada.",
 	fallo: "No se pudo leer en voz alta.",
 } as const;
 
-export function EscucharCuaderno({ voz }: { voz: VozVista }) {
-	const { disponible, activo, leyendo, aviso, alternar } = voz;
+/** «Leer en voz alta los comentarios» en el menú «⋯» de la cabecera: una casilla, marcada si está encendido. Sin síntesis de voz
+ * en el equipo se ve desactivada y dice por qué. */
+export function OpcionEscuchar({ voz }: { voz: VozVista }) {
+	const { disponible, activo, alternar } = voz;
 	return (
-		<>
-			<button
-				type="button" role="switch" aria-checked={disponible && activo} aria-disabled={disponible ? undefined : true} data-escuchar-interruptor
-				title={disponible ? "Que el tutor te lea en voz alta sus comentarios nuevos, con las voces de tu equipo" : "Este equipo no ofrece síntesis de voz"}
-				onClick={() => { if (disponible) alternar(); }}
-				className={cn(
-					"inline-flex h-7 items-center gap-2 rounded-full border border-border px-2.5 text-foreground/90 outline-none focus-visible:ring-2 focus-visible:ring-ring",
-					disponible ? "hover:bg-accent hover:text-accent-foreground" : "cursor-not-allowed text-muted-foreground opacity-70",
-				)}
-			>
-				<span
-					aria-hidden="true"
-					className={cn("size-2 rounded-full transition-opacity", disponible && activo ? "opacity-100" : "bg-muted-foreground/40 opacity-60", leyendo && "motion-safe:animate-pulse")}
-					style={disponible && activo ? { backgroundColor: TINTA } : undefined}
-				/>
-				<span>Escuchar</span>
-			</button>
-			{!disponible && <span role="status" data-escuchar-aviso="sin-voz" className="text-muted-foreground">Sin voz en este equipo</span>}
-			{aviso && <span role="status" data-escuchar-aviso={aviso} className="text-muted-foreground">{TEXTO_AVISO[aviso]}</span>}
-		</>
+		<DropdownMenuCheckboxItem
+			checked={disponible && activo} disabled={!disponible} data-escuchar-interruptor
+			onSelect={() => { if (disponible) alternar(); }}
+			className="items-start"
+		>
+			<span className="min-w-0">
+				<span className="block">Leer en voz alta los comentarios</span>
+				<span className="block text-xs text-muted-foreground">{disponible ? "Con las voces de este equipo; nada sale de él" : "Este equipo no ofrece síntesis de voz"}</span>
+			</span>
+		</DropdownMenuCheckboxItem>
 	);
+}
+
+/** Lo que la voz tiene que contar en la cabecera: que no hay voz española o que falló. Sin nada que contar no pinta nada. */
+export function AvisoEscuchar({ voz }: { voz: VozVista }) {
+	if (!voz.aviso) return null;
+	return <span role="status" data-escuchar-aviso={voz.aviso} className="font-sans text-xs text-muted-foreground">{TEXTO_AVISO[voz.aviso]}</span>;
 }
 
 /** Lo que un comentario necesita para escucharse: el estado de la voz y cómo leer o parar. */
