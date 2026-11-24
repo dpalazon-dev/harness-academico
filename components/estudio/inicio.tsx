@@ -17,7 +17,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRightIcon, ArrowUpIcon, PlusIcon, MessageSquarePlusIcon, RotateCwIcon, TargetIcon, Undo2Icon, UploadIcon, XIcon } from "lucide-react";
+import { ArrowUpIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SetupDialog } from "@/components/setup-dialog";
@@ -25,16 +25,16 @@ import { openModelPicker, selectedModelUnavailable, useModelSetup } from "@/comp
 import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { SessionStarter } from "@/components/start-session";
 import { useServerEvent, useServerResync } from "@/components/server-events";
-import { cn } from "@/lib/utils";
 import { llamarEstudio } from "./llamar";
 import { useAbrirConversacion } from "./abrir-conversacion";
 import { rutaIntento, rutaPracticar } from "./intento";
+import { FilaHoy, ListaPorDecidirHoy, TiraSemana } from "./panel-hoy";
 import { usePorDecidir } from "./por-decidir";
-import { AgendaInicio, useDatosAgenda, type DatosAgenda, type Rango } from "./agenda";
+import { AgendaInicio, isoLocal, useDatosAgenda, type DatosAgenda, type Rango } from "./agenda";
 import { LineaRitmo } from "./ritmo";
 import { destinoDelPaso, rutaVolcado } from "./paso";
 import { ANCLA_SUBIR, RUTA_BIBLIOTECA } from "./documentos";
-import type { LecturaInicio, LecturaPlanes, LecturaRitmo, PasoDeUnidad } from "./tipos";
+import type { LecturaInicio, LecturaPlanes, LecturaPorDecidir, LecturaRitmo, PasoDeUnidad } from "./tipos";
 import { unidadesEnOrden } from "./planes";
 import { rutaPlan } from "./plan";
 
@@ -76,13 +76,15 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 	error: string | null;
 	acciones: AccionesInicio;
 	/** Lo que espera una decisión de David y cómo abrir su panel; sin ello no se enseña la tarjeta. */
-	porDecidir?: { total: number; abrir(): void };
+	porDecidir?: { total: number; abrir(): void; lectura: LecturaPorDecidir | null };
 }) {
 	const [texto, setTexto] = useState("");
 	const [sinContexto, setSinContexto] = useState(false);
 	/** «Añadir contexto» sin volcado pendiente: la caja invita a contar lo que David ya sabe o busca. */
 	const [indicacion, setIndicacion] = useState(false);
 	const caja = useRef<HTMLTextAreaElement>(null);
+	/** «Ver el mes»: el calendario completo, debajo de la tira de la semana. */
+	const [verMes, setVerMes] = useState(false);
 	const paso = lectura?.paso ?? null;
 	const contexto = sinContexto || !paso ? null : { unitId: paso.unitId, titulo: paso.titulo };
 	// El paso de volcado solo se propone a una unidad sin volcado (`pasoDe` en el plugin): es la señal que trae el inicio.
@@ -101,7 +103,7 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 				<h1 className="font-title text-3xl leading-tight">{espacio ? `Hoy en ${espacio}` : "Hoy"}</h1>
 				{error && <p role="alert" className="mt-6 text-sm text-destructive">{error}</p>}
 				<form
-					className="mt-6 rounded-3xl border border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.12)] transition-shadow focus-within:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.2)]"
+					className="mt-6 rounded-3xl border border-border bg-[color-mix(in_oklab,var(--background),white_60%)] dark:bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.12)] transition-shadow focus-within:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.2)]"
 					onSubmit={(e) => { e.preventDefault(); enviar(); }}
 				>
 					<textarea
@@ -145,25 +147,33 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 					<div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_1fr]">
 						<div className="flex min-w-0 flex-col gap-3">
 							<SiguientePaso lectura={lectura} ocupado={ocupado} acciones={acciones} />
-							<AccionesRapidas lectura={lectura} unidades={unidades} sinPlanes={sinPlanes} volcadoPendiente={volcadoPendiente} enfocarCaja={() => { setIndicacion(true); caja.current?.focus(); }} ocupado={ocupado} acciones={acciones} />
+							<AccionesRapidas lectura={lectura} unidades={unidades} sinPlanes={sinPlanes} volcadoPendiente={volcadoPendiente} enfocarCaja={() => { setIndicacion(true); caja.current?.focus(); }} ocupado={ocupado} acciones={acciones} ahora={ahora} />
 						</div>
 						<div className="flex min-w-0 flex-col gap-3">
 							<Tarjeta titulo="Esta semana">
-								<div className="mb-2"><LineaRitmo ritmo={ritmo} /></div>
-								<AgendaInicio
-									datos={agenda.datos}
-									error={agenda.error}
-									reintentar={agenda.refrescar}
-									ahora={ahora}
-									ocupado={ocupado}
-									onRangos={agenda.onRangos}
-									acciones={{ repasar: acciones.repasar, paso: acciones.paso, abrirUnidad: acciones.abrirUnidad, abrirConversacion: acciones.retomar }}
-								/>
+								<TiraSemana datos={agenda.datos} error={agenda.error} reintentar={agenda.refrescar} ahora={ahora} onRangos={agenda.onRangos} />
+								<button type="button" aria-expanded={verMes} onClick={() => setVerMes(v => !v)} className="anillo-foco mt-2 self-start rounded-sm text-sm text-[var(--lh-accent)] underline underline-offset-[3px]">
+									{verMes ? "Ver solo la semana" : "Ver el mes"}
+								</button>
+								{verMes && (
+									<div className="mt-2">
+										<LineaRitmo ritmo={ritmo} />
+										<AgendaInicio
+											datos={agenda.datos}
+											error={agenda.error}
+											reintentar={agenda.refrescar}
+											ahora={ahora}
+											ocupado={ocupado}
+											inicial={{ vista: "mes" }}
+											onRangos={agenda.onRangos}
+											acciones={{ repasar: acciones.repasar, paso: acciones.paso, abrirUnidad: acciones.abrirUnidad, abrirConversacion: acciones.retomar }}
+										/>
+									</div>
+								)}
 							</Tarjeta>
 							{porDecidir && porDecidir.total > 0 && (
 								<Tarjeta titulo={`Por decidir (${porDecidir.total})`}>
-									<p className="text-sm text-muted-foreground">{porDecidir.total === 1 ? "Una propuesta del tutor espera tu decisión." : `${porDecidir.total} propuestas del tutor esperan tu decisión.`}</p>
-									<Button variant="outline" size="sm" className="mt-2 self-start" onClick={porDecidir.abrir}>Revisar</Button>
+									<ListaPorDecidirHoy lectura={porDecidir.lectura} abrir={porDecidir.abrir} />
 								</Tarjeta>
 							)}
 						</div>
@@ -174,100 +184,77 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 	);
 }
 
-type Ficha = "crear-plan" | "continuar" | "repasar" | "retomar" | "prueba" | "material" | "contexto";
 /** Una unidad activa de un plan, para «Ponerme a prueba». */
 export interface UnidadActiva { id: string; titulo: string }
 
-/** Las acciones rápidas bajo la caja (ticket 04 de la segunda ronda): solo las que tocan en este momento, por orden de
- * prioridad y como mucho cinco. */
-const MAX_FICHAS = 5;
 /** Los repasos fijados por el regulador (de hoy o vencidos); los intentos a medias, sin fecha, no cuentan. */
 const repasosFijados = (lectura: LecturaInicio) => lectura.repasos.filter(r => r.intentoId === null);
 
-/** Con planes, uno nuevo se crea con el «+» de la sección «Planes» de la barra. */
-function fichasDe(lectura: LecturaInicio, unidades: UnidadActiva[], sinPlanes: boolean): Ficha[] {
-	const fichas: Ficha[] = [];
-	if (sinPlanes) fichas.push("crear-plan");
-	if (lectura.paso) fichas.push("continuar");
-	if (repasosFijados(lectura).length > 0) fichas.push("repasar");
-	if (lectura.abierto) fichas.push("retomar");
-	if (unidades.length > 0) fichas.push("prueba");
-	fichas.push("material", "contexto");
-	return fichas.slice(0, MAX_FICHAS);
-}
-
-function AccionesRapidas({ lectura, unidades, sinPlanes, volcadoPendiente, enfocarCaja, ocupado, acciones }: {
+function AccionesRapidas({ lectura, unidades, sinPlanes, volcadoPendiente, enfocarCaja, ocupado, acciones, ahora }: {
 	lectura: LecturaInicio; unidades: UnidadActiva[]; sinPlanes: boolean; ocupado: boolean; acciones: AccionesInicio;
 	/** La unidad de contexto, si aún no tiene volcado; null si no hay contexto o ya lo tiene. */
 	volcadoPendiente: string | null;
 	enfocarCaja(): void;
+	ahora: Date;
 }) {
 	const [creandoPlan, setCreandoPlan] = useState(false);
-	// El paso propuesto tiene su propia tarjeta (SiguientePaso); aquí, lo demás que toca hoy.
-	const fichas = fichasDe(lectura, unidades, sinPlanes).filter(f => f !== "continuar");
+	const hoy = isoLocal(ahora);
+	const repasos = repasosFijados(lectura);
+	const abierto = lectura.abierto;
+	const vacia = !sinPlanes && repasos.length === 0 && !abierto;
+	// «Para hoy» (variante B, como la maqueta): una fila por cosa que toca hoy, con su estado a la derecha.
 	return (
 		<Tarjeta titulo="Para hoy">
 			<div className="flex flex-col" role="group" aria-label="Acciones rápidas">
-				{fichas.map(f => {
-					switch (f) {
-						case "crear-plan": return (
-							<FichaBoton key={f} ficha={f} detalle="Tu objetivo en este espacio, dividido en unidades" onClick={() => setCreandoPlan(v => !v)} disabled={ocupado} aria-expanded={creandoPlan}>
-								<PlusIcon className="size-3.5" />Crear plan
-							</FichaBoton>
-						);
-						case "repasar": {
-							const repasos = repasosFijados(lectura);
-							return (
-								<FichaBoton key={f} ficha={f} detalle="Los que tocan hoy o ya han vencido" onClick={() => acciones.repasar(repasos[0]!)} disabled={ocupado}>
-									<RotateCwIcon className="size-3.5" />Repasar <small className="text-xs text-muted-foreground">({repasos.length})</small>
-								</FichaBoton>
-							);
-						}
-						case "retomar": {
-							const abierto = lectura.abierto!;
-							const pendiente = [...abierto.abierto, ...(abierto.siguiente ? [`Siguiente: ${abierto.siguiente}`] : [])].join("\n");
-							return (
-								<FichaBoton key={f} ficha={f} title={pendiente || undefined} detalle={abierto.abierto[0] ?? (abierto.siguiente ? `Siguiente: ${abierto.siguiente}` : undefined)} onClick={() => acciones.retomar(abierto.chatId)} disabled={ocupado}>
-									<Undo2Icon className="size-3.5 shrink-0" />Retomar
-									<small className="min-w-0 truncate text-xs text-muted-foreground">«{abierto.titulo}»</small>
-								</FichaBoton>
-							);
-						}
-						case "prueba": return (
-							<DropdownMenu key={f}>
-								<DropdownMenuTrigger asChild disabled={ocupado}>
-									<FichaBoton ficha={f} detalle="Elige una unidad del plan"><TargetIcon className="size-3.5" />Ponerme a prueba</FichaBoton>
-								</DropdownMenuTrigger>
-								<DropdownMenuContent align="start" className="max-h-72 max-w-xs font-prose">
-									<DropdownMenuLabel className="text-xs text-muted-foreground">Practicar una unidad</DropdownMenuLabel>
-									{unidades.map(u => (
-										<DropdownMenuItem key={u.id} onSelect={() => acciones.ponerAPrueba(u.id)}><span className="truncate">{u.titulo}</span></DropdownMenuItem>
-									))}
-								</DropdownMenuContent>
-							</DropdownMenu>
-						);
-						case "material": return (
-							<FichaBoton key={f} ficha={f} detalle="Sube un PDF o un apunte a la biblioteca" onClick={acciones.anadirMaterial} disabled={ocupado}>
-								<UploadIcon className="size-3.5" />Añadir material
-							</FichaBoton>
-						);
-						case "contexto": return (
-							<FichaBoton key={f} ficha={f} detalle="Cuéntale al tutor lo que ya sabes del tema" onClick={() => volcadoPendiente ? acciones.abrirVolcado(volcadoPendiente) : enfocarCaja()} disabled={ocupado}>
-								<MessageSquarePlusIcon className="size-3.5" />Añadir contexto
-							</FichaBoton>
-						);
-					}
-				})}
+				{sinPlanes && (
+					<FilaHoy data-ficha="crear-plan" color="neutro" texto="Crear plan" onClick={() => setCreandoPlan(v => !v)} disabled={ocupado} />
+				)}
+				{repasos.map(r => (
+					<FilaHoy key={`${r.unitId}-${r.fecha}`} data-ficha="repasar" color="aviso" texto={`Repasar ${r.titulo}`} estado={r.fecha !== null && r.fecha < hoy ? "vencido" : "hoy"} onClick={() => acciones.repasar(r)} disabled={ocupado} />
+				))}
+				{abierto && (
+					<FilaHoy
+						data-ficha="retomar"
+						color="acento"
+						texto={`Retomar «${abierto.titulo}»`}
+						estado="abierta"
+						title={[...abierto.abierto, ...(abierto.siguiente ? [`Siguiente: ${abierto.siguiente}`] : [])].join("\n") || undefined}
+						onClick={() => acciones.retomar(abierto.chatId)}
+						disabled={ocupado}
+					/>
+				)}
+				{vacia && <p className="px-2 py-1.5 text-sm text-muted-foreground">Nada pendiente para hoy.</p>}
 			</div>
-			{creandoPlan && fichas.includes("crear-plan") && <NuevoPlan ocupado={ocupado} crear={acciones.crearPlan} />}
+			{/* Decisión de David: las acciones que no son «de hoy», como enlaces discretos al pie. */}
+			<p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 px-2 text-sm text-muted-foreground">
+				{unidades.length > 0 && <>
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild disabled={ocupado}>
+							<button type="button" data-ficha="prueba" className="anillo-foco rounded-sm underline underline-offset-2 hover:text-foreground">Ponerme a prueba</button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="start" className="max-h-72 max-w-xs font-prose">
+							<DropdownMenuLabel className="text-xs text-muted-foreground">Practicar una unidad</DropdownMenuLabel>
+							{unidades.map(u => (
+								<DropdownMenuItem key={u.id} onSelect={() => acciones.ponerAPrueba(u.id)}><span className="truncate">{u.titulo}</span></DropdownMenuItem>
+							))}
+						</DropdownMenuContent>
+					</DropdownMenu>
+					<span aria-hidden>·</span>
+				</>}
+				<button type="button" data-ficha="material" onClick={acciones.anadirMaterial} disabled={ocupado} className="anillo-foco rounded-sm underline underline-offset-2 hover:text-foreground">Añadir material</button>
+				<span aria-hidden>·</span>
+				<button type="button" data-ficha="contexto" onClick={() => volcadoPendiente ? acciones.abrirVolcado(volcadoPendiente) : enfocarCaja()} disabled={ocupado} className="anillo-foco rounded-sm underline underline-offset-2 hover:text-foreground">Añadir contexto</button>
+			</p>
+			{creandoPlan && sinPlanes && <NuevoPlan ocupado={ocupado} crear={acciones.crearPlan} />}
 		</Tarjeta>
 	);
 }
 
-/** Una tarjeta del panel de hoy: título pequeño y su contenido. */
+/** Una tarjeta del panel de hoy: título pequeño y su contenido. Como en la maqueta, más clara que el papel en los
+ * temas claros; en los oscuros, la superficie del tema. */
 function Tarjeta({ titulo, children }: { titulo: string; children: React.ReactNode }) {
 	return (
-		<section aria-label={titulo} className="flex min-w-0 flex-col rounded-2xl bg-card px-4 py-3.5">
+		<section aria-label={titulo} className="flex min-w-0 flex-col rounded-2xl bg-[color-mix(in_oklab,var(--background),white_60%)] dark:bg-card px-4 py-3.5">
 			<h2 className="mb-2 text-sm font-medium text-muted-foreground">{titulo}</h2>
 			{children}
 		</section>
@@ -283,11 +270,11 @@ function SiguientePaso({ lectura, ocupado, acciones }: { lectura: LecturaInicio;
 	const demas = lectura.pasos.filter(p => !(p.unitId === paso.unitId && p.tipo === paso.tipo));
 	return (
 		<Tarjeta titulo="Siguiente paso">
-			<p className="text-lg font-semibold leading-snug">{paso.accion} · {paso.titulo}</p>
+			<p className="text-[length:var(--lh-prose-size)] font-bold leading-snug">{paso.accion} · {paso.titulo}</p>
 			<p className="mt-1 text-sm text-muted-foreground">{paso.motivo}</p>
 			<div className="mt-3 flex flex-wrap gap-2">
 				<Button size="sm" data-ficha="continuar" data-destacada="true" title={paso.motivo} onClick={() => acciones.paso(paso)} disabled={ocupado}>
-					<ArrowRightIcon />{paso.boton || "Empezar"}
+					Empezar
 				</Button>
 				{demas.length > 0 && (
 					<Button size="sm" variant="outline" aria-expanded={otros} onClick={() => setOtros(v => !v)}>Otra cosa</Button>
@@ -308,26 +295,6 @@ function SiguientePaso({ lectura, ocupado, acciones }: { lectura: LecturaInicio;
 		</Tarjeta>
 	);
 }
-
-/** Una acción de «Para hoy» (variante B): fila con la acción y su motivo a la vista. */
-function FichaBoton({ ficha, destacada, detalle, children, className, ...props }: React.ComponentProps<"button"> & { ficha: Ficha; destacada?: boolean; detalle?: string }) {
-	return (
-		<button
-			type="button"
-			{...props}
-			data-ficha={ficha}
-			data-destacada={destacada || undefined}
-			className={cn(
-				"anillo-foco flex w-full min-w-0 flex-col items-start rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent disabled:opacity-60",
-				className,
-			)}
-		>
-			<span className="flex w-full min-w-0 items-center gap-1.5 font-medium">{children}</span>
-			{detalle && <span className="line-clamp-2 text-sm text-muted-foreground">{detalle}</span>}
-		</button>
-	);
-}
-
 
 /** Crear un plan del espacio a mano, como en la Ruta de la vista antigua (ticket 11): solo el objetivo; los elementos
  * se añaden después en su página o los propone el tutor. Se despliega con la ficha «Crear plan». */
@@ -442,7 +409,7 @@ export function Inicio({ initialConfigured }: { initialConfigured: boolean }) {
 				ritmo={ritmo}
 				ocupado={ocupado || conversacion.abriendo}
 				error={error ?? conversacion.error}
-				porDecidir={{ total: porDecidir.total, abrir: porDecidir.abrir }}
+				porDecidir={{ total: porDecidir.total, abrir: porDecidir.abrir, lectura: porDecidir.lectura }}
 				acciones={{
 					enviar: (t, u) => void enviar(t, u),
 					paso: (p) => {

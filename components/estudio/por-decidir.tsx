@@ -216,6 +216,8 @@ export function usePorDecidir() {
 	};
 	return {
 		total: totalPorDecidir(lectura),
+		/** Para listar las propuestas en el panel de hoy del inicio. */
+		lectura,
 		abrir: () => { if (!enCurso.current) setError(null); if (errorLectura) reintentar(); setAbierto(true); },
 		panel: <PanelPorDecidir abierto={abierto} onAbierto={setAbierto} lectura={lectura} ocupado={ocupado} error={error} errorLectura={errorLectura} reintentar={reintentar} acciones={acciones} />,
 	};
