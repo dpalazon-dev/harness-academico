@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { llamarEstudio } from "./llamar";
 import { useAbrirConversacion } from "./abrir-conversacion";
 import { rutaIntento, rutaPracticar } from "./intento";
+import { usePorDecidir } from "./por-decidir";
 import { AgendaInicio, useDatosAgenda, type DatosAgenda, type Rango } from "./agenda";
 import { LineaRitmo } from "./ritmo";
 import { destinoDelPaso, rutaVolcado } from "./paso";
@@ -57,7 +58,7 @@ export interface AccionesInicio {
 	abrirVolcado(unitId: string): void;
 }
 
-export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, agenda, ritmo, ahora = new Date(), ocupado, error, acciones }: {
+export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, agenda, ritmo, ahora = new Date(), ocupado, error, acciones, porDecidir }: {
 	/** Nombre del espacio activo; null con «Todos». */
 	espacio: string | null;
 	/** null mientras se lee. */
@@ -74,6 +75,8 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 	ocupado: boolean;
 	error: string | null;
 	acciones: AccionesInicio;
+	/** Lo que espera una decisión de David y cómo abrir su panel; sin ello no se enseña la tarjeta. */
+	porDecidir?: { total: number; abrir(): void };
 }) {
 	const [texto, setTexto] = useState("");
 	const [sinContexto, setSinContexto] = useState(false);
@@ -93,12 +96,12 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 		<div className="relative h-dvh overflow-y-auto font-prose">
 			{/* Franja para arrastrar la ventana en Electron; primera en el DOM (ver home del núcleo). */}
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
-			<main className="mx-auto w-full max-w-2xl px-6 pb-24 pt-[12vh]">
-				<h1 className="text-center font-title text-[2.5rem] leading-tight tracking-tight">¿Qué quieres poder hacer hoy?</h1>
-				<p className="mt-2 text-center text-muted-foreground">{espacio ?? "Todos los espacios"}</p>
+			{/* HarnessAcademico (Inicio, variante B elegida por David el 24-nov-2026): el panel de hoy, caja arriba y dos columnas. */}
+			<main className="mx-auto w-full max-w-[55rem] px-6 pb-24 pt-16">
+				<h1 className="font-title text-3xl leading-tight">{espacio ? `Hoy en ${espacio}` : "Hoy"}</h1>
 				{error && <p role="alert" className="mt-6 text-sm text-destructive">{error}</p>}
 				<form
-					className="mt-8 rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.12)] transition-shadow focus-within:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.2)]"
+					className="mt-6 rounded-3xl border border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.12)] transition-shadow focus-within:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.2)]"
 					onSubmit={(e) => { e.preventDefault(); enviar(); }}
 				>
 					<textarea
@@ -138,20 +141,32 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 					</div>
 				</form>
 
-				{lectura && <AccionesRapidas lectura={lectura} unidades={unidades} sinPlanes={sinPlanes} volcadoPendiente={volcadoPendiente} enfocarCaja={() => { setIndicacion(true); caja.current?.focus(); }} ocupado={ocupado} acciones={acciones} />}
-
 				{lectura && (
-					<div className="mt-12">
-						<div className="mb-3"><LineaRitmo ritmo={ritmo} /></div>
-						<AgendaInicio
-							datos={agenda.datos}
-							error={agenda.error}
-							reintentar={agenda.refrescar}
-							ahora={ahora}
-							ocupado={ocupado}
-							onRangos={agenda.onRangos}
-							acciones={{ repasar: acciones.repasar, paso: acciones.paso, abrirUnidad: acciones.abrirUnidad, abrirConversacion: acciones.retomar }}
-						/>
+					<div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_1fr]">
+						<div className="flex min-w-0 flex-col gap-3">
+							<SiguientePaso lectura={lectura} ocupado={ocupado} acciones={acciones} />
+							<AccionesRapidas lectura={lectura} unidades={unidades} sinPlanes={sinPlanes} volcadoPendiente={volcadoPendiente} enfocarCaja={() => { setIndicacion(true); caja.current?.focus(); }} ocupado={ocupado} acciones={acciones} />
+						</div>
+						<div className="flex min-w-0 flex-col gap-3">
+							<Tarjeta titulo="Esta semana">
+								<div className="mb-2"><LineaRitmo ritmo={ritmo} /></div>
+								<AgendaInicio
+									datos={agenda.datos}
+									error={agenda.error}
+									reintentar={agenda.refrescar}
+									ahora={ahora}
+									ocupado={ocupado}
+									onRangos={agenda.onRangos}
+									acciones={{ repasar: acciones.repasar, paso: acciones.paso, abrirUnidad: acciones.abrirUnidad, abrirConversacion: acciones.retomar }}
+								/>
+							</Tarjeta>
+							{porDecidir && porDecidir.total > 0 && (
+								<Tarjeta titulo={`Por decidir (${porDecidir.total})`}>
+									<p className="text-sm text-muted-foreground">{porDecidir.total === 1 ? "Una propuesta del tutor espera tu decisión." : `${porDecidir.total} propuestas del tutor esperan tu decisión.`}</p>
+									<Button variant="outline" size="sm" className="mt-2 self-start" onClick={porDecidir.abrir}>Revisar</Button>
+								</Tarjeta>
+							)}
+						</div>
 					</div>
 				)}
 			</main>
@@ -188,30 +203,22 @@ function AccionesRapidas({ lectura, unidades, sinPlanes, volcadoPendiente, enfoc
 	enfocarCaja(): void;
 }) {
 	const [creandoPlan, setCreandoPlan] = useState(false);
-	const fichas = fichasDe(lectura, unidades, sinPlanes);
+	// El paso propuesto tiene su propia tarjeta (SiguientePaso); aquí, lo demás que toca hoy.
+	const fichas = fichasDe(lectura, unidades, sinPlanes).filter(f => f !== "continuar");
 	return (
-		<div className="mt-4">
-			<div className="flex flex-wrap gap-2" role="group" aria-label="Acciones rápidas">
+		<Tarjeta titulo="Para hoy">
+			<div className="flex flex-col" role="group" aria-label="Acciones rápidas">
 				{fichas.map(f => {
 					switch (f) {
 						case "crear-plan": return (
-							<FichaBoton key={f} ficha={f} onClick={() => setCreandoPlan(v => !v)} disabled={ocupado} aria-expanded={creandoPlan}>
+							<FichaBoton key={f} ficha={f} detalle="Tu objetivo en este espacio, dividido en unidades" onClick={() => setCreandoPlan(v => !v)} disabled={ocupado} aria-expanded={creandoPlan}>
 								<PlusIcon className="size-3.5" />Crear plan
 							</FichaBoton>
 						);
-						case "continuar": {
-							const paso = lectura.paso!;
-							return (
-								<FichaBoton key={f} ficha={f} destacada title={paso.motivo} onClick={() => acciones.paso(paso)} disabled={ocupado}>
-									<ArrowRightIcon className="size-3.5 shrink-0" />Continuar
-									<small className="min-w-0 truncate text-xs text-muted-foreground">{paso.accion} · {paso.titulo}</small>
-								</FichaBoton>
-							);
-						}
 						case "repasar": {
 							const repasos = repasosFijados(lectura);
 							return (
-								<FichaBoton key={f} ficha={f} onClick={() => acciones.repasar(repasos[0]!)} disabled={ocupado}>
+								<FichaBoton key={f} ficha={f} detalle="Los que tocan hoy o ya han vencido" onClick={() => acciones.repasar(repasos[0]!)} disabled={ocupado}>
 									<RotateCwIcon className="size-3.5" />Repasar <small className="text-xs text-muted-foreground">({repasos.length})</small>
 								</FichaBoton>
 							);
@@ -220,7 +227,7 @@ function AccionesRapidas({ lectura, unidades, sinPlanes, volcadoPendiente, enfoc
 							const abierto = lectura.abierto!;
 							const pendiente = [...abierto.abierto, ...(abierto.siguiente ? [`Siguiente: ${abierto.siguiente}`] : [])].join("\n");
 							return (
-								<FichaBoton key={f} ficha={f} title={pendiente || undefined} onClick={() => acciones.retomar(abierto.chatId)} disabled={ocupado}>
+								<FichaBoton key={f} ficha={f} title={pendiente || undefined} detalle={abierto.abierto[0] ?? (abierto.siguiente ? `Siguiente: ${abierto.siguiente}` : undefined)} onClick={() => acciones.retomar(abierto.chatId)} disabled={ocupado}>
 									<Undo2Icon className="size-3.5 shrink-0" />Retomar
 									<small className="min-w-0 truncate text-xs text-muted-foreground">«{abierto.titulo}»</small>
 								</FichaBoton>
@@ -229,7 +236,7 @@ function AccionesRapidas({ lectura, unidades, sinPlanes, volcadoPendiente, enfoc
 						case "prueba": return (
 							<DropdownMenu key={f}>
 								<DropdownMenuTrigger asChild disabled={ocupado}>
-									<FichaBoton ficha={f}><TargetIcon className="size-3.5" />Ponerme a prueba</FichaBoton>
+									<FichaBoton ficha={f} detalle="Elige una unidad del plan"><TargetIcon className="size-3.5" />Ponerme a prueba</FichaBoton>
 								</DropdownMenuTrigger>
 								<DropdownMenuContent align="start" className="max-h-72 max-w-xs font-prose">
 									<DropdownMenuLabel className="text-xs text-muted-foreground">Practicar una unidad</DropdownMenuLabel>
@@ -240,12 +247,12 @@ function AccionesRapidas({ lectura, unidades, sinPlanes, volcadoPendiente, enfoc
 							</DropdownMenu>
 						);
 						case "material": return (
-							<FichaBoton key={f} ficha={f} onClick={acciones.anadirMaterial} disabled={ocupado}>
+							<FichaBoton key={f} ficha={f} detalle="Sube un PDF o un apunte a la biblioteca" onClick={acciones.anadirMaterial} disabled={ocupado}>
 								<UploadIcon className="size-3.5" />Añadir material
 							</FichaBoton>
 						);
 						case "contexto": return (
-							<FichaBoton key={f} ficha={f} onClick={() => volcadoPendiente ? acciones.abrirVolcado(volcadoPendiente) : enfocarCaja()} disabled={ocupado}>
+							<FichaBoton key={f} ficha={f} detalle="Cuéntale al tutor lo que ya sabes del tema" onClick={() => volcadoPendiente ? acciones.abrirVolcado(volcadoPendiente) : enfocarCaja()} disabled={ocupado}>
 								<MessageSquarePlusIcon className="size-3.5" />Añadir contexto
 							</FichaBoton>
 						);
@@ -253,12 +260,57 @@ function AccionesRapidas({ lectura, unidades, sinPlanes, volcadoPendiente, enfoc
 				})}
 			</div>
 			{creandoPlan && fichas.includes("crear-plan") && <NuevoPlan ocupado={ocupado} crear={acciones.crearPlan} />}
-		</div>
+		</Tarjeta>
 	);
 }
 
-/** Una ficha: píldora con borde, como en la variante C del prototipo; la destacada lleva el acento. */
-function FichaBoton({ ficha, destacada, children, className, ...props }: React.ComponentProps<"button"> & { ficha: Ficha; destacada?: boolean }) {
+/** Una tarjeta del panel de hoy: título pequeño y su contenido. */
+function Tarjeta({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+	return (
+		<section aria-label={titulo} className="flex min-w-0 flex-col rounded-2xl bg-card px-4 py-3.5">
+			<h2 className="mb-2 text-sm font-medium text-muted-foreground">{titulo}</h2>
+			{children}
+		</section>
+	);
+}
+
+/** «Siguiente paso» (variante B): qué toca ahora, su porqué y un solo botón principal; «Otra cosa» despliega los demás
+ * pasos propuestos del plan. Sin paso, la tarjeta no aparece. */
+function SiguientePaso({ lectura, ocupado, acciones }: { lectura: LecturaInicio; ocupado: boolean; acciones: AccionesInicio }) {
+	const [otros, setOtros] = useState(false);
+	const paso = lectura.paso;
+	if (!paso) return null;
+	const demas = lectura.pasos.filter(p => !(p.unitId === paso.unitId && p.tipo === paso.tipo));
+	return (
+		<Tarjeta titulo="Siguiente paso">
+			<p className="text-lg font-semibold leading-snug">{paso.accion} · {paso.titulo}</p>
+			<p className="mt-1 text-sm text-muted-foreground">{paso.motivo}</p>
+			<div className="mt-3 flex flex-wrap gap-2">
+				<Button size="sm" data-ficha="continuar" data-destacada="true" title={paso.motivo} onClick={() => acciones.paso(paso)} disabled={ocupado}>
+					<ArrowRightIcon />{paso.boton || "Empezar"}
+				</Button>
+				{demas.length > 0 && (
+					<Button size="sm" variant="outline" aria-expanded={otros} onClick={() => setOtros(v => !v)}>Otra cosa</Button>
+				)}
+			</div>
+			{otros && (
+				<ul className="mt-3 flex flex-col" aria-label="Otros pasos propuestos">
+					{demas.map(p => (
+						<li key={`${p.unitId}-${p.tipo}`}>
+							<button type="button" onClick={() => acciones.paso(p)} disabled={ocupado} className="flex w-full min-w-0 flex-col items-start rounded-lg px-2 py-1.5 text-left outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50">
+								<span className="truncate font-medium">{p.accion} · {p.titulo}</span>
+								<span className="line-clamp-1 text-sm text-muted-foreground">{p.motivo}</span>
+							</button>
+						</li>
+					))}
+				</ul>
+			)}
+		</Tarjeta>
+	);
+}
+
+/** Una acción de «Para hoy» (variante B): fila con la acción y su motivo a la vista. */
+function FichaBoton({ ficha, destacada, detalle, children, className, ...props }: React.ComponentProps<"button"> & { ficha: Ficha; destacada?: boolean; detalle?: string }) {
 	return (
 		<button
 			type="button"
@@ -266,15 +318,16 @@ function FichaBoton({ ficha, destacada, children, className, ...props }: React.C
 			data-ficha={ficha}
 			data-destacada={destacada || undefined}
 			className={cn(
-				"anillo-foco inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[13px] transition-colors hover:border-primary disabled:opacity-60",
-				destacada && "border-primary bg-primary/10",
+				"anillo-foco flex w-full min-w-0 flex-col items-start rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent disabled:opacity-60",
 				className,
 			)}
 		>
-			{children}
+			<span className="flex w-full min-w-0 items-center gap-1.5 font-medium">{children}</span>
+			{detalle && <span className="line-clamp-2 text-sm text-muted-foreground">{detalle}</span>}
 		</button>
 	);
 }
+
 
 /** Crear un plan del espacio a mano, como en la Ruta de la vista antigua (ticket 11): solo el objetivo; los elementos
  * se añaden después en su página o los propone el tutor. Se despliega con la ficha «Crear plan». */
@@ -314,6 +367,7 @@ export function Inicio({ initialConfigured }: { initialConfigured: boolean }) {
 	const [configurar, setConfigurar] = useState(false);
 	const starter = useRef(new SessionStarter());
 	const agenda = useDatosAgenda();
+	const porDecidir = usePorDecidir();
 	const refrescarAgenda = agenda.refrescar;
 	const { catalog, configured, zeroKeys } = useModelSetup(initialConfigured);
 
@@ -388,6 +442,7 @@ export function Inicio({ initialConfigured }: { initialConfigured: boolean }) {
 				ritmo={ritmo}
 				ocupado={ocupado || conversacion.abriendo}
 				error={error ?? conversacion.error}
+				porDecidir={{ total: porDecidir.total, abrir: porDecidir.abrir }}
 				acciones={{
 					enviar: (t, u) => void enviar(t, u),
 					paso: (p) => {
@@ -404,6 +459,7 @@ export function Inicio({ initialConfigured }: { initialConfigured: boolean }) {
 					abrirVolcado: (unitId) => router.push(rutaVolcado(unitId)),
 				}}
 			/>
+			{porDecidir.panel}
 			<SetupDialog open={configurar} onClose={() => setConfigurar(false)} onDone={() => setConfigurar(false)} />
 			{conversacion.dialogo}
 		</>

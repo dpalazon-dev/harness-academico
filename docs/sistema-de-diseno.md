@@ -72,8 +72,8 @@ Regla de los cinco minutos: si vas a escribir un control que no está en esta ta
 - **Escala**: la de `@theme inline` en `globals.css`. Nada de `text-[11px]`, `text-[13px]` ni `text-[0.8125rem]`. Los títulos de página usan `text-3xl` (32 px), no `text-4xl`, que está fuera de la escala.
 - **Mínimo 12 px.** `--text-xs` pasa de 11 a 12 px (decisión 1A). Quedan prohibidos 9, 10 y 11 px en cualquier sitio, incluidos los rótulos en mayúsculas.
 - **Dos colores de texto**: `foreground` y `muted-foreground`. **Sin opacidad añadida** sobre `muted-foreground` (`/40`, `/50`, `/70`, `/80`): si algo tiene que pesar menos, se quita o se pliega. Excepción única: el `placeholder` de un campo usa `muted-foreground` sin más.
-- **Familias**: **Atkinson Hyperlegible Next** en toda la app, interfaz (`font-ui`) y prosa (`font-sans`, `lh-input`). Hecha por el Braille Institute para baja visión: no confunde I/l/1 ni O/0; licencia OFL, empaquetada con `next/font` (funciona sin conexión). JetBrains Mono (`font-mono`) solo para código. `font-title` en el título de cada página. Source Sans 3 sigue elegible en Ajustes › Apariencia. Base: un estudio con 16 fuentes ([Wallace et al., 2022](https://jeffhuang.com/papers/Readability_TOCHI22.pdf)) vio que cada persona lee hasta un 35 % más rápido con «su» fuente; por eso la fuente de lectura se puede cambiar.
-- **Prosa**: 17 px con interlineado 1,7, en una columna de unos 46 rem (≈ 65–75 caracteres por línea), alineada a la izquierda ([WCAG 1.4.8](https://www.w3.org/WAI/WCAG22/Understanding/visual-presentation)).
+- **Familias**: **Atkinson Hyperlegible Next** en toda la app, interfaz (`font-ui`) y prosa (`font-sans`, `lh-input`). Hecha por el Braille Institute para baja visión: no confunde I/l/1 ni O/0; licencia OFL, empaquetada con `next/font` (funciona sin conexión). JetBrains Mono (`font-mono`) solo para código. **Títulos** (`font-title`) también en Atkinson, en negrita (700), sin serifa: sustituye a CMU Serif, la letra de LaTeX heredada de LearnHarness, que sigue elegible en Ajustes › Apariencia › Letra de títulos. Los encabezados de las respuestas, en 700 en vez de 900. Source Sans 3 sigue elegible en Ajustes › Apariencia. Base: un estudio con 16 fuentes ([Wallace et al., 2022](https://jeffhuang.com/papers/Readability_TOCHI22.pdf)) vio que cada persona lee hasta un 35 % más rápido con «su» fuente; por eso la fuente de lectura se puede cambiar.
+- **Prosa**: 17 px con interlineado 1,7, en una columna de 47 rem (≈ 75 caracteres por línea), alineada a la izquierda ([WCAG 1.4.8](https://www.w3.org/WAI/WCAG22/Understanding/visual-presentation)).
 - **Ecuaciones**: siempre renderizadas con KaTeX (`$…$` en línea y `$$…$$` en bloque, plugin de matemáticas de streamdown). Nunca se enseña LaTeX en crudo ni una fórmula como código. KaTeX conserva su letra matemática con cualquier fuente de lectura.
 - **Rótulos de sección** (el «eyebrow» en mayúsculas): `text-xs uppercase tracking-wide text-muted-foreground`, nada más. Se usa poco; un título de sección en `text-sm font-medium` suele bastar.
 - Mayúscula solo al principio de frase y en nombres propios («Crear plan», no «Crear Plan»).
@@ -106,6 +106,18 @@ Cada lectura asíncrona distingue **cuatro estados**: cargando, error, vacío y 
 | Guardado automático | Estado visible: «Guardado», «Guardando…», «No se pudo guardar: …» con «Reintentar». Si falla, se avisa al salir | — |
 
 Las lecturas que se anuncian a lectores de pantalla usan `role="status"`; los errores, `role="alert"`. Los márgenes los pone la pieza, no cada pantalla.
+
+## Chat (estilo assistant-ui)
+
+Decisión de David (variante B, 24-nov-2026), sobre el chat de [assistant-ui](https://www.assistant-ui.com/):
+- Columna centrada de **47 rem** con la prosa a **17 px** (algo más ancha que assistant-ui, para fórmulas y tablas); la caja de texto, del mismo ancho y fija abajo.
+- **Tus mensajes**, en burbuja a la derecha (`rounded-3xl bg-card px-5 py-2.5`, hasta el 80 % del ancho), sin etiqueta visible. **Las respuestas del tutor**, sin burbuja, con sus acciones debajo al pasar el ratón.
+- **Caja de texto**: muy redondeada (`rounded-3xl`), sombra suave y botón de enviar circular con flecha hacia arriba; mientras el tutor responde, el mismo botón detiene.
+- Herramientas como líneas con su estado; razonamiento plegado; ecuaciones con KaTeX.
+
+## Inicio
+
+Variante B (panel de hoy, elegida por David el 24-nov-2026): título «Hoy en <espacio>» con el objetivo del plan; la caja de texto como en el chat; debajo, **dos columnas**. A la izquierda, «Siguiente paso» (la acción, su motivo a la vista, un solo botón principal y «Otra cosa», que despliega los demás pasos propuestos) y «Para hoy» (repasos, retomar y el resto de acciones, cada una con su motivo). A la derecha, «Esta semana» (ritmo y agenda) y «Por decidir», si hay algo, con «Revisar».
 
 ## Textos
 

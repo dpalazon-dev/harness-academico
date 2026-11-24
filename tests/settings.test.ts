@@ -32,9 +32,9 @@ describe("FACTORY_SETTINGS (the compiled factory layer)", () => {
 		assert.equal(a.background, null); // the theme's own background, not a factory hex
 		assert.deepEqual(a.colors, {});
 		assert.equal(a.fontFamily, null); // Atkinson Hyperlegible Next (HarnessAcademico)
-		assert.equal(a.proseFontSize, 17);
+		assert.equal(a.proseFontSize, 17); // HarnessAcademico
 		assert.equal(a.sessionNameSerif, true);
-		assert.equal(a.mdRendering.headingWeight, 900);
+		assert.equal(a.mdRendering.headingWeight, 700); // HarnessAcademico
 		assert.equal(a.mdRendering.boldColor, null); // white
 		assert.equal(a.mdRendering.italicColor, null);
 	});

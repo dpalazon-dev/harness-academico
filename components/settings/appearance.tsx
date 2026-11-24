@@ -77,7 +77,8 @@ export const BUNDLED_READING_FONTS: Readonly<Record<string, string>> = {
  *  default row itself (the "lh-cmu" face in globals.css). */
 export const BUNDLED_TITLE_FONTS: Readonly<Record<string, string>> = {
 	...BUNDLED_READING_FONTS,
-	"Atkinson Hyperlegible Next": "var(--font-atkinson)",
+	// HarnessAcademico: el título por defecto es Atkinson; Computer Modern queda elegible.
+	"Computer Modern": '"lh-cmu"',
 };
 
 /** THE mapping: resolved appearance + active theme → the CSS variables to
@@ -104,7 +105,7 @@ export function appearanceVars(
 	// prose family. Old records are read as they are, never rewritten.
 	if (a.titleFont !== null) {
 		const bundled = BUNDLED_TITLE_FONTS[a.titleFont];
-		vars["--font-title"] = `"${a.titleFont}", ${bundled ? `${bundled}, ` : ""}"lh-cmu", serif`;
+		vars["--font-title"] = `"${a.titleFont}", ${bundled ? `${bundled}, ` : ""}var(--font-atkinson), ui-sans-serif, system-ui, sans-serif`;
 	} else if (!a.sessionNameSerif) {
 		vars["--font-title"] = "var(--font-prose)";
 	}
