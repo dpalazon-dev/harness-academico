@@ -461,6 +461,25 @@ describe("InicioEstudio", () => {
 		assert.match(html, /data-ficha="contexto"[^>]*>Añadir contexto<\/button>/);
 	});
 
+	// Decisiones de David del 24-nov-2026 sobre el panel de hoy.
+	it("sin paso propuesto, «Siguiente paso» invita a empezar: crear plan sin planes o pedir un paso al tutor", () => {
+		const sinPlan = inicio({ lectura: VACIA, sinPlanes: true });
+		assert.match(sinPlan, /<section aria-label="Siguiente paso"[\s\S]*No hay nada propuesto ahora[\s\S]*<button[^>]*data-ficha="crear-plan"[^>]*>Crear plan<\/button>/);
+		assert.equal([...sinPlan.matchAll(/data-ficha="crear-plan"/g)].length, 1, "«Crear plan» una sola vez");
+		const conPlan = inicio({ lectura: VACIA });
+		assert.match(conPlan, /<section aria-label="Siguiente paso"[\s\S]*<button[^>]*data-pedir-paso[^>]*>Pedir un siguiente paso<\/button>/);
+	});
+
+	it("con unidades y sin unidad de contexto, la caja ofrece «+ Unidad» como menú", () => {
+		const html = inicio({ lectura: VACIA, unidades: [{ id: "u1", titulo: "Recorridos BFS y DFS" }] });
+		assert.match(html, /<button(?=[^>]*aria-haspopup="menu")[^>]*data-elegir-unidad[^>]*>[\s\S]*Unidad<\/button>/);
+		assert.doesNotMatch(inicio({ unidades: [{ id: "u1", titulo: "x" }] }), /data-elegir-unidad/, "con la unidad del paso, se ve esa");
+	});
+
+	it("los títulos de las tarjetas van en seminegrita", () => {
+		assert.match(inicio(), /<h2 class="[^"]*font-semibold[^"]*">Siguiente paso<\/h2>/);
+	});
+
 	it("enseña el error cuando lo hay", () => {
 		assert.match(inicio({ error: "No se pudo" }), /role="alert"[^>]*>No se pudo</);
 	});

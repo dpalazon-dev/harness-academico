@@ -17,7 +17,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUpIcon, XIcon } from "lucide-react";
+import { ArrowUpIcon, PlusIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SetupDialog } from "@/components/setup-dialog";
@@ -86,7 +86,9 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 	/** «Ver el mes»: el calendario completo, debajo de la tira de la semana. */
 	const [verMes, setVerMes] = useState(false);
 	const paso = lectura?.paso ?? null;
-	const contexto = sinContexto || !paso ? null : { unitId: paso.unitId, titulo: paso.titulo };
+	/** La unidad elegida con «+ Unidad»; manda sobre la del paso propuesto. */
+	const [elegida, setElegida] = useState<{ unitId: string; titulo: string } | null>(null);
+	const contexto = elegida ?? (sinContexto || !paso ? null : { unitId: paso.unitId, titulo: paso.titulo });
 	// El paso de volcado solo se propone a una unidad sin volcado (`pasoDe` en el plugin): es la señal que trae el inicio.
 	const volcadoPendiente = contexto && paso?.tipo === "volcado" ? contexto.unitId : null;
 	const enviar = () => {
@@ -124,17 +126,32 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 					/>
 					<div className="flex items-center gap-2 px-3 pb-3">
 						{contexto ? (
-							<span className="inline-flex max-w-[70%] items-center gap-1 rounded-full bg-secondary py-0.5 pl-2.5 pr-1 text-xs text-secondary-foreground" data-contexto={contexto.unitId}>
+							<span className="inline-flex max-w-[70%] items-center gap-1 rounded-full bg-secondary py-1 pl-3 pr-1.5 text-sm text-secondary-foreground" data-contexto={contexto.unitId}>
 								<span className="truncate">{contexto.titulo}</span>
-								<button type="button" aria-label="Quitar la unidad de contexto" onClick={() => setSinContexto(true)} className="anillo-foco rounded-full p-0.5 hover:bg-background">
+								<button type="button" aria-label="Quitar la unidad de contexto" onClick={() => { setElegida(null); setSinContexto(true); }} className="anillo-foco rounded-full p-0.5 hover:bg-background">
 									<XIcon className="size-3" />
 								</button>
 							</span>
+						) : unidades.length > 0 ? (
+							// Decisión de David (24-nov-2026): elegir la unidad de contexto desde la caja, como en la maqueta.
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild disabled={ocupado}>
+									<button type="button" data-elegir-unidad="" className="anillo-foco inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-sm text-secondary-foreground hover:bg-accent">
+										<PlusIcon className="size-3.5" aria-hidden />Unidad
+									</button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="start" className="max-h-72 max-w-xs font-prose">
+									<DropdownMenuLabel className="text-xs text-muted-foreground">Unidad de contexto</DropdownMenuLabel>
+									{unidades.map(u => (
+										<DropdownMenuItem key={u.id} onSelect={() => setElegida({ unitId: u.id, titulo: u.titulo })}><span className="truncate">{u.titulo}</span></DropdownMenuItem>
+									))}
+								</DropdownMenuContent>
+							</DropdownMenu>
 						) : <span className="text-xs text-muted-foreground">Conversación nueva, sin unidad de contexto</span>}
 						<Button
 							type="submit"
 							size="icon"
-							className="ml-auto size-8 rounded-full"
+							className="ml-auto size-8 rounded-full disabled:opacity-80"
 							disabled={!texto.trim() || ocupado}
 							aria-label="Empezar conversación"
 						>
@@ -146,7 +163,7 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 				{lectura && (
 					<div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_1fr]">
 						<div className="flex min-w-0 flex-col gap-3">
-							<SiguientePaso lectura={lectura} ocupado={ocupado} acciones={acciones} />
+							<SiguientePaso lectura={lectura} sinPlanes={sinPlanes} ocupado={ocupado} acciones={acciones} />
 							<AccionesRapidas lectura={lectura} unidades={unidades} sinPlanes={sinPlanes} volcadoPendiente={volcadoPendiente} enfocarCaja={() => { setIndicacion(true); caja.current?.focus(); }} ocupado={ocupado} acciones={acciones} ahora={ahora} />
 						</div>
 						<div className="flex min-w-0 flex-col gap-3">
@@ -201,12 +218,12 @@ function AccionesRapidas({ lectura, unidades, sinPlanes, volcadoPendiente, enfoc
 	const hoy = isoLocal(ahora);
 	const repasos = repasosFijados(lectura);
 	const abierto = lectura.abierto;
-	const vacia = !sinPlanes && repasos.length === 0 && !abierto;
+	const vacia = !(sinPlanes && lectura.paso) && repasos.length === 0 && !abierto;
 	// «Para hoy» (variante B, como la maqueta): una fila por cosa que toca hoy, con su estado a la derecha.
 	return (
 		<Tarjeta titulo="Para hoy">
 			<div className="flex flex-col" role="group" aria-label="Acciones rápidas">
-				{sinPlanes && (
+				{sinPlanes && lectura.paso && (
 					<FilaHoy data-ficha="crear-plan" color="neutro" texto="Crear plan" onClick={() => setCreandoPlan(v => !v)} disabled={ocupado} />
 				)}
 				{repasos.map(r => (
@@ -245,7 +262,7 @@ function AccionesRapidas({ lectura, unidades, sinPlanes, volcadoPendiente, enfoc
 				<span aria-hidden>·</span>
 				<button type="button" data-ficha="contexto" onClick={() => volcadoPendiente ? acciones.abrirVolcado(volcadoPendiente) : enfocarCaja()} disabled={ocupado} className="anillo-foco rounded-sm underline underline-offset-2 hover:text-foreground">Añadir contexto</button>
 			</p>
-			{creandoPlan && sinPlanes && <NuevoPlan ocupado={ocupado} crear={acciones.crearPlan} />}
+			{creandoPlan && sinPlanes && lectura.paso && <NuevoPlan ocupado={ocupado} crear={acciones.crearPlan} />}
 		</Tarjeta>
 	);
 }
@@ -255,18 +272,41 @@ function AccionesRapidas({ lectura, unidades, sinPlanes, volcadoPendiente, enfoc
 function Tarjeta({ titulo, children }: { titulo: string; children: React.ReactNode }) {
 	return (
 		<section aria-label={titulo} className="flex min-w-0 flex-col rounded-2xl bg-[color-mix(in_oklab,var(--background),white_60%)] dark:bg-card px-4 py-3.5">
-			<h2 className="mb-2 text-sm font-medium text-muted-foreground">{titulo}</h2>
+			<h2 className="mb-2 text-sm font-semibold text-muted-foreground">{titulo}</h2>
 			{children}
 		</section>
 	);
 }
 
+/** El mensaje que «Pedir un siguiente paso» manda al tutor en una conversación nueva. */
+export const PEDIR_PASO = "¿Qué me propones hacer ahora?";
+
 /** «Siguiente paso» (variante B): qué toca ahora, su porqué y un solo botón principal; «Otra cosa» despliega los demás
  * pasos propuestos del plan. Sin paso, la tarjeta no aparece. */
-function SiguientePaso({ lectura, ocupado, acciones }: { lectura: LecturaInicio; ocupado: boolean; acciones: AccionesInicio }) {
+function SiguientePaso({ lectura, sinPlanes, ocupado, acciones }: { lectura: LecturaInicio; sinPlanes: boolean; ocupado: boolean; acciones: AccionesInicio }) {
 	const [otros, setOtros] = useState(false);
+	const [creandoPlan, setCreandoPlan] = useState(false);
 	const paso = lectura.paso;
-	if (!paso) return null;
+	// Sin paso (decisión de David del 24-nov-2026): la tarjeta invita a empezar; sin planes, crear uno, y si no,
+	// pedirle al tutor qué hacer.
+	if (!paso) {
+		return (
+			<Tarjeta titulo="Siguiente paso">
+				<p className="text-[length:var(--lh-prose-size)] font-bold leading-snug">No hay nada propuesto ahora</p>
+				<p className="mt-1 text-sm text-muted-foreground">
+					{sinPlanes ? "Crea un plan con tu objetivo y el tutor te propondrá por dónde empezar." : "Pídele al tutor que te proponga qué hacer, o escribe arriba lo que quieras."}
+				</p>
+				<div className="mt-3 flex flex-wrap gap-2">
+					{sinPlanes ? (
+						<Button size="sm" data-ficha="crear-plan" aria-expanded={creandoPlan} onClick={() => setCreandoPlan(v => !v)} disabled={ocupado}>Crear plan</Button>
+					) : (
+						<Button size="sm" data-pedir-paso="" onClick={() => acciones.enviar(PEDIR_PASO, null)} disabled={ocupado}>Pedir un siguiente paso</Button>
+					)}
+				</div>
+				{creandoPlan && sinPlanes && <NuevoPlan ocupado={ocupado} crear={acciones.crearPlan} />}
+			</Tarjeta>
+		);
+	}
 	const demas = lectura.pasos.filter(p => !(p.unitId === paso.unitId && p.tipo === paso.tipo));
 	return (
 		<Tarjeta titulo="Siguiente paso">
