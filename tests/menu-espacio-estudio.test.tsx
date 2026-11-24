@@ -40,7 +40,7 @@ const ESPACIOS: DatosBarraLateral["espacios"] = { areas: [
 	{ id: "a2", name: "Doctorado", archived: false, revision: 1 },
 	{ id: "a3", name: "Viejo", archived: true, revision: 4 },
 ], activeAreaId: "a1" };
-const PLAN: DatosBarraLateral["plan"] = { plan: { id: "p1", objetivo: "Dominar grafos" }, unidades: [] };
+const PLANES: DatosBarraLateral["planes"] = { planes: [], sinPlan: [] };
 
 async function abrirMenu(datos: Partial<DatosBarraLateral> = {}) {
 	const dom = parseHTML("<html><head></head><body><div id='root'></div></body></html>");
@@ -69,13 +69,13 @@ async function abrirMenu(datos: Partial<DatosBarraLateral> = {}) {
 		archivarEspacio: (id: string) => { llamadas.push(`archivar ${id}`); },
 		recuperarEspacio: (id: string) => { llamadas.push(`recuperar ${id}`); },
 		traerSinEspacio: () => { llamadas.push("traer"); },
-		moverPlan: (planId: string, areaId: string | null) => { llamadas.push(`mover ${planId} ${areaId}`); },
+		crearPlan: (objetivo: string) => { llamadas.push(`plan ${objetivo}`); },
 	};
 	root = createRoot(dom.document.querySelector("#root")!);
 	await act(async () => {
 		root!.render(
 			<SidebarProvider open onOpenChange={() => {}}>
-				<BarraLateralEstudio espacios={ESPACIOS} conversaciones={[]} plan={PLAN} ruta="/" acciones={acciones} {...datos} />
+				<BarraLateralEstudio espacios={ESPACIOS} conversaciones={[]} planes={PLANES} ruta="/" acciones={acciones} {...datos} />
 			</SidebarProvider>,
 		);
 	});
@@ -121,16 +121,7 @@ it("con «Todos» activo no hay adónde traer nada", async () => {
 	assert.equal(m.opcion("Traer aquí lo que no tiene espacio"), undefined);
 });
 
-it("«Mover el plan a…» ofrece los demás espacios vivos y «Sin espacio», y mueve ese plan", async () => {
+it("el menú de espacios ya no mueve planes: un espacio tiene varios y cada uno se mueve desde su página", async () => {
 	const m = await abrirMenu();
-	await m.abrirSubmenu("Mover el plan a…");
-	const sub = [...m.dom.document.querySelectorAll<HTMLElement>('[data-slot="dropdown-menu-sub-content"] [role="menuitem"]')];
-	assert.deepEqual(sub.map(o => o.textContent), ["Doctorado", "Sin espacio"]);
-	await act(async () => { sub[0]!.click(); });
-	assert.deepEqual(m.llamadas, ["mover p1 a2"]);
-});
-
-it("sin plan no ofrece moverlo", async () => {
-	const m = await abrirMenu({ plan: { plan: null, unidades: [] } });
 	assert.equal(m.dom.document.querySelector('[data-slot="dropdown-menu-sub-trigger"]'), null);
 });

@@ -6,7 +6,8 @@ import { SOURCE_OPENED, type AttemptStatus, type Fidelity, type PracticeAttempt,
 import { inArea, type AreaFilter } from './study/areas.ts';
 import type { Notebook, NotebookKind } from './notebooks/types.ts';
 import type { StudyStore } from './study/store.ts';
-import { StudyError, type StudyPlan, type StudyUnit, type UnitKind, type UnitPolicy, type UnitStatus } from './study/types.ts';
+import { StudyError, type PlanEstado, type PlanProposal, type StudyPlan, type StudyUnit, type TipoElemento, type UnitKind, type UnitPolicy, type UnitStatus } from './study/types.ts';
+import { describirOp } from './study/proposals.ts';
 import type { ConversationView } from './sessions/types.ts';
 import { volcadoDe, type HechoCiclo } from './study/hechos.ts';
 
@@ -36,9 +37,6 @@ export interface PreguntaUnidad { cuadernoId: string; cuaderno: string; id: stri
 export interface CuadernoUnidad { id: string; titulo: string; tipo: NotebookKind; notas: number; preguntas: number; actualizado: string }
 export interface IntentoUnidad { id: string; fecha: string; tarea: TaskKind; estado: AttemptStatus; fidelidad: Fidelity | null }
 
-/** Dónde está la unidad en el plan de su espacio, contando solo las unidades no archivadas. `subir` y `bajar`
- * son el índice de la lista del plan al que moverla (op `move`) para cambiarla por la vecina, o null en un extremo. */
-export interface LugarEnPlan { posicion: number; total: number; subir: number | null; bajar: number | null }
 
 /** Una conversación sobre la unidad con lo que dejó su resumen: de qué trató, qué quedó abierto y qué sigue. */
 export interface ConversacionUnidad {
@@ -59,10 +57,10 @@ export interface LecturaUnidad {
   estado: UnitStatus;
   /** El espacio de la unidad, o null si no tiene. */
   areaId: string | null;
-  /** Su lugar en el plan de su espacio, o null si está fuera de él (o el espacio no tiene plan). */
-  lugarEnPlan: LugarEnPlan | null;
-  /** El plan actual del espacio de la unidad, aunque esté activo «Todos»; null si ese espacio no tiene. */
-  planId: string | null;
+  /** El plan con un tema enlazado a la unidad, o null si no está en ninguno. */
+  plan: { id: string; objetivo: string } | null;
+  /** La capacidad y el criterio que sugirió el tutor, pendientes de que David los acepte o descarte. */
+  sugerencia: { capacidad: string; criterio: string } | null;
   capacidad: string;
   criterio: string;
   tipo: UnitKind | null;
@@ -111,23 +109,41 @@ export function pasoDe(u: Pick<LecturaUnidad, 'estado' | 'volcado' | 'fuentes' |
   return null;
 }
 
-export interface UnidadDelPlan {
+/** Una unidad activa (o propuesta de antes) que no está enlazada a ningún tema de un plan vivo. */
+export interface UnidadSinPlan { id: string; titulo: string; propuesta: boolean; ciclo: CicloUnidad }
+export interface ElementoLeido {
   id: string;
+  tipo: TipoElemento;
   titulo: string;
-  propuesta: boolean;
-  /** Propuestas y unidades activas que no están en el plan: se listan detrás para no perderlas. */
-  fueraDelPlan: boolean;
-  ciclo: CicloUnidad;
+  hecho: boolean;
+  /** Solo en un hito con fecha. */
+  fecha: string | null;
+  /** La unidad de un tema que David decidió trabajar. */
+  unidad: { id: string; titulo: string; estado: UnitStatus; ciclo: CicloUnidad } | null;
 }
-export interface LecturaPlan { plan: { id: string; objetivo: string } | null; unidades: UnidadDelPlan[] }
+/** Un cambio del plan que propuso el tutor; `caducado`: por qué ya no se puede aplicar. */
+export interface CambioPendiente { id: string; descripcion: string[]; motivo: string; caducado: string | null }
+export interface PlanLeido {
+  id: string;
+  revision: number;
+  objetivo: string;
+  estado: PlanEstado;
+  origen: 'tutor' | 'manual';
+  /** Elementos marcados como hechos y total, para el progreso. */
+  hechos: number;
+  total: number;
+  elementos: ElementoLeido[];
+  cambios: CambioPendiente[];
+}
+export interface LecturaPlanes { planes: PlanLeido[]; sinPlan: UnidadSinPlan[] }
 
 export interface LecturasArmazon {
-  /** El plan actual del espacio, en orden; detrás, las propuestas del tutor y las unidades activas fuera de él. */
-  plan(filter: AreaFilter): LecturaPlan;
+  /** Los planes vivos del espacio (propuestos y activos, el último actualizado primero) y las unidades sin plan. */
+  planes(filter: AreaFilter): LecturaPlanes;
   /** Una unidad del espacio; fuera de él no existe. */
   unidad(unitId: string, filter: AreaFilter): LecturaUnidad;
-  /** Los pasos propuestos de las unidades confirmadas, en el orden del plan y después las de fuera de él. Las
-   * propuestas del tutor no entran: se deciden en la bandeja. */
+  /** Los pasos propuestos de las unidades activas, en el orden de los planes y de sus temas, y después las que no
+   * están en ningún plan. */
   pasos(filter: AreaFilter): PasoDeUnidad[];
 }
 
@@ -135,8 +151,10 @@ export interface OpcionesLecturas {
   now: () => string;
   timeZone: string;
   conversaciones: (filter: AreaFilter) => ConversationView[];
-  /** El plan actual de un espacio, el mismo al que van los cambios propuestos sin plan explícito. */
-  planActual: (filter: AreaFilter) => StudyPlan | null;
+  /** Los planes vivos de un espacio, el último actualizado primero (todos con null). */
+  planes: (filter: AreaFilter) => StudyPlan[];
+  /** Por qué un cambio pendiente ya no se puede aplicar, o null. */
+  caducidad: (proposal: PlanProposal) => string | null;
 }
 
 const vigente = (a: PracticeAttempt) => (a.status === 'frozen' || a.status === 'graded') && a.frozenAt !== null;
@@ -230,10 +248,11 @@ export function createLecturas(store: StudyStore, options: OpcionesLecturas): Le
       repasoVencido: proximoRepaso !== null && proximoRepaso <= hoy,
     });
 
-    const plan = completa ? options.planActual(unit.areaId) : null;
+    const plan = completa ? options.planes(null).find(p => p.elementos.some(e => e.unitId === unit.id)) ?? null : null;
     const lectura: LecturaUnidad = {
       id: unit.id, revision: unit.revision, titulo: unit.title, estado: unit.status, areaId: unit.areaId,
-      planId: plan?.id ?? null, lugarEnPlan: plan ? lugarEn(plan, unit.id) : null,
+      plan: plan && { id: plan.id, objetivo: plan.goal },
+      sugerencia: unit.sugerencia ? { capacidad: unit.sugerencia.capability, criterio: unit.sugerencia.criterion } : null,
       capacidad: unit.capability, criterio: unit.criterion, tipo: unit.kind, practica: unit.policy, practicaEfectiva: effectivePolicy(unit),
       etapa, ciclo, volcado: volcado && { texto: volcado.texto, fecha: volcado.fecha, origen: volcado.origen }, fuentes: deFuentes, notas, preguntas,
       cuadernos: [...cuadernos].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(nb => ({
@@ -255,36 +274,41 @@ export function createLecturas(store: StudyStore, options: OpcionesLecturas): Le
     return lectura;
   }
 
-  function lugarEn(plan: StudyPlan, unitId: string): LugarEnPlan | null {
-    // Las archivadas siguen en la lista del plan pero no se ven: los vecinos son los visibles.
-    const visibles = plan.unitIds.map((id, indice) => ({ id, indice })).filter(x => store.getUnit(x.id)?.status !== 'archivada');
-    const i = visibles.findIndex(x => x.id === unitId);
-    if (i === -1) return null;
-    return { posicion: i + 1, total: visibles.length, subir: visibles[i - 1]?.indice ?? null, bajar: visibles[i + 1]?.indice ?? null };
-  }
-
-  /** Las unidades del espacio en el orden de la barra lateral: el plan, y detrás las que están fuera de él. */
+  /** Las unidades del espacio en el orden de la barra lateral: las de los temas de cada plan, y detrás las que no están
+   * en ningún plan vivo. Una unidad archivada sigue enlazada a su tema, pero no da pasos. */
   function ordenadas(filter: AreaFilter) {
-    const plan = options.planActual(filter);
+    const planes = options.planes(filter);
+    const enlazadas = new Set(options.planes(null).flatMap(p => p.elementos.flatMap(e => (e.unitId ? [e.unitId] : []))));
     const units = store.listUnits().filter(u => inArea(u, filter));
     const byId = new Map(units.map(u => [u.id, u]));
-    const enPlan = (plan?.unitIds ?? []).map(id => byId.get(id)).filter((u): u is StudyUnit => !!u && u.status !== 'archivada');
-    const fuera = units.filter(u => u.status !== 'archivada' && !enPlan.includes(u))
-      // Primero las propuestas, que piden decisión; dentro de cada grupo, por antigüedad.
+    const enPlan = [...new Set(planes.flatMap(p => p.elementos.flatMap(e => (e.unitId ? [e.unitId] : []))))]
+      .map(id => byId.get(id)).filter((u): u is StudyUnit => !!u && u.status !== 'archivada');
+    const sinPlan = units.filter(u => u.status !== 'archivada' && !enlazadas.has(u.id))
       .sort((a, b) => Number(a.status !== 'propuesta') - Number(b.status !== 'propuesta') || a.createdAt.localeCompare(b.createdAt));
-    return { plan, enPlan, fuera };
+    return { planes, enPlan, sinPlan };
   }
 
   return {
-    plan(filter) {
-      const { plan, enPlan, fuera } = ordenadas(filter);
+    planes(filter) {
+      const { planes, sinPlan } = ordenadas(filter);
       const cuadernos = store.listNotebooks();
-      const fila = (u: StudyUnit, fueraDelPlan: boolean): UnidadDelPlan => ({
-        id: u.id, titulo: u.title, propuesta: u.status === 'propuesta', fueraDelPlan, ciclo: leer(u, cuadernos, filter, false).ciclo,
-      });
+      const ciclo = (u: StudyUnit) => leer(u, cuadernos, filter, false).ciclo;
+      const proposals = store.listProposals().filter(p => p.status === 'pendiente');
       return {
-        plan: plan ? { id: plan.id, objetivo: plan.goal } : null,
-        unidades: [...enPlan.map(u => fila(u, false)), ...fuera.map(u => fila(u, true))],
+        planes: planes.map(p => ({
+          id: p.id, revision: p.revision, objetivo: p.goal, estado: p.estado, origen: p.origen,
+          hechos: p.elementos.filter(e => e.hecho).length, total: p.elementos.length,
+          elementos: p.elementos.map(e => {
+            const u = e.unitId ? store.getUnit(e.unitId) : null;
+            return {
+              id: e.id, tipo: e.tipo, titulo: e.titulo, hecho: e.hecho, fecha: e.fecha ?? null,
+              unidad: u && { id: u.id, titulo: u.title, estado: u.status, ciclo: ciclo(u) },
+            };
+          }),
+          cambios: proposals.filter(c => c.planId === p.id && c.author === 'tutor').sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+            .map(c => ({ id: c.id, descripcion: c.ops.map(op => describirOp(op, p.elementos)), motivo: c.rationale, caducado: options.caducidad(c) })),
+        })),
+        sinPlan: sinPlan.map(u => ({ id: u.id, titulo: u.title, propuesta: u.status === 'propuesta', ciclo: ciclo(u) })),
       };
     },
 
@@ -295,9 +319,9 @@ export function createLecturas(store: StudyStore, options: OpcionesLecturas): Le
     },
 
     pasos(filter) {
-      const { enPlan, fuera } = ordenadas(filter);
+      const { enPlan, sinPlan } = ordenadas(filter);
       const cuadernos = store.listNotebooks();
-      return [...enPlan, ...fuera].filter(u => u.status === 'activa').flatMap(u => {
+      return [...enPlan, ...sinPlan].filter(u => u.status === 'activa').flatMap(u => {
         const { paso } = leer(u, cuadernos, filter, false);
         return paso ? [{ ...paso, unitId: u.id, titulo: u.title }] : [];
       });

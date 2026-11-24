@@ -19,6 +19,7 @@ in-app cheat sheet. See [Getting started](getting-started.md) for setup.
 | Rename current session | F2 |
 | Toggle all your thinking in the session | Mod+T |
 | Find in session / search graph or chains view | Mod+F |
+| Previous / next message in the session | Alt+↑ / Alt+↓ |
 | Shortcut cheat sheet | ? |
 
 Surface-specific actions require their surface to be mounted. Bare shortcuts
@@ -123,6 +124,15 @@ submission conventions above.
   separate from checkbox selection; navigation does not select graph nodes.
   Clicking a row establishes the navigation position. Rename inputs keep their
   normal text-editing arrow keys; foreground menus/dialogs take priority.
+
+## Message navigation
+
+In a session, **Alt+↑ / Alt+↓** (also the ↑ ↓ buttons on the transcript's
+right edge) move to the previous or next message: the learner's messages and
+the tutor's replies, not context cards or dividers. The target's start lands
+near the top of the view. From the middle of a long reply, Alt+↑ goes to that
+reply's own start. Both keys fire while typing and are claimed so the field's
+caret does not move too; they do nothing under a dialog.
 
 ## Search and menus
 

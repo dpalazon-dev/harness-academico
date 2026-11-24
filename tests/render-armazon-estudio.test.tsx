@@ -13,7 +13,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { SidebarProvider } from "../components/ui/sidebar.tsx";
 import { BarraLateralEstudio, RUTA_PROGRESO, type DatosBarraLateral } from "../components/estudio/barra-lateral.tsx";
 import { recordarPlegadas, seccionesPlegadas } from "../components/estudio/secciones.ts";
-import { InicioEstudio } from "../components/estudio/inicio.tsx";
+import { fechaCorta, fechaDeHoy, InicioEstudio, mejorRacha } from "../components/estudio/inicio.tsx";
 import { agruparPorFecha } from "../components/estudio/conversaciones.ts";
 import { ActivitySection } from "../components/activity-dock.tsx";
 import type { LecturaInicio } from "../components/estudio/tipos.ts";
@@ -21,7 +21,7 @@ import type { LecturaInicio } from "../components/estudio/tipos.ts";
 const AHORA = new Date("2026-11-12T18:00:00");
 const nada = () => {};
 const acciones = {
-	elegirEspacio: nada, crearEspacio: nada, renombrarEspacio: nada, archivarEspacio: nada, recuperarEspacio: nada, traerSinEspacio: nada, moverPlan: nada,
+	elegirEspacio: nada, crearEspacio: nada, renombrarEspacio: nada, archivarEspacio: nada, recuperarEspacio: nada, traerSinEspacio: nada, crearPlan: nada,
 	abrirAjustes: nada, navegar: nada, abrirPaleta: nada,
 	renombrarConversacion: nada, exportarConversacion: nada, resumirConversacion: nada, borrarConversacion: nada, alternarSeccion: nada, abrirPorDecidir: nada, cambiarFiltros: nada,
 };
@@ -38,9 +38,17 @@ function barra(datos: Partial<DatosBarraLateral> = {}, abierta = true) {
 					{ id: "c1", title: "Qué es un grafo", updatedAt: "2026-11-12T10:00:00", origen: "libre", unidad: null, plan: null },
 					{ id: "c2", title: "Caminos mínimos", updatedAt: "2026-11-11T10:00:00", origen: "libre", unidad: null, plan: null },
 				]}
-				plan={{ plan: { id: "p1", objetivo: "Dominar grafos" }, unidades: [
-					{ id: "u1", titulo: "Recorridos", propuesta: false, fueraDelPlan: false, ciclo: { orientar: "hecho", exponer: "pendiente", reconstruir: "vacio", mantener: "vacio" } },
-					{ id: "u2", titulo: "Flujo máximo", propuesta: true, fueraDelPlan: true, ciclo: { orientar: "pendiente", exponer: "vacio", reconstruir: "vacio", mantener: "vacio" } },
+				planes={{ planes: [
+					{ id: "p1", revision: 2, objetivo: "Dominar grafos", estado: "activo", origen: "manual", hechos: 1, total: 3, cambios: [], elementos: [
+						{ id: "e1", tipo: "tema", titulo: "Recorridos", hecho: false, fecha: null, unidad: { id: "u1", titulo: "Recorridos", estado: "activa", ciclo: { orientar: "hecho", exponer: "pendiente", reconstruir: "vacio", mantener: "vacio" } } },
+						{ id: "e2", tipo: "tarea", titulo: "Leer el Cormen", hecho: true, fecha: null, unidad: null },
+						{ id: "e3", tipo: "hito", titulo: "Parcial", hecho: false, fecha: "2027-01-20", unidad: null },
+					] },
+					{ id: "p2", revision: 1, objetivo: "Planaridad", estado: "propuesto", origen: "tutor", hechos: 0, total: 1, cambios: [], elementos: [
+						{ id: "k1", tipo: "tema", titulo: "Kuratowski", hecho: false, fecha: null, unidad: null },
+					] },
+				], sinPlan: [
+					{ id: "u2", titulo: "Flujo máximo", propuesta: true, ciclo: { orientar: "pendiente", exponer: "vacio", reconstruir: "vacio", mantener: "vacio" } },
 				] }}
 				ruta="/"
 				ahora={AHORA}
@@ -146,20 +154,20 @@ describe("BarraLateralEstudio", () => {
 		assert.match(barra(), /data-sidebar="trigger"/);
 	});
 
-	it("pinta el plan en orden, cada unidad con la barra de su ciclo, y marca las propuestas", () => {
+	it("pinta cada plan con su objetivo, su progreso y, desplegados, sus temas, tareas e hitos; el tema con unidad lleva su ciclo", () => {
 		const html = barra();
-		assert.match(html, />Plan</);
-		assert.match(html, /Recorridos[\s\S]*Flujo máximo/);
+		assert.match(html, />Planes</);
+		assert.match(html, /Dominar grafos[\s\S]*1\/3[\s\S]*Recorridos[\s\S]*Leer el Cormen[\s\S]*Parcial[\s\S]*20 de enero de 2027/);
+		assert.match(html, /Planaridad[\s\S]*propuesto[\s\S]*Kuratowski/);
 		assert.match(html, /aria-label="Orientar: Hecho, Exponer y capturar: Pendiente, Reconstruir y contrastar: Sin empezar, Mantener y usar: Sin empezar"/);
-		assert.match(html, /Flujo máximo[\s\S]*?propuesta/);
-		assert.equal(html.match(/data-ciclo="barra"/g)?.length, 1, "la propuesta no lleva barra de ciclo");
+		assert.match(html, /line-through[^>]*>Leer el Cormen</, "una tarea hecha se tacha");
+		assert.match(html, /aria-expanded="true" aria-label="Plegar «Dominar grafos»"/);
+		assert.equal(html.match(/data-ciclo="barra"/g)?.length, 1, "solo el tema con unidad; la propuesta sin plan, no");
 	});
 
-	it("lista detrás las unidades activas fuera del plan, marcadas", () => {
-		const html = barra({ plan: { plan: null, unidades: [
-			{ id: "u3", titulo: "Suelta", propuesta: false, fueraDelPlan: true, ciclo: { orientar: "pendiente", exponer: "vacio", reconstruir: "vacio", mantener: "vacio" } },
-		] } });
-		assert.match(html, /Suelta[\s\S]*?fuera del plan/);
+	it("lista aparte las unidades sin plan, marcando las propuestas", () => {
+		const html = barra();
+		assert.match(html, /Unidades sin plan[\s\S]*Flujo máximo[\s\S]*?propuesta/);
 	});
 
 	it("lleva a Biblioteca y la marca también con el lector abierto (ticket 05)", () => {
@@ -189,13 +197,17 @@ describe("BarraLateralEstudio", () => {
 	});
 
 	it("un espacio sin plan dice qué hacer a continuación", () => {
-		const html = barra({ plan: { plan: null, unidades: [] } });
+		const html = barra({ planes: { planes: [], sinPlan: [] } });
 		assert.match(html, /Este espacio aún no tiene plan/);
 		assert.match(html, /Inicio/);
 	});
 
-	it("un plan sin unidades también lo dice", () => {
-		assert.match(barra({ plan: { plan: { id: "p1", objetivo: "x" }, unidades: [] } }), /El plan aún no tiene unidades/);
+	it("el «+» de la sección abre el campo del objetivo de un plan nuevo", () => {
+		assert.match(barra(), /<button[^>]*aria-label="Nuevo plan"[^>]*data-testid="nuevo-plan-barra"/);
+	});
+
+	it("el objetivo de un plan lleva a su página", () => {
+		assert.match(barra({ ruta: "/plan/p1" }), /data-active="true"[^>]*>[\s\S]*?Dominar grafos/);
 	});
 
 	it("usa la letra de lectura", () => {
@@ -209,9 +221,9 @@ describe("BarraLateralEstudio: jerarquía (ticket 01 de la segunda ronda)", () =
 	/** La etiqueta de apertura del contenedor de los elementos de una sección. */
 	const contenedor = (html: string, seccion: string) => html.match(new RegExp(`<div[^>]*data-elementos="${seccion}"[^>]*>`))?.[0] ?? "";
 
-	it("Plan, Materiales y Conversaciones son cabeceras: botón en negrita al tamaño del cuerpo, con chevrón", () => {
+	it("Planes, Materiales y Conversaciones son cabeceras: botón en negrita al tamaño del cuerpo, con chevrón", () => {
 		const html = barra();
-		for (const [seccion, titulo] of [["plan", "Plan"], ["materiales", "Materiales"], ["conversaciones", "Conversaciones"]] as const) {
+		for (const [seccion, titulo] of [["plan", "Planes"], ["materiales", "Materiales"], ["conversaciones", "Conversaciones"]] as const) {
 			const etiqueta = cabecera(html, seccion);
 			assert.ok(etiqueta, `cabecera de ${titulo}`);
 			assert.match(etiqueta, /type="button"/);
@@ -260,7 +272,7 @@ describe("BarraLateralEstudio: «Por decidir» (ticket 02 de la segunda ronda)",
 
 	it("con decisiones pendientes, va bajo Inicio con el total en una insignia de acento", () => {
 		const html = barra({ porDecidir: 3 });
-		assert.match(html, />Inicio<[\s\S]*data-testid="por-decidir"[\s\S]*data-seccion="plan"/, "entre Inicio y el plan");
+		assert.match(html, />Inicio<[\s\S]*data-testid="por-decidir"[\s\S]*data-seccion="plan"/, "entre Inicio y los planes");
 		const li = elemento(html);
 		assert.match(li, />Por decidir</);
 		assert.match(li, /data-sidebar="menu-badge"[^>]*class="[^"]*bg-primary[^"]*text-primary-foreground[^"]*"[^>]*>3</, "insignia de acento con el total");
@@ -329,9 +341,8 @@ describe("InicioEstudio", () => {
 		enviar: nada, paso: nada, repasar: nada, retomar: nada, abrirUnidad: nada, crearPlan: nada,
 		ponerAPrueba: nada, anadirMaterial: nada, abrirVolcado: nada,
 	};
-	const VACIA: LecturaInicio = { plan: null, paso: null, pasos: [], repasos: [], proximos: [], abierto: null };
+	const VACIA: LecturaInicio = { paso: null, pasos: [], repasos: [], proximos: [], abierto: null };
 	const COMPLETA: LecturaInicio = {
-		plan: { id: "p1", objetivo: "Dominar los algoritmos de grafos" },
 		paso: { unitId: "u2", titulo: "Árboles de expansión", tipo: "volcado", accion: "Escribe lo que ya sabes", motivo: "Sin volcado inicial no podrás ver después qué cambió.", boton: "Escribir volcado" },
 		pasos: [{ unitId: "u3", titulo: "Caminos mínimos", tipo: "reconstruir", accion: "Reconstruye sin mirar", motivo: "Capturaste 5 notas.", boton: "Empezar reconstrucción" }],
 		repasos: [
@@ -346,12 +357,12 @@ describe("InicioEstudio", () => {
 	const inicio = (props: Partial<React.ComponentProps<typeof InicioEstudio>> = {}) =>
 		renderToStaticMarkup(<InicioEstudio espacio="Grafos" lectura={COMPLETA} unidades={[]} agenda={AGENDA} ritmo={null} ahora={AHORA} ocupado={false} error={null} acciones={accionesInicio} {...props} />);
 
-	it("pregunta qué quiere poder hacer, con título en serifa, y ofrece el cuadro de mensaje", () => {
+	// HarnessAcademico (Inicio, variante B): «Hoy en <espacio>», en la letra de títulos.
+	it("titula el panel de hoy con el espacio y ofrece el cuadro de mensaje", () => {
 		const html = inicio();
-		assert.match(html, /<h1[^>]*font-title[^>]*>¿Qué quieres poder hacer hoy\?<\/h1>/);
+		assert.match(html, /<h1[^>]*font-title[^>]*>(Buenos días|Buenas tardes|Buenas noches)<\/h1>/);
 		assert.match(html, /<textarea/);
 		assert.match(html, /aria-label="Empezar conversación"/);
-		assert.match(html, /Dominar los algoritmos de grafos/);
 	});
 
 	it("el cuadro lleva como contexto la unidad del paso propuesto, que se puede quitar", () => {
@@ -359,33 +370,53 @@ describe("InicioEstudio", () => {
 		assert.match(inicio({ lectura: VACIA }), /sin unidad de contexto/);
 	});
 
-	it("«Continuar» lleva la acción y la unidad del paso propuesto, destacada, con el motivo como descripción emergente", () => {
+	// Variante B: el paso propuesto tiene su tarjeta «Siguiente paso», con el motivo a la vista y un botón principal.
+	it("«Siguiente paso» lleva la acción y la unidad del paso propuesto, su motivo y el botón destacado", () => {
 		const html = inicio();
-		assert.match(html, /<button[^>]*title="Sin volcado inicial no podrás ver después qué cambió\."[^>]*data-ficha="continuar"[^>]*data-destacada="true"[^>]*>.*Continuar.*Escribe lo que ya sabes · Árboles de expansión.*<\/button>/);
+		assert.match(html, /<section aria-label="Siguiente paso"[\s\S]*Árboles de expansión[\s\S]*Escribe lo que ya sabes[\s\S]*Sin volcado inicial no podrás ver después qué cambió\.[\s\S]*<button[^>]*data-ficha="continuar"[^>]*data-destacada="true"/);
 		assert.doesNotMatch(html, /data-paso=/, "el paso ya no se pinta como botón aparte");
 		assert.doesNotMatch(inicio({ lectura: VACIA }), /data-ficha="continuar"/, "sin paso, no se ofrece");
 	});
 
-	it("sobre la agenda, la línea de ritmo (ticket 06 de la segunda ronda); sin actividad, ceros", () => {
-		const html = inicio({ ritmo: RITMO });
-		assert.match(html, /data-ficha="[^"]+"[\s\S]*data-ritmo[\s\S]*<section aria-label="Agenda"/, "acciones, ritmo y agenda, en ese orden");
-		assert.match(html, /4<\/strong> días en 4 semanas/);
-		const cero = inicio({ ritmo: { ...RITMO, diasEstudiados: 0, racha: 0, repasos: { total: 0, aTiempo: 0 }, intentosPorSemana: [0, 0, 0, 0], tendencia: "igual" } });
-		assert.match(cero, /0<\/strong> días en 4 semanas[\s\S]*<section aria-label="Agenda"/);
-		assert.doesNotMatch(inicio({ lectura: null, ritmo: RITMO }), /data-ritmo/, "mientras se lee el inicio, tampoco hay ritmo");
+	// Panel B fiel a la maqueta: «Esta semana» es una tira de siete días con «Ver el mes»; el ritmo y el calendario del
+	// mes solo aparecen al desplegar, para que todo quepa sin desplazarse.
+	// Referencia 2 «Centro de aprendizaje» (David, 24-nov-2026), con los datos que la app tiene.
+	it("cabecera con saludo y fecha; caja con Notas y Material; cuatro sugerencias", () => {
+		const html = inicio();
+		assert.match(html, /<h1[^>]*font-title[^>]*>(Buenos días|Buenas tardes|Buenas noches)<\/h1>/);
+		assert.doesNotMatch(html, /Tu cabina de estudio|Centro de aprendizaje/, "sin frase de folleto ni rótulo genérico");
+		assert.match(html, />Material<\/button>/);
+		assert.equal([...html.matchAll(/data-sugerencia/g)].length, 4);
+		assert.equal(fechaDeHoy(new Date(2026, 10, 24)), "Martes, 24 de noviembre de 2026");
+		assert.equal(fechaCorta(new Date(2026, 10, 24)), "Martes 24 de noviembre");
+	});
+
+	it("«Sesión de hoy», «Actividad de hoy» y, a la derecha, «Tu progreso»", () => {
+		const html = inicio({ ritmo: RITMO, enfoque: ["Dominar grafos"] });
+		assert.match(html, /<section aria-label="Sesión de hoy"[\s\S]*hechas/);
+		assert.match(html, /<section aria-label="Actividad de hoy"/);
+		assert.match(html, /<aside aria-label="Tu progreso"[\s\S]*Progreso semanal[\s\S]*Racha[\s\S]*Repasos[\s\S]*Esta semana[\s\S]*Próximos repasos[\s\S]*Enfoque de la semana[\s\S]*Dominar grafos/);
+		assert.equal([...html.matchAll(/data-dia="/g)].length, 7);
+		assert.doesNotMatch(inicio({ lectura: null }), /Tu progreso/, "mientras se lee el inicio, no hay panel");
+	});
+
+	it("la mejor racha sale de la actividad del año", () => {
+		assert.equal(mejorRacha([{ dia: "2026-11-01", n: 1 }, { dia: "2026-11-02", n: 2 }, { dia: "2026-11-03", n: 0 }, { dia: "2026-11-04", n: 1 }]), 2);
+		assert.equal(mejorRacha([{ dia: "2026-11-01", n: 1 }, { dia: "2026-11-03", n: 1 }]), 1, "un hueco corta la racha");
 	});
 
 	it("bajo las acciones, la agenda sustituye a las listas «Hoy» y «Próximos 7 días» (ticket 05 de la segunda ronda)", () => {
 		const html = inicio();
-		assert.match(html, /data-ficha="[^"]+"[\s\S]*<section aria-label="Agenda"/, "acciones y agenda, en ese orden");
+		assert.match(html, /data-ficha="[^"]+"[\s\S]*<section aria-label="Actividad de hoy"/, "acciones y actividad, en ese orden");
 		assert.doesNotMatch(html, /Repasar · |Retomar el intento · |Reconstruye sin mirar · /, "sin el formato «acción · unidad»");
-		assert.doesNotMatch(html, />Hoy<\/h2>|>Próximos 7 días<\/h2>|Mañana/, "sin las listas fijas");
+		assert.doesNotMatch(html, />Hoy<\/h2>|>Próximos 7 días<\/h2>/, "sin las listas fijas (los próximos repasos, con su día, van en su tarjeta)");
 		assert.doesNotMatch(inicio({ lectura: null }), /aria-label="Agenda"/, "mientras se lee el inicio, no hay agenda");
 	});
 
 	it("«Retomar» nombra la conversación con algo abierto y lleva lo pendiente como descripción emergente; ya no hay «Quedó abierto»", () => {
 		const html = inicio();
-		assert.match(html, /<button[^>]*title="¿Por qué falla con pesos negativos\?\nSiguiente: Probar Bellman-Ford"[^>]*data-ficha="retomar"[^>]*>.*Retomar.*«Dudas de Dijkstra».*<\/button>/s);
+		// Panel B: fila compacta con el estado «abierta» a la derecha.
+		assert.match(html, /<button(?=[^>]*title="¿Por qué falla con pesos negativos\?\nProbar Bellman-Ford")[^>]*data-ficha="retomar"[^>]*>.*Retomar «Dudas de Dijkstra».*abierta.*<\/button>/s);
 		assert.doesNotMatch(html, /Quedó abierto/);
 		assert.doesNotMatch(inicio({ lectura: VACIA }), /data-ficha="retomar"/);
 	});
@@ -406,17 +437,19 @@ describe("InicioEstudio", () => {
 	/** Las fichas de acción rápida, en el orden en que se pintan (ticket 04 de la segunda ronda). */
 	const fichas = (html: string) => [...html.matchAll(/data-ficha="([^"]+)"/g)].map(m => m[1]);
 
-	it("sin plan, la primera ficha es «Crear plan», sin texto explicativo ni formulario fijo", () => {
-		const html = inicio({ lectura: VACIA });
+	it("sin planes, la primera ficha es «Crear plan», sin texto explicativo ni formulario fijo", () => {
+		const html = inicio({ lectura: VACIA, sinPlanes: true });
 		assert.equal(fichas(html)[0], "crear-plan");
 		assert.match(html, /<button[^>]*data-ficha="crear-plan"[^>]*>.*Crear plan.*<\/button>/);
 		assert.doesNotMatch(html, /Este espacio aún no tiene plan/);
 		assert.doesNotMatch(html, /nuevo-plan/, "el campo del objetivo solo aparece al pulsar la ficha");
-		assert.doesNotMatch(inicio(), /data-ficha="crear-plan"/, "con plan, no se ofrece");
+		assert.doesNotMatch(inicio(), /data-ficha="crear-plan"/, "con planes, otro se crea desde la barra");
 	});
 
 	it("«Repasar» cuenta los repasos de hoy y los vencidos, sin los intentos a medias, y solo aparece si hay alguno", () => {
-		assert.match(inicio(), /<button[^>]*data-ficha="repasar"[^>]*>.*Repasar.*\(1\).*<\/button>/);
+		// Panel B: una fila por repaso, con su estado a la derecha.
+		assert.match(inicio(), /<button[^>]*data-ficha="repasar"[^>]*>.*Repasar Recorridos BFS y DFS.*vencido.*<\/button>/);
+		assert.equal([...inicio().matchAll(/data-ficha="repasar"/g)].length, 1);
 		assert.doesNotMatch(inicio({ lectura: VACIA }), /data-ficha="repasar"/);
 		const soloIntento = { ...COMPLETA, repasos: COMPLETA.repasos.filter(r => r.intentoId) };
 		assert.doesNotMatch(inicio({ lectura: soloIntento }), /data-ficha="repasar"/, "un intento a medias no es un repaso");
@@ -424,22 +457,44 @@ describe("InicioEstudio", () => {
 
 	it("«Ponerme a prueba» se ofrece con unidades activas en el plan, como menú", () => {
 		const html = inicio({ unidades: [{ id: "u1", titulo: "Recorridos BFS y DFS" }] });
-		assert.match(html, /<button(?=[^>]*aria-haspopup="menu")[^>]*data-ficha="prueba"[^>]*>.*Ponerme a prueba.*<\/button>/);
+		assert.match(html, /<button(?=[^>]*aria-haspopup="menu")[^>]*data-ficha="prueba"[^>]*>.*Ponerme a prueba<\/button>/);
 		assert.doesNotMatch(inicio({ unidades: [] }), /data-ficha="prueba"/);
 	});
 
-	it("solo las fichas que tocan, en orden de prioridad y nunca más de cinco", () => {
-		assert.deepEqual(fichas(inicio({ lectura: VACIA })), ["crear-plan", "material", "contexto"]);
+	// Panel B: siguiente paso, «Para hoy» (crear plan, repasos, retomar) y, al pie, los enlaces discretos.
+	it("solo las acciones que tocan, en su sitio y en orden", () => {
+		assert.deepEqual(fichas(inicio({ lectura: VACIA, sinPlanes: true })), ["crear-plan", "material", "contexto"]);
 		assert.deepEqual(fichas(inicio({ unidades: [] })), ["continuar", "repasar", "retomar", "material", "contexto"]);
-		assert.deepEqual(fichas(inicio({ unidades: [{ id: "u1", titulo: "Recorridos BFS y DFS" }] })), ["continuar", "repasar", "retomar", "prueba", "material"]);
-		const todas = inicio({ lectura: { ...COMPLETA, plan: null }, unidades: [{ id: "u1", titulo: "Recorridos BFS y DFS" }] });
-		assert.deepEqual(fichas(todas), ["crear-plan", "continuar", "repasar", "retomar", "prueba"]);
+		assert.deepEqual(fichas(inicio({ unidades: [{ id: "u1", titulo: "Recorridos BFS y DFS" }] })), ["continuar", "repasar", "retomar", "prueba", "material", "contexto"]);
+		const todas = inicio({ sinPlanes: true, unidades: [{ id: "u1", titulo: "Recorridos BFS y DFS" }] });
+		// Con paso propuesto, «Crear plan» se hace desde la barra; sin paso, va en «Siguiente paso».
+		assert.deepEqual(fichas(todas), ["continuar", "repasar", "retomar", "prueba", "material", "contexto"]);
 	});
 
 	it("«Añadir material» y «Añadir contexto» se nombran tal cual", () => {
 		const html = inicio({ lectura: VACIA });
+		// Panel B: enlaces discretos al pie de «Para hoy» (decisión de David).
 		assert.match(html, /data-ficha="material"[^>]*>.*Añadir material<\/button>/);
 		assert.match(html, /data-ficha="contexto"[^>]*>.*Añadir contexto<\/button>/);
+	});
+
+	// Decisiones de David del 24-nov-2026 sobre el panel de hoy.
+	it("sin paso propuesto, «Siguiente paso» invita a empezar: crear plan sin planes o pedir un paso al tutor", () => {
+		const sinPlan = inicio({ lectura: VACIA, sinPlanes: true });
+		assert.match(sinPlan, /<section aria-label="Siguiente paso"[\s\S]*No hay nada propuesto ahora[\s\S]*<button[^>]*data-ficha="crear-plan"[^>]*>.*Crear plan<\/button>/);
+		assert.equal([...sinPlan.matchAll(/data-ficha="crear-plan"/g)].length, 1, "«Crear plan» una sola vez");
+		const conPlan = inicio({ lectura: VACIA });
+		assert.match(conPlan, /<section aria-label="Siguiente paso"[\s\S]*<button[^>]*data-pedir-paso[^>]*>.*Pedir un siguiente paso<\/button>/);
+	});
+
+	it("con unidades y sin unidad de contexto, la caja ofrece «+ Unidad» como menú", () => {
+		const html = inicio({ lectura: VACIA, unidades: [{ id: "u1", titulo: "Recorridos BFS y DFS" }] });
+		assert.match(html, /<button(?=[^>]*aria-haspopup="menu")[^>]*data-elegir-unidad[^>]*>[\s\S]*Unidad<\/button>/);
+		assert.doesNotMatch(inicio({ unidades: [{ id: "u1", titulo: "x" }] }), /data-elegir-unidad/, "con la unidad del paso, se ve esa");
+	});
+
+	it("los títulos de las tarjetas van en seminegrita", () => {
+		assert.match(inicio(), /<h2 class="[^"]*font-(semibold|bold)[^"]*">Siguiente paso<\/h2>/);
 	});
 
 	it("enseña el error cuando lo hay", () => {
@@ -451,5 +506,12 @@ describe("InicioEstudio", () => {
 		for (const fuera of ["home-mode-switch", "home-mode-practice", "open-chain-table", "knowledge-summary", "Import", "Chains", "graph"]) {
 			assert.doesNotMatch(html, new RegExp(fuera), fuera);
 		}
+	});
+
+	it("si la agenda no se pudo leer, lo dice dentro de la agenda con «Reintentar», no arriba del inicio", () => {
+		const html = inicio({ agenda: { datos: null, error: "Estudio no respondió (500)", refrescar: () => {}, onRangos: () => {} } });
+		assert.match(html, /<section aria-label="Actividad de hoy"[\s\S]*data-error-lectura[^>]*>No se pudo leer la agenda\.[\s\S]*>Reintentar<\/button>/);
+		assert.doesNotMatch(html, /Leyendo la agenda…/);
+		assert.doesNotMatch(html, /Estudio no respondió/);
 	});
 });

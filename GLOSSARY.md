@@ -5,12 +5,25 @@ Aplicación de escritorio para aprender cualquier tema con un tutor de IA que cr
 ## Organización del estudio
 
 **Espacio**:
-Contexto de estudio de una materia, con su plan, sus unidades, sus documentos, sus cuadernos y sus conversaciones. Se elige uno activo; «Todos» no filtra.
+Contexto de estudio de una materia, con sus planes, sus unidades, sus documentos, sus cuadernos y sus conversaciones. Se elige uno activo; «Todos» no filtra.
 _Avoid_: área, materia, workspace, proyecto
 
 **Plan**:
-Ruta ordenada de unidades de un espacio hacia un objetivo.
+Un objetivo con una lista plana y ordenada de elementos (temas, tareas e hitos). Un espacio puede tener varios. El que propone el tutor queda «propuesto» hasta que David lo acepta o lo descarta entero (ADR 0007).
 _Avoid_: ruta (como objeto), currículo
+
+**Elemento del plan**:
+Una línea de un plan: un tema, una tarea o un hito. David lo marca como hecho; el ciclo de una unidad no lo marca solo.
+
+**Tema**:
+Algo que aprender dentro de un plan. Se convierte en unidad cuando David pulsa «Trabajar»; desde entonces abre esa unidad.
+_Avoid_: unidad (antes de trabajarlo), concepto (como objeto)
+
+**Tarea**:
+Algo que hacer dentro de un plan, como leer un capítulo o resolver un ejercicio.
+
+**Hito**:
+Un punto de control de un plan, como un examen o una entrega, con fecha opcional y solo informativa: las fechas de repaso salen del regulador.
 
 **Unidad**:
 Una capacidad concreta que David quiere poder ejercer, con el criterio que demuestra que la tiene. Es la unidad de trabajo: sobre ella se estudia, se practica y se registra la evidencia.
@@ -70,7 +83,7 @@ La siguiente acción que la aplicación sugiere para una unidad o para el día, 
 _Avoid_: tarea obligatoria, siguiente fase
 
 **Propuesta**:
-Un cambio del plan o una unidad nueva que sugiere el tutor y que no se aplica hasta que David lo confirma.
+Un plan entero, un cambio de un plan activo o la capacidad y el criterio de una unidad que sugiere el tutor, y que no se aplica hasta que David lo confirma.
 
 **Oferta del margen** (en el código, `Propuesta` de un comentario de Cuadernos):
 Lo que el tutor ofrece junto a un comentario del margen: una pregunta de recuperación, un hecho para la base o una conexión con una unidad o un cuaderno. No es una Propuesta del plan: no cambia nada hasta que David la acepta con un clic (la pregunta entra como bloque suyo tras el párrafo; el hecho, como borrador con origen tutor en «Por decidir»), y la conexión se abre sin aceptarla.
@@ -81,7 +94,7 @@ Un diagrama Mermaid que el tutor dibuja solo si David se lo pide («Dibújalo» 
 _Avoid_: esquema (a secas), gráfico
 
 **Cambio caducado**:
-Un cambio del plan pendiente que ya no se puede aplicar porque otro cambio aplicado después tocó sus unidades o su posición, o porque ya no encaja en el plan. Solo cabe descartarlo; en los datos queda como `obsoleta`.
+Un cambio del plan pendiente que ya no se puede aplicar porque otro cambio aplicado después tocó sus elementos o su posición, porque ya no encaja en el plan o porque el plan ya no está activo. Solo cabe descartarlo; en los datos queda como `obsoleta`.
 _Avoid_: propuesta rechazada (eso lo decide David)
 
 **Borrador de conocimiento**:

@@ -212,8 +212,8 @@ export function TarjetaMargen({ item, sitio, top, resaltar, quitar, hilos, accio
 		<article
 			data-margen-id={item.id} data-bloque={sitio?.blockId} data-estado={c ? c.state : p!.estado} data-sin-frase={sitio ? undefined : ""} data-hilo-abierto={abierto ? "" : undefined}
 			onMouseEnter={() => resaltar(true)} onMouseLeave={() => resaltar(false)} onFocus={() => resaltar(true)} onBlur={() => resaltar(false)}
-			style={{ ...estilo, borderLeftColor: error ? "var(--lh-error)" : TINTA_MARGEN }}
-			className={cn("group/margen border-l-2 py-0.5 pl-3 font-prose text-[0.8125rem] leading-[1.35rem] text-foreground/90", puesto)}
+			style={{ ...estilo, backgroundColor: `color-mix(in oklab, ${TINTA_MARGEN} 10%, var(--card))`, ...(error ? { outline: "1px solid var(--lh-error)" } : {}) }}
+			className={cn("group/margen rounded-md px-3 py-1 font-prose text-[0.8125rem] leading-[1.35rem] text-foreground/90", puesto)}
 		>
 			<header className="flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
 				<span data-firma>{c ? item.firma ?? firmaDe(c) : p?.firma ?? "Tutor"}</span>

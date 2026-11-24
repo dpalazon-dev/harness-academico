@@ -101,6 +101,8 @@ export * from "./session-markdown.ts";
 // side-chat.ts (shared side conversations): ask-input validation,
 // thread lookup and the side model's lesson document. Pure, browser-safe.
 export * from "./side-chat.ts";
+// HarnessAcademico: corte del historial para bifurcar una conversación.
+export * from "./bifurcar.ts";
 export * from "./plugins.ts";
 export * from "./plugin-questions.ts";
 export * from "./plugin-problems.ts";

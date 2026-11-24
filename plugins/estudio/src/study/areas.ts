@@ -23,7 +23,7 @@ export interface AreaService {
   activate(input: unknown): AreasView;
   /** Gives the active space everything that has none yet, conversations included. */
   adopt(chatIds: readonly string[]): { moved: number };
-  /** Moves one record to a space; a plan takes its units with it. */
+  /** Moves one record to a space; a plan takes the units of its temas with it. */
   move(input: unknown): { moved: number };
 }
 
@@ -139,7 +139,7 @@ export function createAreaService(store: StudyStore, now: () => string, newId: (
         if (!p) throw new StudyError('NOT_FOUND', 'El plan no existe');
         let moved = 1;
         if (p.areaId !== areaId) store.savePlan({ ...p, areaId, revision: p.revision + 1, updatedAt: at }, p.revision);
-        for (const unitId of p.unitIds) {
+        for (const unitId of p.elementos.flatMap(e => (e.unitId ? [e.unitId] : []))) {
           const u = store.getUnit(unitId);
           if (u && u.areaId !== areaId) { store.saveUnit({ ...u, areaId, revision: u.revision + 1, updatedAt: at }, u.revision); moved++; }
         }

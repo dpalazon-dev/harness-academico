@@ -8,17 +8,21 @@ const { PROVIDERS, fileStore, validateCredential, safeHttps, failure } = require
 const LABELS = { "github-copilot": "GitHub Copilot", xai: "Grok" };
 const APIS = new Set(["openai-responses", "openai-completions", "anthropic-messages"]);
 const clone = (value) => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+/** Lo que ve David por cada código de error. El código es lo que viaja por IPC y lo que clasifica el agente; el texto solo
+ * se enseña (en Ajustes y en el chat). */
 const MESSAGES = {
-	storage: "The saved connection could not be read or written safely. Reopen the app or reconnect after resolving the credential-file problem.",
-	login: "Sign-in did not complete. Try connecting again.",
-	refresh: "The connection could not be refreshed. Retry or reconnect in Providers.",
-	cancel: "Sign-in cancelled.",
-	unavailable: "This subscription connection is unavailable. Reconnect or explicitly choose another connection.",
-	background: "Background use is off for this connection. Automatic follow-up remains deferred in its queue.",
-	stale: "The connection or model catalog changed. Select an available model and retry.",
-	interaction: "This sign-in action is no longer available.",
+	storage: "No se pudo leer ni guardar con seguridad la conexión guardada. Vuelve a abrir la app o reconecta cuando hayas resuelto el problema del archivo de credenciales.",
+	login: "El inicio de sesión no terminó. Vuelve a intentar conectar.",
+	refresh: "No se pudo renovar la conexión. Reinténtalo o vuelve a conectar en Ajustes › Proveedores.",
+	cancel: "Se canceló el inicio de sesión.",
+	unavailable: "Esta conexión de suscripción no está disponible. Vuelve a conectar o elige otra conexión.",
+	background: "El uso en segundo plano está desactivado en esta conexión. Los seguimientos automáticos esperan en su cola.",
+	stale: "La conexión o el catálogo de modelos ha cambiado. Elige un modelo disponible y reinténtalo.",
+	interaction: "Este paso del inicio de sesión ya no está disponible.",
 };
-function publicError(error) { return MESSAGES[error?.code] ?? MESSAGES.unavailable; }
+/** El código público de un error: uno de `MESSAGES`, o `unavailable` si no es de los conocidos. */
+function publicCode(error) { return typeof error?.code === "string" && Object.hasOwn(MESSAGES, error.code) ? error.code : "unavailable"; }
+function publicError(error) { return MESSAGES[publicCode(error)]; }
 /** Resolve the SAME SDK installation as the standalone server, through public exports. */
 async function loadSubscriptionSDK(baseDirectory) {
 	const resolve = createRequire(path.join(baseDirectory, "package.json"));
@@ -157,7 +161,7 @@ function createSubscriptions(options) {
 					if (event.type === "auth_url") addBrowser(event.url);
 					if (event.type === "device_code") { addBrowser(event.verificationUri); attempt.public.userCode = event.userCode; }
 					// Native provider diagnostics are never forwarded. Public prompt wording comes from SDK-owned prompts.
-					attempt.public.progress = event.type === "device_code" || event.type === "auth_url" ? "Complete sign-in in your browser." : "Waiting for the provider…";
+					attempt.public.progress = event.type === "device_code" || event.type === "auth_url" ? "Termina de iniciar sesión en el navegador." : "Esperando al proveedor…";
 					changed(entry);
 				},
 				prompt: (prompt) => new Promise((resolve, reject) => {
@@ -248,4 +252,4 @@ function createSubscriptions(options) {
 		close() { closed = true; for (const entry of entries.values()) { cancel(entry.providerId); entry.epoch++; changed(entry); } },
 	};
 }
-module.exports = { createSubscriptions, loadSubscriptionSDK, publicError, validEndpoint, LABELS };
+module.exports = { createSubscriptions, loadSubscriptionSDK, publicError, publicCode, validEndpoint, LABELS };

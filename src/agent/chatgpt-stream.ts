@@ -5,18 +5,21 @@ import { transformMessages } from "@earendil-works/pi-ai/api/transform-messages"
 import { chatGPTAbortController, chatGPTScope, chatGPTScopeCurrent, chatGPTLease, chatGPTDenial } from "./chatgpt-bridge.ts";
 import type { AdmissionScope, ChatGPTDispatchLifecycle } from "./chatgpt-request-cycle.ts";
 import { capturePreparedBackgroundPayload } from "./background-capture.ts";
+import { motivoDeError } from "./error-de-conexion.ts";
 
 const USAGE = "https://chatgpt.com/settings/usage";
+/** El mensaje del chat para un fallo de ChatGPT. `message` es el código de la conexión de escritorio (`motivoDeError`) o el
+ * texto crudo, en inglés, del proveedor o de un error interno: las expresiones de abajo buscan esas palabras, no el español. */
 export function chatGPTStreamError(message: string): string {
-	if (/subscription_sharing_usage_limit_exceeded|quota|429/.test(message)) return `ChatGPT plan usage limit reached. Manage usage at ${USAGE}. No API-key fallback was used.`;
-	if (/scope|authorization_context|permission/.test(message)) return "ChatGPT plan permission is missing. Reconnect in Providers and authorize plan use. No API-key fallback was used.";
-	if (/expired|invalid_grant|401|invalid_user/.test(message)) return "Your ChatGPT session expired. Reconnect in Providers. No API-key fallback was used.";
-	if (/background|Background/.test(message)) return "ChatGPT background use is off in this app. Enable Allow background use for all ChatGPT accounts in Providers to run this work. No API-key fallback was used.";
-	if (/eligible|403/.test(message)) return "This ChatGPT account or workspace does not permit this request. Check ChatGPT settings; reconnecting may not change eligibility.";
-	if (/cancel|abort|closed|disconnect/i.test(message)) return "ChatGPT request cancelled or connection closed. No API-key fallback was used.";
-	if (/catalog|model/.test(message)) return "The selected model is unavailable for this ChatGPT account. Refresh Providers and explicitly choose an available model. No API-key fallback was used.";
-	if (/incomplete|terminal|interrupted|stop reason/.test(message)) return "ChatGPT returned an incomplete response. Retry when ready; no API-key fallback was used.";
-	return "ChatGPT request failed. Check your connection and ChatGPT usage, then retry. No API-key fallback was used.";
+	if (/subscription_sharing_usage_limit_exceeded|quota|429/.test(message)) return `Has llegado al límite de uso de tu plan de ChatGPT. Puedes gestionarlo en ${USAGE}. No se ha usado ninguna clave de API en su lugar.`;
+	if (/scope|authorization_context|permission/.test(message)) return "Falta el permiso para usar tu plan de ChatGPT. Vuelve a conectar en Ajustes › Proveedores y autoriza el uso del plan. No se ha usado ninguna clave de API en su lugar.";
+	if (/expired|invalid_grant|401|invalid_user/.test(message)) return "Tu sesión de ChatGPT ha caducado. Vuelve a conectar en Ajustes › Proveedores. No se ha usado ninguna clave de API en su lugar.";
+	if (/background|Background/.test(message)) return "El uso en segundo plano de ChatGPT está desactivado en esta app. Activa «Permitir el uso en segundo plano en todas las cuentas de ChatGPT» en Ajustes › Proveedores para hacer este trabajo. No se ha usado ninguna clave de API en su lugar.";
+	if (/eligible|403/.test(message)) return "Esta cuenta o espacio de trabajo de ChatGPT no permite esta petición. Revisa los ajustes de ChatGPT; volver a conectar puede no cambiarlo.";
+	if (/cancel|abort|closed|disconnect/i.test(message)) return "La petición a ChatGPT se canceló o se cerró la conexión. No se ha usado ninguna clave de API en su lugar.";
+	if (/catalog|model/.test(message)) return "El modelo elegido no está disponible para esta cuenta de ChatGPT. Vuelve a cargar Ajustes › Proveedores y elige un modelo disponible. No se ha usado ninguna clave de API en su lugar.";
+	if (/incomplete|terminal|interrupted|stop reason/.test(message)) return "ChatGPT devolvió una respuesta incompleta. Reinténtalo cuando quieras; no se ha usado ninguna clave de API en su lugar.";
+	return "Falló la petición a ChatGPT. Comprueba tu conexión y el uso de ChatGPT, y reinténtalo. No se ha usado ninguna clave de API en su lugar.";
 }
 
 /** Restrict the body at the final payload seam, even if caller samplingParams add fields. */
@@ -111,7 +114,7 @@ export function chatGPTStream(background: () => boolean, lifecycle?: ChatGPTDisp
 			} catch (err) {
 				if (terminal) return;
 				if (!committed) lifecycle?.noDispatch(await chatGPTDenial(scope, controller, options?.signal?.aborted === true, purpose));
-				partial = { ...partial, stopReason: signal.aborted ? "aborted" : "error", errorMessage: chatGPTStreamError(err instanceof Error ? err.message : "") };
+				partial = { ...partial, stopReason: signal.aborted ? "aborted" : "error", errorMessage: chatGPTStreamError(motivoDeError(err)) };
 				output.push({ type: "error", reason: partial.stopReason as "error" | "aborted", error: partial });
 			} finally { release(); output.end(); }
 		})();

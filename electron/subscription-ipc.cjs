@@ -1,6 +1,6 @@
 "use strict";
 const { PROVIDERS } = require("./subscription-store.cjs");
-const { publicError } = require("./subscriptions.cjs");
+const { publicError, publicCode } = require("./subscriptions.cjs");
 function attachSubscriptionChild(child, controller) {
 	let disposed = false;
 	const send = (packet) => { if (!disposed && child.connected) { try { child.send(packet, () => {}); } catch { /* child exited */ } } };
@@ -12,7 +12,7 @@ function attachSubscriptionChild(child, controller) {
 			if (op === "lease" && (typeof message.background !== "boolean" || !validScope(message.scope))) throw new Error();
 			const value = op === "snapshot" ? await controller.snapshot() : await controller.lease(message.scope, message.background);
 			send({ channel: "lh:subscriptions", id, op, ok: true, value });
-		} catch (error) { send({ channel: "lh:subscriptions", id, op, ok: false, error: publicError(error) }); }
+		} catch (error) { send({ channel: "lh:subscriptions", id, op, ok: false, error: publicError(error), code: publicCode(error) }); }
 	};
 	child.on("message", listener);
 	return {

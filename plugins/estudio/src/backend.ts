@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { PluginBackendContext } from 'learnharness-plugin-api';
+import type { PluginBackendContext, PluginToolContext } from 'learnharness-plugin-api';
+import { aportacion } from './aporta.ts';
 import { PROBE_INSTRUCTIONS, STUDY_INSTRUCTIONS, TEACH_INSTRUCTIONS } from './instructions.ts';
 import { createOperations } from './operations.ts';
 import { createLecturas } from './armazon.ts';
@@ -16,9 +17,10 @@ import { StudyError, type StudyUnit } from './study/types.ts';
 import { kbConfig, openKbRepo } from './kb/repo.ts';
 import { createKbService } from './kb/service.ts';
 import { createKbSearch } from './kb/corpus.ts';
-import { extractProbeDump, extractProbeResults, ingestProbeResults } from './probe.ts';
+import { extractProbeDump } from './probe.ts';
 import { createCiclo } from './study/ciclo.ts';
 import { openStudyStore } from './study/store.ts';
+import { migrarPlanes } from './study/migracion.ts';
 import { createAreaService, inArea, type AreaFilter } from './study/areas.ts';
 import { createStudyTools } from './tools.ts';
 import { createSessionService } from './sessions/service.ts';
@@ -42,6 +44,8 @@ export async function activate(ctx: PluginBackendContext): Promise<() => Promise
   if (ctx.signal.aborted) throw new Error('Estudio se desactivó mientras arrancaba.');
   const now = () => new Date().toISOString();
   const study = openStudyStore(path.join(ctx.dataDirectory, 'study'));
+  // Planes de antes de los elementos ligeros: se convierten una vez, antes de que nada los lea.
+  migrarPlanes(study.root, now());
   const ops = createOperations(study, now);
   const ciclo = createCiclo(study, now);
   const areas = createAreaService(study, now, randomUUID);
@@ -69,7 +73,7 @@ export async function activate(ctx: PluginBackendContext): Promise<() => Promise
     incorporate: (file, title) => documents.incorporate({ path: file, title }),
   });
   const sessions = createSessionService({ store: study, learning: ctx.learning, inference: ctx.inference, today: f => practice.today(f), area: () => areas.active(), kbRecords, now, signal: ctx.signal, onChange: () => changed() });
-  const lecturas = createLecturas(study, { now, timeZone: TIME_ZONE, conversaciones: f => sessions.list(f), planActual: f => ops.currentPlan(f) });
+  const lecturas = createLecturas(study, { now, timeZone: TIME_ZONE, conversaciones: f => sessions.list(f), planes: f => ops.plans(f), caducidad: ops.staleReason });
   // La agenda del inicio (ticket 05 de la segunda ronda): por día, lo hecho y lo pendiente del espacio activo.
   const fuentesAgenda = {
     store: study, sesiones: () => ctx.learning.listSessions(), sesion: (chatId: string) => ctx.learning.getSession(chatId),
@@ -110,6 +114,11 @@ export async function activate(ctx: PluginBackendContext): Promise<() => Promise
     });
   };
 
+  const herramientas = (context: PluginToolContext) => createStudyTools(ops, context, assertActive, kb, searchInput, () => areas.forChat(context.chatId), {
+    registrar: (unitId, chatId) => ciclo.registrarCierreBloque({ unitId }, chatId),
+    unidad: () => study.getConversation(context.chatId)?.unitId ?? null,
+  });
+
   const unregister = [
     ctx.handle('espacios', () => { assertActive(); return areas.view(); }),
     ctx.handle('crear-espacio', write(areas.create)),
@@ -118,17 +127,17 @@ export async function activate(ctx: PluginBackendContext): Promise<() => Promise
     ctx.handle('mover-a-espacio', write(areas.move)),
     ctx.handle('traer-sin-espacio', write(() => areas.adopt(ctx.learning.listSessions().filter(s => s.messageCount > 0).map(s => s.id)))),
     ctx.handle('estado', () => { assertActive(); return ops.state(filter()); }),
-    ctx.handle('plan', () => { assertActive(); return lecturas.plan(filter()); }),
+    ctx.handle('planes', () => { assertActive(); return lecturas.planes(filter()); }),
     ctx.handle('inicio', () => {
       assertActive();
       return leerInicio({
-        lecturas, estado: f => ops.state(f), planActual: f => ops.currentPlan(f), hoy: f => practice.today(f), ruta: f => practice.overview(f),
+        lecturas, estado: f => ops.state(f), hoy: f => practice.today(f), ruta: f => practice.overview(f),
         conversaciones: f => sessions.list(f), now, timeZone: TIME_ZONE,
       }, filter());
     }),
     ctx.handle('por-decidir', () => {
       assertActive();
-      return leerPorDecidir({ estado: f => ops.state(f), planActual: f => ops.currentPlan(f), borradores: () => kb.drafts(), caducidad: ops.staleReason }, filter());
+      return leerPorDecidir({ estado: f => ops.state(f), borradores: () => kb.drafts(), caducidad: ops.staleReason }, filter());
     }),
     ctx.handle('agenda', input => { assertActive(); return agenda(input, filter()); }),
     ctx.handle('ritmo', () => { assertActive(); return ritmo(filter()); }),
@@ -138,11 +147,17 @@ export async function activate(ctx: PluginBackendContext): Promise<() => Promise
     ctx.handle('registrar-fuente-trabajada', write(ciclo.registrarFuenteTrabajada)),
     ctx.handle('registrar-cierre-bloque', write(input => ciclo.registrarCierreBloque(input))),
     ctx.handle('crear-plan', write(input => ops.createPlan(input, filter()))),
+    ctx.handle('editar-plan', write(ops.editPlan)),
+    ctx.handle('aceptar-plan', write(ops.acceptPlan)),
+    ctx.handle('descartar-plan', write(input => { ops.discardPlan(input); return null; })),
+    ctx.handle('cambiar-plan', write(ops.changePlan)),
+    ctx.handle('trabajar-tema', write(ops.workOnTema)),
+    ctx.handle('aceptar-sugerencia', write(ops.acceptSuggestion)),
+    ctx.handle('descartar-sugerencia', write(ops.discardSuggestion)),
     ctx.handle('crear-unidad', write(input => ops.createUnit(input, undefined, undefined, filter()))),
     ctx.handle('editar-unidad', write(ops.editUnit)),
     ctx.handle('confirmar-unidad', write(ops.confirmUnit)),
     ctx.handle('archivar-unidad', write(ops.archiveUnit)),
-    ctx.handle('proponer-cambio', write(input => ops.proposePlanChange(input, 'david', filter()))),
     ctx.handle('aplicar-propuesta', input => {
       assertActive();
       try { return ops.applyProposal(input); } finally { changed(); }
@@ -229,18 +244,24 @@ export async function activate(ctx: PluginBackendContext): Promise<() => Promise
     ctx.handle('kb-descartar', writeAsync(kb.discard)),
     // La creación de conversaciones del núcleo la llama con el id de la conversación nueva (ADR 0003).
     ctx.handle('contexto-conversacion', write(contexto)),
-    ctx.handle('conversaciones', () => { assertActive(); return filasConversaciones(sessions.list(filter()), study, f => ops.currentPlan(f)); }),
+    // Harness conversacional: la ruta de bifurcar del núcleo la llama para que la rama herede el espacio y la unidad del original.
+    ctx.handle('rama-conversacion', write(input => {
+      const r = fields(input, ['chatId', 'origenId'], 'input');
+      const original = study.getConversation(id(r.origenId, 'input.origenId'));
+      sessions.register(id(r.chatId, 'input.chatId'), { areaId: original?.areaId ?? null, unitId: original?.unitId ?? null, origen: original?.origen ?? (original?.unitId ? 'unidad' : 'libre') });
+      return { ok: true };
+    })),
+    ctx.handle('conversaciones', () => { assertActive(); return filasConversaciones(sessions.list(filter()), study, () => ops.plans(null)); }),
     ctx.handle('resumir-conversacion', writeAsync(input => sessions.summarizeNow(id(fields(input, ['chatId'], 'input').chatId, 'input.chatId')))),
+    // Ajustes › Estudio: lo que el plugin aporta al tutor, en español (aporta.ts).
+    ctx.handle('aporta', () => aportacion(herramientas({ chatId: '', agent: 'teacher' }))),
     ctx.registerInstructions({ agents: ['prober', 'teacher'], text: STUDY_INSTRUCTIONS }),
     ctx.registerInstructions({ agents: ['prober'], text: PROBE_INSTRUCTIONS }),
     ctx.registerInstructions({ agents: ['teacher'], text: TEACH_INSTRUCTIONS }),
     ctx.registerInstructions({ agents: ['prober', 'teacher'], text: context => sessions.briefingFor(context) }),
     ctx.registerTools({
       agents: ['prober', 'teacher'],
-      create: context => createStudyTools(ops, context, assertActive, kb, searchInput, () => areas.forChat(context.chatId), {
-        registrar: (unitId, chatId) => ciclo.registrarCierreBloque({ unitId }, chatId),
-        unidad: () => study.getConversation(context.chatId)?.unitId ?? null,
-      }).map(tool => {
+      create: context => herramientas(context).map(tool => {
         const execute = tool.execute;
         return { ...tool, execute: async (...args: Parameters<typeof execute>) => { const result = await execute(...args); changed(); return result; } };
       }),
@@ -258,11 +279,10 @@ export async function activate(ctx: PluginBackendContext): Promise<() => Promise
       invalidateSearch();
       const record = ctx.learning.getSession(event.chatId);
       if (!record) return;
-      const created = ingestProbeResults(study, extractProbeResults(record), now(), chatId => areas.forChat(chatId));
       const dump = extractProbeDump(record);
       const dumped = dump !== null && ciclo.volcadoDelSondeo(dump.unitId, dump.texto, event.chatId);
       const exposed = practice.recordSessionExposure(event.chatId);
-      if (created.length > 0 || dumped || exposed > 0) changed();
+      if (dumped || exposed > 0) changed();
     }),
   ];
 

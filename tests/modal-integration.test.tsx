@@ -173,7 +173,7 @@ for (const provider of ["chatgpt", "native"] as const) it(`${provider} return-to
 	await f.render(<HostDialog open layerId="settings" onClose={() => assert.fail("must not close target")}><h2>Settings</h2>
 		{provider === "chatgpt" ? <ChatGPTUIProvider><ChatGPTConnection /></ChatGPTUIProvider> : <NativeSubscriptionUIProvider><NativeSubscriptionConnection providerId="xai" /></NativeSubscriptionUIProvider>}
 	</HostDialog>);
-	await click(button("Manage…")); await click(button("Disconnect"));
+	await click(button("Gestionar…")); await click(button("Desconectar"));
 	let result: string | undefined;
 	await act(async () => { result = f.controller().popTo("settings"); });
 	assert.equal(result, "handled-without-close"); assert.equal(cancelCalls, 0); assert.equal(f.controller().getSnapshot().length, 2);

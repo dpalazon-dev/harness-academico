@@ -163,7 +163,7 @@ export function LectorEstudio({ pagina: vista, detalle, unidad, capturas, ocupad
 										type="button"
 										aria-current={s.actual ? "true" : undefined}
 										onClick={() => acciones.ir(s.primera)}
-										className={cn("flex w-full gap-2 rounded px-1.5 py-0.5 text-left hover:bg-accent", s.actual ? "text-foreground" : "text-muted-foreground")}
+										className={cn("anillo-foco flex w-full gap-2 rounded px-1.5 py-0.5 text-left hover:bg-accent", s.actual ? "text-foreground" : "text-muted-foreground")}
 									>
 										<span className="flex-1">{s.rotulo}</span><span className="tabular-nums">{s.primera}</span>
 									</button>
@@ -180,7 +180,7 @@ export function LectorEstudio({ pagina: vista, detalle, unidad, capturas, ocupad
 
 					{cita && (
 						<div role="region" aria-label="Pasaje seleccionado" className="sticky bottom-4 mt-6 max-h-[60vh] overflow-y-auto rounded-xl border border-border bg-background px-4 py-3 shadow-sm">
-							<blockquote className="border-l-2 border-border pl-3 text-sm italic">{cita.length > 400 ? `${cita.slice(0, 400)}…` : cita}</blockquote>
+							<blockquote className="rounded-md bg-muted px-3 py-2 text-sm italic">{cita.length > 400 ? `${cita.slice(0, 400)}…` : cita}</blockquote>
 							<div className="mt-3 flex flex-wrap gap-1">
 								<Button size="sm" disabled={ocupado} onClick={() => acciones.preguntar(vista.page, cita)}>Preguntar al tutor</Button>
 								<Button size="sm" variant="outline" disabled={ocupado} onClick={() => {

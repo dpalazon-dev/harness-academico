@@ -39,7 +39,7 @@ export function PersonajeCuaderno({ lista, actual, elegir, guardar, borrar }: Pe
 					<button
 						type="button" data-personaje
 						aria-label={`Comenta solo: ${actual.nombre}. Cambiar de personaje.`} title="El personaje que comenta solo en este cuaderno"
-						className="inline-flex h-7 items-center gap-1.5 rounded-md px-1.5 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-accent"
+						className="inline-flex h-7 items-center gap-1.5 rounded-md px-1.5 font-sans text-xs text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-accent"
 					>
 						<span aria-hidden="true" className="size-2 rounded-full" style={{ backgroundColor: punto(actual) }} />
 						<span>{actual.nombre}</span>

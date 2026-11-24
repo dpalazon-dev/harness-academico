@@ -145,8 +145,8 @@ describe("Providers settings-label typography", () => {
 			assert.ok(settings.includes(`<span class="font-prose text-(length:--lh-prose-size) text-foreground">${label}</span>`), `${label}: settings sans label`);
 			assert.ok(setup.includes(`<span class="font-ui text-xs text-foreground">${label}</span>`), `${label}: unchanged setup label`);
 		}
-		assert.equal((settings.match(/>Connect<\/button>/g) ?? []).length, 3);
-		assert.equal((setup.match(/>Connect<\/button>/g) ?? []).length, 3);
+		assert.equal((settings.match(/>Conectar<\/button>/g) ?? []).length, 3);
+		assert.equal((setup.match(/>Conectar<\/button>/g) ?? []).length, 3);
 	});
 });
 
@@ -315,27 +315,27 @@ describe("GraphSection — master switch + chunk budget (wave 7 + 2026-10-02)", 
 	it("renders the master-switch row — EXTRACTION since 2026-10-06 (the data channel, renamed when rendering split off)", () => {
 		const html = renderToStaticMarkup(<GraphSection graph={undefined} onSectionChange={() => true} />);
 		assert.ok(html.includes('data-testid="graph-row-enabled"'));
-		assert.ok(html.includes(">Extraction<"), "the row names the DATA channel, not 'Graph'");
+		assert.ok(html.includes(">Extracción del grafo<"), "the row names the DATA channel, not 'Graph'");
 		assert.ok(!html.includes("graph-row-embedding"), "the dead rungs render nothing");
 		assert.ok(!html.includes("Embedding model"), "the picker is gone");
 		assert.ok(!html.includes("graph-row-clustering"));
 		assert.ok(!html.includes("graph-row-labeling"));
-		assert.ok(tagOf(html, "toggle-extraction-enabled").includes('aria-checked="true"'), "absent record = factory ON");
+		assert.ok(tagOf(html, "toggle-extraccion-del-grafo-activada").includes('aria-checked="true"'), "absent record = factory ON");
 	});
 
 	it("a stored off record shows the extraction switch off", () => {
 		const html = renderToStaticMarkup(<GraphSection graph={{ enabled: false }} onSectionChange={() => true} />);
-		assert.ok(tagOf(html, "toggle-extraction-enabled").includes('aria-checked="false"'));
+		assert.ok(tagOf(html, "toggle-extraccion-del-grafo-activada").includes('aria-checked="false"'));
 	});
 
 	it("the GRAPH RENDERING row (2026-10-06): display-only — absent record = factory ON, stored off shows off", () => {
 		const html = renderToStaticMarkup(<GraphSection graph={undefined} onSectionChange={() => true} />);
 		assert.ok(html.includes('data-testid="graph-row-rendering"'));
-		assert.ok(html.includes(">Graph rendering<"));
-		assert.ok(tagOf(html, "toggle-graph-rendering-enabled").includes('aria-checked="true"'), "the home defaults to the canvas");
+		assert.ok(html.includes(">Dibujo del grafo<"));
+		assert.ok(tagOf(html, "toggle-dibujo-del-grafo-activado").includes('aria-checked="true"'), "the home defaults to the canvas");
 		const off = renderToStaticMarkup(<GraphSection graph={{ rendering: false }} onSectionChange={() => true} />);
-		assert.ok(tagOf(html, "toggle-extraction-enabled").includes('aria-checked="true"'), "rendering off does NOT touch extraction");
-		assert.ok(tagOf(off, "toggle-graph-rendering-enabled").includes('aria-checked="false"'));
+		assert.ok(tagOf(html, "toggle-extraccion-del-grafo-activada").includes('aria-checked="true"'), "rendering off does NOT touch extraction");
+		assert.ok(tagOf(off, "toggle-dibujo-del-grafo-activado").includes('aria-checked="false"'));
 	});
 
 	it("the chunk-budget row: unset shows EMPTY with the factory placeholder + hint — one truth with the trigger", () => {
@@ -343,7 +343,7 @@ describe("GraphSection — master switch + chunk budget (wave 7 + 2026-10-02)", 
 		const input = tagOf(html, "input-chunk-tokens");
 		assert.ok(input.includes('placeholder="4096"'), "the placeholder IS the resolved factory default");
 		assert.ok(!/value="\d/.test(input), "unset renders EMPTY, not a materialized 4096");
-		assert.ok(html.includes(">4096 tok</"), "the hint reports the resolved truth");
+		assert.ok(html.includes(">4096 tokens</"), "the hint reports the resolved truth");
 	});
 
 	it("a stored budget shows its value and denominates the hint", () => {
@@ -351,7 +351,7 @@ describe("GraphSection — master switch + chunk budget (wave 7 + 2026-10-02)", 
 			<GraphSection graph={{ enabled: true, extractionChunkTokens: 6000 }} onSectionChange={() => true} />,
 		);
 		assert.ok(tagOf(html, "input-chunk-tokens").includes('value="6000"'));
-		assert.ok(html.includes(">6000 tok</"));
+		assert.ok(html.includes(">6000 tokens</"));
 	});
 });
 
@@ -397,9 +397,10 @@ describe("AppearanceSection (thin SSR)", () => {
 		assert.ok(!html.includes("theme-remove-"), "presets cannot be removed");
 	});
 
-	it("absent theme = the Default card pressed", () => {
+	// HarnessAcademico: el tema de fábrica es Limpio.
+	it("absent theme = the Limpio card pressed", () => {
 		const html = renderAppearance(undefined);
-		assert.ok(tagOf(html, "theme-card-default").includes('aria-pressed="true"'));
+		assert.ok(tagOf(html, "theme-card-limpio").includes('aria-pressed="true"'));
 	});
 
 	it("an imported theme gets a custom card with a remove button", () => {
@@ -435,7 +436,7 @@ describe("AppearanceSection (thin SSR)", () => {
 		assert.ok(html.includes('data-testid="font-trigger"'));
 		assert.ok(html.includes('data-testid="row-prose-size"'));
 		assert.ok(html.includes('data-testid="row-heading-weight"'));
-		assert.ok(html.includes("16px"));
+		assert.ok(html.includes("17px")); // HarnessAcademico
 		assert.ok(!html.includes('data-testid="row-mode"'), "the mode row is gone — the theme declares it");
 	});
 });

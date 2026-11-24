@@ -12,6 +12,8 @@ export interface ChatGPTStatus {
 		canSignInAgain?: boolean;
 	}[];
 	error: string | null;
+	/** El código estable de `error` (por ejemplo, `revocation`); se compara este, nunca el texto, que va en español. */
+	errorCode?: string | null;
 	catalogError?: string | null;
 }
 export interface ChatGPTControlBridge {

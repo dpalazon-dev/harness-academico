@@ -358,7 +358,7 @@ export function MarkdownBlockquote(props: ComponentProps<"blockquote"> & ExtraPr
 		return (
 			<blockquote
 				{...rest}
-				className="my-4 border-l-4 border-muted-foreground/30 pl-4 text-muted-foreground italic"
+				className="my-4 rounded-lg bg-card px-4 py-3 text-muted-foreground italic"
 				data-streamdown="blockquote"
 			>
 				{children}

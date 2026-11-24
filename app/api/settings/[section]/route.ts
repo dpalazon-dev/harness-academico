@@ -30,7 +30,7 @@
  * lands here.
  */
 
-import { isBuiltinThemeId, type AgentSettings, type AppearanceSettings, type ChatSettings, type ModelsSettings } from "@/src/core";
+import { FACTORY_THEME_ID, isBuiltinThemeId, type AgentSettings, type AppearanceSettings, type ChatSettings, type ModelsSettings } from "@/src/core";
 import {
 	SETTINGS_SECTIONS,
 	allSegmentPaths,
@@ -98,7 +98,7 @@ export async function PUT(request: Request, ctx: { params: Promise<{ section: st
 			if (theme !== record.appearance?.theme) {
 				return Response.json({ error: `unknown theme "${theme}"` }, { status: 400 });
 			}
-			appearance.theme = "default";
+			appearance.theme = FACTORY_THEME_ID; // HarnessAcademico: el tema de fábrica es Papel
 		}
 	}
 	if (section === "agent") {

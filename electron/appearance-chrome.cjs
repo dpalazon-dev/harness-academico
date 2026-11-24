@@ -16,6 +16,9 @@ const PRESET_APPEARANCE = {
 	"gruvbox-dark": { mode: "dark", background: "#282828" },
 	ivory: { mode: "light", background: "#faf9f5" },
 	pastel: { mode: "light", background: "#f2f0e8" },
+	// HarnessAcademico: «Papel», el tema de fábrica (src/core/themes.ts FACTORY_THEME_ID).
+	limpio: { mode: "light", background: "#f7f7f9" },
+	papel: { mode: "light", background: "#f7f3ea" },
 	"nvchad-onedark": { mode: "dark", background: "#1e222a" },
 };
 const HEX = /^#[0-9a-f]{3}([0-9a-f]{3})?$/i;
@@ -46,7 +49,7 @@ function readAppearance(dataDir) {
 	try { a = JSON.parse(fs.readFileSync(path.join(dataDir, "settings.json"), "utf8"))?.appearance; }
 	catch { /* absent/corrupt record = factory */ }
 	const id = typeof a?.theme === "string" ? a.theme : undefined;
-	let theme = Object.hasOwn(PRESET_APPEARANCE, id) ? PRESET_APPEARANCE[id] : PRESET_APPEARANCE.default;
+	let theme = Object.hasOwn(PRESET_APPEARANCE, id) ? PRESET_APPEARANCE[id] : PRESET_APPEARANCE.limpio;
 	if (typeof id === "string" && id.length <= 64 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) && !Object.hasOwn(PRESET_APPEARANCE, id)) {
 		try {
 			const custom = JSON.parse(fs.readFileSync(path.join(dataDir, "themes", `${id}.json`), "utf8"));

@@ -150,6 +150,13 @@ export function KeyboardShortcuts() {
 					e.preventDefault();
 					if (isInteractionScopeEligible(document.body, controller)) window.dispatchEvent(new CustomEvent(kbdEventForAction(action)));
 					break;
+				case "message-prev":
+				case "message-next":
+					// La conversación montada salta de mensaje (navegar-mensajes.tsx); nunca bajo un modal.
+					// Se reclama Alt+↑/↓ para que el campo no mueva también el cursor.
+					e.preventDefault();
+					if (isInteractionScopeEligible(document.body, controller)) window.dispatchEvent(new CustomEvent(kbdEventForAction(action)));
+					break;
 				case "find":
 					// The mounted surface owns Find (session text / graph nodes).
 					// Claim Mod+F so Chromium's whole-window finder cannot open too.

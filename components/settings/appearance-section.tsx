@@ -23,7 +23,7 @@
  * it). In a plain dev browser the API is absent → a small curated list
  * + a footer that says exactly that — never a fabricated system list.
  * The custom-family input inside the menu is the manual escape path.
- * Empty/unset keeps meaning Source Sans 3.
+ * Empty/unset keeps meaning the factory family (Inter in HarnessAcademico).
  *
  * Overrides live in two homes by design: `background` and
  * `mdRendering.boldColor/italicColor` keep their pre-theme keys (existing
@@ -34,6 +34,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
 	EXTRACTION_CHUNK_TOKENS_FLOOR,
+	FACTORY_THEME_ID,
 	resolveSettings,
 	THEME_COLOR_KEYS,
 	type AppearanceSettings,
@@ -50,7 +51,7 @@ import { CommitInput, SettingsMenuTrigger, SettingsRow, Toggle } from "./control
 
 /** The factory reading family — the DEFAULT row's identity (unset =
  *  this). Exported for tests. */
-export const DEFAULT_READING_FONT = "Source Sans 3";
+export const DEFAULT_READING_FONT = "Inter";
 
 /** The dev-browser fallback list (queryLocalFonts is absent there):
  *  the app's own knowns plus a handful of ubiquitous macOS families,
@@ -84,7 +85,7 @@ function localFontsApi(): LocalFontsApi | null {
 }
 
 /** Compose the reading-font pick: null (or blank) = the factory
- *  Source Sans 3; otherwise the family verbatim (trimmed — the
+ *  the factory family; otherwise the family verbatim (trimmed — the
  *  sanitizer trims again server-side). Pure — exported for tests. */
 export function composeFontFamily(
 	appearance: AppearanceSettings | undefined,
@@ -96,7 +97,7 @@ export function composeFontFamily(
 
 /** The title default (the bundled "lh-cmu" face) and the pick that
  *  follows the reading font (HarnessAcademico, ux2 ticket 08). */
-export const DEFAULT_TITLE_FONT = "Computer Modern";
+export const DEFAULT_TITLE_FONT = "Inter"; // HarnessAcademico: títulos sin serifa
 /** Its installed name (the curated list has it): left out of the title
  *  menu, where the default row already is that face. */
 const CMU_FAMILY = "CMU Serif";
@@ -398,7 +399,7 @@ export function AppearanceSection({
 					void refreshThemes();
 					// The server already fell back to Default; the write keeps the
 					// dialog's record mirror and the live vars in step with it.
-					if (removed.id === activeTheme.id) onSectionChange({ ...appearance, theme: "default" });
+					if (removed.id === activeTheme.id) onSectionChange({ ...appearance, theme: FACTORY_THEME_ID });
 				}}
 			/>
 			<div data-testid="group-colors" className="mt-5 flex flex-col gap-2">
@@ -413,7 +414,7 @@ export function AppearanceSection({
 						type="button"
 						data-testid="colors-reset"
 						onClick={() => onSectionChange(clearColorOverrides(appearance))}
-						className="h-6 shrink-0 rounded-sm px-2 font-ui text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+						className="anillo-foco h-6 shrink-0 rounded-sm px-2 font-ui text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 					>
 						Restablecer todos
 					</button>
@@ -547,10 +548,10 @@ export function GraphSection({
 			    switch below arrived: off ≠ no graph, off = the graph stops
 			    growing. The testid keeps the old name's shape (row-enabled) so
 			    this stays one rename, not a test re-pin. */}
-			<SettingsRow label="Extraction" hint="Off = the graph stops growing" testid="graph-row-enabled">
+			<SettingsRow label="Extracción del grafo" hint="Si la desactivas, el grafo deja de crecer" testid="graph-row-enabled">
 				<Toggle
 					checked={graph?.enabled ?? true}
-					label="extraction enabled"
+					label="extracción del grafo activada"
 					onChange={(on) =>
 						// Compose, never replace-whole (the section PUT is, but the
 					// row must not drop its sibling field — fixed with the budget
@@ -563,23 +564,23 @@ export function GraphSection({
 			    round): display-only. Off = the home shows the chains view
 			    instead of the canvas. The ledgers, the pipeline, everything
 			    data keeps working — that is the extraction switch above. */}
-			<SettingsRow label="Graph rendering" hint="Off = home shows the chains view" testid="graph-row-rendering">
+			<SettingsRow label="Dibujo del grafo" hint="Si lo desactivas, el inicio muestra la vista de cadenas" testid="graph-row-rendering">
 				<Toggle
 					checked={graph?.rendering ?? true}
-					label="graph rendering enabled"
+					label="dibujo del grafo activado"
 					onChange={(on) => onSectionChange({ ...graph, rendering: on })}
 				/>
 			</SettingsRow>
 			<SettingsRow
-				label="Extraction chunk budget"
-				hint={`${resolved.extractionChunkTokens} tok`}
+				label="Tamaño de cada tramo de extracción"
+				hint={`${resolved.extractionChunkTokens} tokens`}
 				testid="graph-row-chunk-tokens"
 			>
 				<CommitInput
 					type="number"
 					value={String(graph?.extractionChunkTokens ?? "")}
 					placeholder={String(resolved.extractionChunkTokens)}
-					ariaLabel="extraction chunk budget"
+					ariaLabel="tamaño de cada tramo de extracción"
 					testid="input-chunk-tokens"
 					onCommit={(v) => {
 						// Empty = factory default (the fix-wave discipline): absence is

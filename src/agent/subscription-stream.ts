@@ -5,16 +5,19 @@ import { NATIVE_SUBSCRIPTIONS, type NativeSubscriptionScope } from "../core/cont
 import { nativeSubscriptionId, nativeSubscriptionBackgroundAllowed, subscriptionScope, subscriptionScopeCurrent, subscriptionAdmissionScope, subscriptionLease, subscriptionAbortController, subscriptionDenial } from "./subscription-bridge.ts";
 import { markUnadmittedUsage, type SubscriptionDispatchLifecycle } from "./subscription-request-cycle.ts";
 import { capturePreparedBackgroundPayload } from "./background-capture.ts";
+import { motivoDeError } from "./error-de-conexion.ts";
 
+/** El mensaje del chat para un fallo de una suscripción nativa. `message` es el código de la conexión de escritorio
+ * (`motivoDeError`) o el texto crudo, en inglés, del proveedor o de un error interno: las expresiones buscan esas palabras. */
 export function nativeSubscriptionError(provider: string, message: string): string {
-	const label = NATIVE_SUBSCRIPTIONS.find((p) => p.logicalId === provider)?.label ?? "Subscription";
-	const suffix = " No API-key fallback was used.";
-	if (/background/i.test(message)) return `${label} background use is off in this app. Enable it in Providers to run this work.${suffix}`;
-	if (/quota|429|limit/i.test(message)) return `${label} usage limit reached. Check your provider account and try again later.${suffix}`;
-	if (/expired|invalid_grant|401|refresh/i.test(message)) return `${label} authorization could not be refreshed. Retry or reconnect in Providers.${suffix}`;
-	if (/cancel|abort|closed|disconnect/i.test(message)) return `${label} request cancelled or connection closed.${suffix}`;
-	if (/catalog|model|stale|changed/i.test(message)) return `The selected ${label} model or connection is unavailable. Refresh Providers and explicitly choose an available model.${suffix}`;
-	return `${label} request failed. Check the connection, account access and provider limits, then retry.${suffix}`;
+	const label = NATIVE_SUBSCRIPTIONS.find((p) => p.logicalId === provider)?.label ?? "la suscripción";
+	const suffix = " No se ha usado ninguna clave de API en su lugar.";
+	if (/background/i.test(message)) return `El uso en segundo plano de ${label} está desactivado en esta app. Actívalo en Ajustes › Proveedores para hacer este trabajo.${suffix}`;
+	if (/quota|429|limit/i.test(message)) return `Has llegado al límite de uso de ${label}. Revisa tu cuenta del proveedor y vuelve a intentarlo más tarde.${suffix}`;
+	if (/expired|invalid_grant|401|refresh/i.test(message)) return `No se pudo renovar la autorización de ${label}. Reinténtalo o vuelve a conectar en Ajustes › Proveedores.${suffix}`;
+	if (/cancel|abort|closed|disconnect/i.test(message)) return `La petición a ${label} se canceló o se cerró la conexión.${suffix}`;
+	if (/catalog|model|stale|changed/i.test(message)) return `El modelo o la conexión de ${label} que elegiste no está disponible. Vuelve a cargar Ajustes › Proveedores y elige un modelo disponible.${suffix}`;
+	return `Falló la petición a ${label}. Comprueba la conexión, el acceso a la cuenta y los límites del proveedor, y reinténtalo.${suffix}`;
 }
 export function subscriptionHistory(context: TranscriptContext, logical: Model<Api>, nativeId: string): TranscriptContext {
 	const messages = transformMessages(context.messages, logical);
@@ -82,7 +85,7 @@ export function nativeSubscriptionStream(provider: Provider, background: () => b
 			} catch (error) {
 				if (terminal) return;
 				if (!committed) { markUnadmittedUsage(partial.usage); lifecycle?.noDispatch(await subscriptionDenial(scope, controller, options?.signal?.aborted === true, purpose)); }
-				partial = { ...partial, stopReason: signal.aborted ? "aborted" : "error", errorMessage: nativeSubscriptionError(logicalModel.provider, error instanceof Error ? error.message : "") };
+				partial = { ...partial, stopReason: signal.aborted ? "aborted" : "error", errorMessage: nativeSubscriptionError(logicalModel.provider, motivoDeError(error)) };
 				output.push({ type: "error", reason: partial.stopReason as "error" | "aborted", error: partial });
 			} finally { release(); output.end(); }
 		})();

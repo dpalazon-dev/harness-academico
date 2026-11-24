@@ -48,9 +48,10 @@ describe("the «Letra de títulos» row", () => {
 		assert.ok(html.includes('data-testid="font-trigger"'), "the reading picker stays");
 	});
 
-	it("shows Computer Modern for a record without the toggle or with it on", () => {
-		assert.match(triggerText(undefined), /Computer Modern/);
-		assert.match(triggerText({ sessionNameSerif: true }), /Computer Modern/);
+	// HarnessAcademico: el título por defecto es Inter.
+	it("shows the default (Inter) for a record without the toggle or with it on", () => {
+		assert.match(triggerText(undefined), /Inter/);
+		assert.match(triggerText({ sessionNameSerif: true }), /Inter/);
 	});
 
 	it("shows «Igual que la lectura» for an old record with the toggle off", () => {

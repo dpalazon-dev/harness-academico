@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import { cn } from "@/lib/utils";
 import { llamarEstudio } from "./llamar";
+import { ErrorDeLectura } from "./error-lectura";
 import {
 	ANCLA_SUBIR, ESTADO_DOCUMENTO, rotuloSeccion, rutaLector, subirArchivo,
 	type ArchivoSubida, type DetalleDocumento, type DocumentoEstudio, type ProgresoSubida,
@@ -49,7 +50,7 @@ function datos(d: DocumentoEstudio): string {
 	return partes.join(" · ");
 }
 
-export function BibliotecaEstudio({ documentos, subiendo, detalle, unidades, ocupado, error, aviso, acciones }: {
+export function BibliotecaEstudio({ documentos, subiendo, detalle, unidades, ocupado, error, errorLectura = false, releer, aviso, acciones }: {
 	/** null mientras carga. */
 	documentos: DocumentoEstudio[] | null;
 	subiendo: ProgresoSubida | null;
@@ -58,6 +59,9 @@ export function BibliotecaEstudio({ documentos, subiendo, detalle, unidades, ocu
 	unidades: UnidadVinculable[];
 	ocupado: boolean;
 	error: string | null;
+	/** La última lectura de los documentos falló; si había una anterior, se sigue enseñando. */
+	errorLectura?: boolean;
+	releer?(): void;
 	/** Lo que salió bien de la última operación. */
 	aviso?: string | null;
 	acciones: AccionesBiblioteca;
@@ -134,8 +138,9 @@ export function BibliotecaEstudio({ documentos, subiendo, detalle, unidades, ocu
 			{aviso && !error && <p role="status" className="mt-4 text-sm text-muted-foreground">{aviso}</p>}
 
 			<section className="mt-10" aria-label="Documentos">
+				{errorLectura && <ErrorDeLectura que="la Biblioteca" reintentar={releer} className="mb-3" />}
 				{documentos === null ? (
-					<p className="text-sm text-muted-foreground">Cargando…</p>
+					!errorLectura && <p className="text-sm text-muted-foreground">Cargando…</p>
 				) : documentos.length === 0 ? (
 					<p className="text-sm text-muted-foreground">Todavía no hay documentos en este espacio. Arrastra un PDF arriba o incorpóralo desde su ruta.</p>
 				) : (
@@ -145,7 +150,7 @@ export function BibliotecaEstudio({ documentos, subiendo, detalle, unidades, ocu
 								<div className="flex items-center gap-3">
 									<BookOpenIcon className="size-4 shrink-0 text-muted-foreground" />
 									{d.status === "listo" ? (
-										<button type="button" onClick={() => acciones.leer(d.id)} className="flex-1 truncate text-left hover:underline">{d.title}</button>
+										<button type="button" onClick={() => acciones.leer(d.id)} className="anillo-foco flex-1 truncate text-left hover:underline">{d.title}</button>
 									) : <span className="flex-1 truncate">{d.title}</span>}
 									<span className={cn(
 										"rounded-md border px-1.5 py-0.5 text-xs",
@@ -198,7 +203,7 @@ function FormularioRuta({ ocupado, incorporar }: { ocupado: boolean; incorporar(
 	const [titulo, setTitulo] = useState("");
 	return (
 		<details className="mt-3 text-sm">
-			<summary className="cursor-pointer text-muted-foreground">Desde una ruta del disco</summary>
+			<summary className="anillo-foco cursor-pointer text-muted-foreground">Desde una ruta del disco</summary>
 			<form
 				className="mt-2 grid gap-2"
 				onSubmit={(e) => { e.preventDefault(); if (ruta.trim()) { incorporar(ruta.trim(), titulo.trim()); setRuta(""); setTitulo(""); } }}
@@ -241,7 +246,7 @@ function Detalle({ detalle, unidades, ocupado, acciones }: { detalle: DetalleDoc
 					<ol className="max-h-64 space-y-0.5 overflow-y-auto">
 						{secciones.map(s => (
 							<li key={s.clave}>
-								<button type="button" onClick={() => acciones.leer(id, s.pagina)} className="flex w-full gap-3 rounded px-1 text-left hover:bg-accent">
+								<button type="button" onClick={() => acciones.leer(id, s.pagina)} className="anillo-foco flex w-full gap-3 rounded px-1 text-left hover:bg-accent">
 									<span className="flex-1">{s.rotulo}</span><span className="tabular-nums text-muted-foreground">{s.pagina}</span>
 								</button>
 							</li>
@@ -304,6 +309,7 @@ export function Biblioteca() {
 	const [subiendo, setSubiendo] = useState<ProgresoSubida | null>(null);
 	const [ocupado, setOcupado] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [errorLectura, setErrorLectura] = useState(false);
 	const [aviso, setAviso] = useState<string | null>(null);
 
 	const ultima = useRef(0);
@@ -317,8 +323,9 @@ export function Biblioteca() {
 			if (esta !== ultima.current) return;
 			setDocumentos(docs);
 			setUnidades(estado.units.filter(u => u.status === "activa").map(({ id, title, revision }) => ({ id, title, revision })));
-		} catch (e) {
-			if (esta === ultima.current) setError(e instanceof Error ? e.message : "No se pudo leer la Biblioteca.");
+			setErrorLectura(false);
+		} catch {
+			if (esta === ultima.current) setErrorLectura(true);
 		}
 	}, []);
 	useEffect(() => { void leer(); }, [leer]);
@@ -372,6 +379,8 @@ export function Biblioteca() {
 				unidades={unidades}
 				ocupado={ocupado}
 				error={error}
+				errorLectura={errorLectura}
+				releer={() => { setErrorLectura(false); void leer(); }}
 				aviso={aviso}
 				acciones={{
 					subir: (archivos) => void subir(archivos),

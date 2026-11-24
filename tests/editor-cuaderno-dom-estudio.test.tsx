@@ -584,20 +584,23 @@ describe("escuchar al tutor (12j)", () => {
 		await act(async () => { boton.dispatchEvent(p.evento("mousedown")); boton.dispatchEvent(p.evento("mouseup")); });
 	}
 	const respuesta = (srv: Servidor) => { srv.nb = { ...srv.nb, revision: srv.nb.revision + 1, comments: [COMENTARIO] } as Cuaderno; return srv.nb; };
-	const interruptor = (p: Awaited<ReturnType<typeof montar>>) => p.doc.querySelector<HTMLElement>("[data-escuchar-interruptor]")!;
-	const encender = async (p: Awaited<ReturnType<typeof montar>>) => { await act(async () => { interruptor(p).dispatchEvent(p.evento("click")); }); await p.esperar(10); };
+	// La casilla «Leer en voz alta» vive en el menú «⋯», que Radix no pinta abierto sobre linkedom: encender es lo que la casilla
+	// recuerda, el interruptor guardado en el navegador para este cuaderno.
+	const encender = () => { almacenLocal.set("estudio.cuaderno.escuchar.nb1", "1"); };
 
-	it("el cuaderno nuevo abre con Escuchar apagado y sin leer nada", async () => {
+	it("el cuaderno nuevo abre con Escuchar apagado y sin leer nada, y la cabecera no lleva su interruptor", async () => {
 		const s = servidor(CON_NOTA);
 		const p = await montar(s);
-		assert.equal(interruptor(p).getAttribute("aria-checked"), "false");
+		assert.equal(p.doc.querySelector("[data-escuchar-interruptor]"), null, "es una casilla del menú «⋯»");
+		assert.ok(p.doc.querySelector("[data-mas-acciones]"));
+		assert.equal(almacenLocal.get("estudio.cuaderno.escuchar.nb1"), undefined);
 		assert.equal(dicho.length, 0);
 	});
 
 	it("encendido, la respuesta nueva del tutor se lee y escribir en la página la detiene", async () => {
 		const s = servidor(CON_NOTA, { "comentar-cuaderno": (_i, srv) => respuesta(srv) });
+		encender();
 		const p = await montar(s);
-		await encender(p);
 		await preguntar(p);
 		await p.esperar(50);
 		assert.deepEqual(dicho.map(d => d.text), ["¿Por qué uno?"]);
@@ -623,7 +626,6 @@ describe("escuchar al tutor (12j)", () => {
 		const nb = { ...CON_NOTA, revision: 2, comments: [COMENTARIO] } as Cuaderno;
 		almacenLocal.set("estudio.cuaderno.escuchar.nb1", "1");
 		const p = await montar(servidor(nb));
-		assert.equal(interruptor(p).getAttribute("aria-checked"), "true");
 		await p.esperar(50);
 		assert.equal(dicho.length, 0);
 	});

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parsePlan, parseProposal, parseUnit } from '../src/study/schema.ts';
 import { StudyError } from '../src/study/types.ts';
-import { plan, proposal, unit } from './study-fixtures.ts';
+import { plan, proposal, unit, tema } from './study-fixtures.ts';
 
 const invalid = (error: unknown) => error instanceof StudyError && error.code === 'INVALID_INPUT';
 
@@ -34,10 +34,15 @@ test('titles must be present and bounded; long texts are bounded', () => {
 
 test('ids accept only letters, digits, underscore and hyphen', () => {
   for (const id of ['', 'a b', '../x', 'a/b', 'á']) assert.throws(() => parseUnit(unit({ id })), invalid);
-  assert.throws(() => parsePlan(plan({ unitIds: ['ok', 'no/'] })), invalid);
+  assert.throws(() => parsePlan(plan({ elementos: [tema('no/')] })), invalid);
 });
 
 test('duplicates in id lists and empty proposals are rejected', () => {
-  assert.throws(() => parsePlan(plan({ unitIds: ['u1', 'u1'] })), invalid);
+  assert.throws(() => parsePlan(plan({ elementos: [tema('e1'), tema('e1')] })), invalid);
+  assert.throws(() => parsePlan(plan({ elementos: [tema('e1', { unitId: 'u1' }), tema('e2', { unitId: 'u1' })] })), invalid, 'a unit is linked to one tema');
+  assert.throws(() => parsePlan(plan({ elementos: [{ id: 'e1', tipo: 'tarea', titulo: 'x', hecho: false, unitId: 'u1' }] })), invalid, 'only a tema has a unit');
+  assert.throws(() => parsePlan(plan({ elementos: [{ id: 'e1', tipo: 'tema', titulo: 'x', hecho: false, fecha: '2027-01-01' }] })), invalid, 'only a hito has a date');
+  assert.throws(() => parsePlan(plan({ elementos: [{ id: 'e1', tipo: 'hito', titulo: 'x', hecho: false, fecha: '2027-02-30' }] })), invalid, 'a date that does not exist');
+  assert.equal(parsePlan(plan({ elementos: [{ id: 'e1', tipo: 'hito', titulo: ' Examen ', hecho: true, fecha: '2027-02-28' }] })).elementos[0]!.titulo, 'Examen');
   assert.throws(() => parseProposal(proposal({ ops: [] })), invalid);
 });

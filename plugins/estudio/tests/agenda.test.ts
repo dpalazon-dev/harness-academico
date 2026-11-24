@@ -70,12 +70,14 @@ async function espacio(f: F, name: string): Promise<string> {
   return area.id;
 }
 
-async function planCon(f: F, titulos: string[]): Promise<Unit[]> {
-  await f.call('crear-plan', { goal: 'Dominar grafos' });
+async function planCon(f: F, titulos: string[], criterio = false): Promise<Unit[]> {
+  const plan = await f.call<{ id: string }>('crear-plan', { goal: 'Dominar grafos' });
+  if (titulos.length) await f.call('cambiar-plan', { id: plan.id, expectedRevision: 1, ops: titulos.map(titulo => ({ op: 'add', tipo: 'tema', titulo })) });
   const units: Unit[] = [];
-  for (const title of titulos) units.push(await f.call<Unit>('crear-unidad', { title, capability: `Explicar ${title}` }));
-  const proposal = await f.call<{ id: string }>('proponer-cambio', { ops: units.map(u => ({ op: 'add', unitId: u.id })) });
-  await f.call('aplicar-propuesta', { id: proposal.id });
+  for (const e of f.store.getPlan(plan.id)!.elementos) {
+    const u = await f.call<Unit>('trabajar-tema', { planId: plan.id, elementoId: e.id });
+    units.push(await f.call<Unit>('editar-unidad', { id: u.id, expectedRevision: u.revision, capability: `Explicar ${e.titulo}`, ...(criterio ? { criterion: 'Lo explico sin mirar' } : {}) }));
+  }
   return units;
 }
 

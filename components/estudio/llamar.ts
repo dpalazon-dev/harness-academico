@@ -11,20 +11,13 @@ export async function llamarEstudio<T = unknown>(operation: string, input?: unkn
 	return body?.result as T;
 }
 
-export type CambioDelPlan = { op: "add"; unitId: string } | { op: "remove"; unitId: string } | { op: "move"; unitId: string; index: number };
+/** Un cambio de David en los elementos de su plan; se aplica al momento (spec de planes, decisión 9). */
+export type CambioDelPlan =
+	| { op: "add"; tipo: "tema" | "tarea" | "hito"; titulo: string; fecha?: string; index?: number }
+	| { op: "remove"; elementoId: string }
+	| { op: "move"; elementoId: string; index: number }
+	| { op: "edit"; elementoId: string; titulo?: string; hecho?: boolean; fecha?: string | null };
 
-/** Un cambio del plan decidido por David: se propone y se aplica en un paso, con las mismas reglas que los del tutor. */
-export async function cambiarPlan(planId: string, op: CambioDelPlan): Promise<void> {
-	const propuesta = await llamarEstudio<{ id: string }>("proponer-cambio", { planId, ops: [op] });
-	await llamarEstudio("aplicar-propuesta", { id: propuesta.id });
-}
-
-/** Confirmar una unidad propuesta es decidir que entra en el plan de su espacio: con plan, se propone y aplica su
- * añadido, que ya la confirma; sin plan, solo cambia su estado. */
-export async function confirmarUnidad(u: { id: string; revision: number; planId: string | null }): Promise<void> {
-	if (u.planId) {
-		await cambiarPlan(u.planId, { op: "add", unitId: u.id });
-	} else {
-		await llamarEstudio("confirmar-unidad", { id: u.id, expectedRevision: u.revision });
-	}
+export async function cambiarPlan(plan: { id: string; revision: number }, ...ops: CambioDelPlan[]): Promise<void> {
+	await llamarEstudio("cambiar-plan", { id: plan.id, expectedRevision: plan.revision, ops });
 }

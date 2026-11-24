@@ -110,11 +110,9 @@ export function ThinkingBlock({
 			data-testid={testId}
 			data-commit={dataCommit === undefined ? undefined : dataCommit ? "true" : "false"}
 			className={cn(
-				// Round five (owner, 2026-10-07): total inset still 3ch (the
-				// chevron law); the rail narrows (14px gap), padding 4px, pr-4
-				// keeps the text off the band's right edge. In-card rows take
-				// NO band — the accent lift read too light; rail only.
-				"lh-card-enter my-2 w-full border-l-[calc(3ch-14px)] border-muted-foreground/30 py-1 pl-[14px] pr-4 font-ui text-xs",
+				// HarnessAcademico (guía de diseño): sin raya izquierda; la banda es
+				// un fondo redondeado. In-card rows take NO band (owner round five).
+				"lh-card-enter my-2 w-full rounded-lg px-4 py-2 font-ui text-xs",
 				inCard ? "" : "bg-card",
 			)}
 		>

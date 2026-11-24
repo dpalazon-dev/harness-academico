@@ -4,7 +4,8 @@
  * La página de una unidad (ticket 02, ADR 0002): capacidad, criterio, tipo y
  * etapa; el estado de los cuatro grupos del ciclo; fuentes, notas, preguntas,
  * intentos con el próximo repaso y conversaciones. Desde aquí se ajustan el
- * tipo y la forma de practicar, y una unidad propuesta se confirma o archiva.
+ * tipo y la forma de practicar, y una unidad propuesta se confirma o archiva. Dice en qué plan está (el de su tema)
+ * y muestra la capacidad y el criterio que sugirió el tutor, para aceptarlos o descartarlos (spec de planes).
  * «Estudiar con el tutor» abre una conversación nueva con la unidad como
  * contexto (ticket 03, ADR 0003). El volcado inicial se escribe aquí, sin IA,
  * y queda como «lo que sabía antes» (ticket 04). «Practicar» abre la pantalla
@@ -20,12 +21,13 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDownIcon, ArrowRightIcon, ArrowUpIcon, BookOpenIcon, GraduationCapIcon, MessageSquareIcon, NotebookPenIcon, PencilLineIcon, PlusIcon } from "lucide-react";
+import { ArrowRightIcon, BookOpenIcon, GraduationCapIcon, MessageSquareIcon, NotebookPenIcon, PencilLineIcon, PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import { cn } from "@/lib/utils";
 import { GRUPOS, TEXTO_ESTADO, TONO_ESTADO } from "./ciclo";
-import { cambiarPlan, confirmarUnidad, llamarEstudio, type CambioDelPlan } from "./llamar";
+import { llamarEstudio } from "./llamar";
+import { rutaPlan } from "./plan";
 import { useAbrirConversacion } from "./abrir-conversacion";
 import { FIDELIDAD, TAREA, rutaIntento, rutaPracticar } from "./intento";
 import type { LecturaUnidad, Paso, PracticaUnidad, TipoUnidad } from "./tipos";
@@ -44,8 +46,9 @@ export interface AccionesUnidad {
 	ajustar(cambios: { kind?: TipoUnidad | null; policy?: PracticaUnidad | null }): void;
 	confirmar(): void;
 	archivar(): void;
-	/** Cambia el plan del espacio de la unidad: subirla, bajarla, quitarla o añadirla. */
-	cambiarPlan(op: CambioDelPlan): void;
+	/** Copia a la unidad la capacidad y el criterio que sugirió el tutor. */
+	aceptarSugerencia(): void;
+	descartarSugerencia(): void;
 	/** Lleva la unidad a otro espacio; null la deja sin espacio. */
 	moverAEspacio(areaId: string | null): void;
 	/** Abre una conversación nueva con la unidad como contexto. */
@@ -120,7 +123,7 @@ export function PaginaUnidadEstudio({ unidad: u, espacios = null, ahora = new Da
 
 			{u.estado === "propuesta" && (
 				<div className="mt-6 flex flex-wrap items-center gap-3 rounded-xl bg-accent/60 p-4">
-					<p className="flex-1 text-sm">El tutor propuso esta unidad. No entra en tu plan hasta que la confirmes.</p>
+					<p className="flex-1 text-sm">El tutor propuso esta unidad. Confírmala para trabajarla o archívala.</p>
 					<Button size="sm" disabled={ocupado} onClick={acciones.confirmar}>Confirmar</Button>
 					<Button size="sm" variant="ghost" disabled={ocupado} onClick={acciones.archivar}>Archivar</Button>
 				</div>
@@ -189,7 +192,20 @@ export function PaginaUnidadEstudio({ unidad: u, espacios = null, ahora = new Da
 					</label>
 				)}
 			</div>
-			{u.estado === "activa" && <LugarEnPlan unidad={u} ocupado={ocupado} cambiar={acciones.cambiarPlan} />}
+			{u.sugerencia && u.estado !== "archivada" && (
+				<div className="mt-6 space-y-2 rounded-xl bg-accent/60 p-4 text-sm" data-testid="sugerencia">
+					<p className="text-xs text-muted-foreground">El tutor sugiere</p>
+					<p>{u.sugerencia.capacidad}</p>
+					<p className="text-muted-foreground">Sabrás que puedes cuando: {u.sugerencia.criterio}</p>
+					<div className="flex gap-1">
+						<Button size="sm" disabled={ocupado} onClick={acciones.aceptarSugerencia}>Aceptar</Button>
+						<Button size="sm" variant="ghost" disabled={ocupado} onClick={acciones.descartarSugerencia}>Descartar</Button>
+					</div>
+				</div>
+			)}
+			<p className="mt-4 text-sm text-muted-foreground" data-testid="plan-de-unidad">
+				{u.plan ? <>Tema del plan <button type="button" className="text-foreground hover:underline" onClick={() => acciones.navegar(rutaPlan(u.plan!.id))}>«{u.plan.objetivo}»</button></> : "Sin plan"}
+			</p>
 			{u.estado === "activa" && (
 				<div className="mt-3">
 					<Button size="sm" variant="ghost" disabled={ocupado} onClick={acciones.archivar}>Archivar unidad</Button>
@@ -221,7 +237,7 @@ export function PaginaUnidadEstudio({ unidad: u, espacios = null, ahora = new Da
 								<a
 									href={rutaLector(f.documentoId, { unidad: u.id })}
 									onClick={(e) => { e.preventDefault(); acciones.navegar(rutaLector(f.documentoId!, { unidad: u.id })); }}
-									className="flex flex-1 items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-accent"
+									className="anillo-foco flex flex-1 items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-accent"
 								>{datos}</a>
 							) : <div className="flex flex-1 items-center gap-3 px-2 py-2">{datos}</div>}
 						</div>
@@ -239,7 +255,7 @@ export function PaginaUnidadEstudio({ unidad: u, espacios = null, ahora = new Da
 								<a
 									href={rutaCuaderno(c.id)}
 									onClick={(e) => { e.preventDefault(); acciones.navegar(rutaCuaderno(c.id)); }}
-									className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent"
+									className="anillo-foco flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent"
 								>
 									<NotebookPenIcon className="size-4 shrink-0 text-muted-foreground" />
 									<span className="flex-1 truncate text-sm">{c.titulo}</span>
@@ -284,7 +300,7 @@ export function PaginaUnidadEstudio({ unidad: u, espacios = null, ahora = new Da
 			<Bloque titulo="Intentos">
 				{u.intentos.length === 0 ? <p className="text-sm text-muted-foreground">Sin intentos todavía.</p> : u.intentos.map(i => (
 					<div key={i.id} className="flex items-center gap-3 rounded-lg px-2 py-1 text-sm hover:bg-accent/50">
-						<button type="button" onClick={() => acciones.navegar(rutaIntento(i.id))} className="flex flex-1 items-baseline gap-3 py-0.5 text-left">
+						<button type="button" onClick={() => acciones.navegar(rutaIntento(i.id))} className="anillo-foco flex flex-1 items-baseline gap-3 py-0.5 text-left">
 							<span className="w-16 shrink-0 tabular-nums text-muted-foreground">{corta(new Date(i.fecha))}</span>
 							<span className="flex-1">
 								{TAREA[i.tarea]} · <span className="text-muted-foreground">{i.estado === "graded" && i.fidelidad !== null ? FIDELIDAD[i.fidelidad] : ESTADO_INTENTO[i.estado as keyof typeof ESTADO_INTENTO] ?? "Valorado"}</span>
@@ -300,7 +316,7 @@ export function PaginaUnidadEstudio({ unidad: u, espacios = null, ahora = new Da
 
 			<Bloque titulo="Conversaciones">
 				{u.conversaciones.length === 0 ? <p className="text-sm text-muted-foreground">Ninguna conversación sobre esta unidad todavía.</p> : u.conversaciones.map(c => (
-					<button key={c.id} type="button" onClick={() => acciones.navegar(`/chat/${c.id}`)} className="flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left text-sm hover:bg-accent" data-chat-id={c.id}>
+					<button key={c.id} type="button" onClick={() => acciones.navegar(`/chat/${c.id}`)} className="anillo-foco flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left text-sm hover:bg-accent" data-chat-id={c.id}>
 						<MessageSquareIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
 						<span className="min-w-0 flex-1">
 							<span className="block truncate">{c.title}</span>
@@ -310,29 +326,6 @@ export function PaginaUnidadEstudio({ unidad: u, espacios = null, ahora = new Da
 				))}
 			</Bloque>
 		</article>
-	);
-}
-
-/** El sitio de la unidad en el plan de su espacio, con lo que la vista antigua ofrecía en la Ruta (ticket 11):
- * subir, bajar y quitar del plan, o añadirla si está fuera. Sin plan en el espacio no hay nada que decir. */
-function LugarEnPlan({ unidad: u, ocupado, cambiar }: { unidad: LecturaUnidad; ocupado: boolean; cambiar(op: CambioDelPlan): void }) {
-	const lugar = u.lugarEnPlan;
-	if (!u.planId) return null;
-	return (
-		<div className="mt-4 flex flex-wrap items-center gap-1 text-sm" data-testid="lugar-en-plan">
-			<span className="mr-2 text-muted-foreground">{lugar ? `En el plan: ${lugar.posicion} de ${lugar.total}` : "Fuera del plan"}</span>
-			{lugar ? <>
-				<Button size="sm" variant="ghost" disabled={ocupado || lugar.subir === null} onClick={() => cambiar({ op: "move", unitId: u.id, index: lugar.subir! })}>
-					<ArrowUpIcon className="size-4" />Subir
-				</Button>
-				<Button size="sm" variant="ghost" disabled={ocupado || lugar.bajar === null} onClick={() => cambiar({ op: "move", unitId: u.id, index: lugar.bajar! })}>
-					<ArrowDownIcon className="size-4" />Bajar
-				</Button>
-				<Button size="sm" variant="ghost" disabled={ocupado} onClick={() => cambiar({ op: "remove", unitId: u.id })}>Quitar del plan</Button>
-			</> : (
-				<Button size="sm" variant="ghost" disabled={ocupado} onClick={() => cambiar({ op: "add", unitId: u.id })}><PlusIcon className="size-4" />Añadir al plan</Button>
-			)}
-		</div>
 	);
 }
 
@@ -457,11 +450,7 @@ export function PaginaUnidad({ id, initialConfigured }: { id: string; initialCon
 		setOcupado(true);
 		setError(null);
 		try {
-			if (operation === "confirmar-unidad") {
-				await confirmarUnidad(unidad);
-			} else if (operation === "cambiar-plan") {
-				if (unidad.planId) await cambiarPlan(unidad.planId, input.op as CambioDelPlan);
-			} else if (operation === "mover-a-espacio") {
+			if (operation === "mover-a-espacio") {
 				await llamarEstudio(operation, { kind: "unidad", id: unidad.id, areaId: input.areaId });
 			} else if (operation === "guardar-volcado") {
 				await llamarEstudio(operation, { unitId: unidad.id, ...input });
@@ -512,7 +501,8 @@ export function PaginaUnidad({ id, initialConfigured }: { id: string; initialCon
 						ajustar: (cambios) => void operar("editar-unidad", cambios),
 						confirmar: () => void operar("confirmar-unidad", {}),
 						archivar: () => void operar("archivar-unidad", {}),
-						cambiarPlan: (op) => void operar("cambiar-plan", { op }),
+						aceptarSugerencia: () => void operar("aceptar-sugerencia", {}),
+						descartarSugerencia: () => void operar("descartar-sugerencia", {}),
 						moverAEspacio: (areaId) => void operar("mover-a-espacio", { areaId }),
 						nuevoCuaderno: () => void nuevoCuaderno(),
 						navegar: (ruta) => router.push(ruta),

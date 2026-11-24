@@ -18,16 +18,17 @@ import { useServerEvent, useServerResync } from "@/components/server-events";
 import { llamarEstudio } from "./llamar";
 import { FALLO } from "./intento";
 import { GraficoActividad } from "./ritmo";
+import { useAtajoPaleta } from "./atajo-paleta";
 import type { LecturaProgreso, LecturaRitmo, TipoEtapa, TipoFallo } from "./tipos";
 
 /** El orden va de menos a más evidencia; «Sin repaso» (unidades que se practican localizando) queda aparte, al final. */
 export const ETAPAS: { kind: TipoEtapa; titulo: string; pista: string }[] = [
 	{ kind: "nueva", titulo: "Sin practicar", pista: "Ningún intento valorado." },
-	{ kind: "practicada", titulo: "Solo práctica en sesión", pista: "Hay intentos, pero ninguno tras un intervalo y sin exposición previa." },
+	{ kind: "practicada", titulo: "Solo práctica en sesión", pista: "Has practicado, pero aún ningún intento cuenta como evidencia." },
 	{ kind: "reaprendiendo", titulo: "Reaprendiendo", pista: "Sin recuperación suficiente en el último repaso: se repasa al día siguiente." },
 	{ kind: "intervalo", titulo: "Recuperadas con intervalo", pista: "Recuperadas completas y sin ayuda tras un intervalo, que crece con cada acierto." },
 	{ kind: "mantenimiento", titulo: "Mantenimiento por uso", pista: "Usadas sin ayuda en contextos distintos: repaso cada 90 días." },
-	{ kind: "fuera", titulo: "Sin repaso", pista: "Se practican localizando en la fuente: el regulador no las programa." },
+	{ kind: "fuera", titulo: "Sin repaso", pista: "Se practican localizando en la fuente: no se les programan repasos." },
 ];
 
 export const PISTA_FALLO: Record<TipoFallo, string> = {
@@ -57,8 +58,9 @@ function Seccion({ titulo, nota, children }: { titulo: string; nota?: string; ch
 }
 
 function Etapas({ unidades, abrirUnidad }: { unidades: LecturaProgreso["units"]; abrirUnidad(id: string): void }) {
+	const atajo = useAtajoPaleta();
 	if (!unidades.length) {
-		return <p className="text-sm text-muted-foreground">Aún no hay unidades activas en este espacio. Confirma una en el plan o crea otra con ⌘K.</p>;
+		return <p className="text-sm text-muted-foreground">Aún no hay unidades activas en este espacio. Confirma una en el plan o crea otra con {atajo}.</p>;
 	}
 	return (
 		<ul className="space-y-4">
@@ -79,7 +81,7 @@ function Etapas({ unidades, abrirUnidad }: { unidades: LecturaProgreso["units"];
 										href={`/unidad/${encodeURIComponent(u.unitId)}`}
 										onClick={(ev) => { ev.preventDefault(); abrirUnidad(u.unitId); }}
 										title={u.stage.label}
-										className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-sm hover:bg-accent/60"
+										className="anillo-foco inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-sm hover:bg-accent/60"
 									>
 										{u.title}
 										{u.needsVerification && <span className="text-xs text-[var(--lh-warning)]">· pendiente de verificar</span>}
@@ -116,15 +118,19 @@ function Calibracion({ c }: { c: LecturaProgreso["calibration"] }) {
 					</div>
 				))}
 			</dl>
-			<p className="mt-4 text-sm">
-				<span className="font-medium">Brier {coma(c.brier)}</span>
-				<span className="text-muted-foreground"> en {intentos(c.attempts)} que cuentan como evidencia.</span>
-			</p>
-			<p className="mt-1 text-sm text-muted-foreground">
-				Antes de cada intento declaras tu confianza. El Brier es la media de (confianza − resultado)², con resultado 1 si
-				recuperaste completo y sin ayuda y 0 si no. 0 es una calibración perfecta; 0,25 es lo que se obtiene declarando
-				siempre 50 %, como quien tira una moneda; por encima, tu confianza orienta peor que ese 50 % fijo.
-			</p>
+			{/* El cálculo, plegado: el veredicto y las barras bastan para leer la calibración. */}
+			<details className="mt-4 text-sm" data-calculo-calibracion>
+				<summary className="anillo-foco cursor-pointer rounded-sm text-muted-foreground hover:text-foreground">Cómo se calcula</summary>
+				<p className="mt-2">
+					<span className="font-medium">Brier {coma(c.brier)}</span>
+					<span className="text-muted-foreground"> en {intentos(c.attempts)} que cuentan como evidencia.</span>
+				</p>
+				<p className="mt-1 text-muted-foreground">
+					Antes de cada intento declaras tu confianza. El Brier es la media de (confianza − resultado)², con resultado 1 si
+					recuperaste completo y sin ayuda y 0 si no. 0 es una calibración perfecta; 0,25 es lo que se obtiene declarando
+					siempre 50 %, como quien tira una moneda; por encima, tu confianza orienta peor que ese 50 % fijo.
+				</p>
+			</details>
 		</div>
 	);
 }

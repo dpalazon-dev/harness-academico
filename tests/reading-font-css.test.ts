@@ -33,7 +33,8 @@ it("reading utilities consume the live appearance variable, not a baked Source S
 		assert.equal(rules(selector).length, 1, selector);
 		assert.match(rules(selector)[0]!, /font-family:\s*var\(--font-prose\);/);
 	}
-	assert.match(css, /--font-prose:\s*var\(--font-sans3\), ui-sans-serif, system-ui, sans-serif;/,
+	// HarnessAcademico: la lectura por defecto es Inter, con Source Sans 3 detrás.
+	assert.match(css, /--font-prose:\s*var\(--font-inter\), var\(--font-sans3\), ui-sans-serif, system-ui, sans-serif;/,
 		"reset/unset retains the bundled default and its fallback stack");
 });
 
@@ -41,13 +42,14 @@ it("no compiled font-family declaration bypasses the reading setting via the loa
 	assert.doesNotMatch(css, /(?:^|[;{])\s*font-family:[^;{}]*var\(--font-sans3\)/m);
 });
 
-it("mono chrome/code and the independent serif title remain separate font contracts", () => {
-	for (const selector of [".font-ui", ".font-mono"]) {
-		assert.match(rules(selector)[0]!, /font-family:\s*var\(--font-jetbrains\), ui-monospace, SFMono-Regular, monospace;/);
-	}
+// HarnessAcademico (guía de diseño): la interfaz en Inter; la monoespaciada, solo para código.
+it("sans chrome, mono code and the independent serif title remain separate font contracts", () => {
+	assert.match(rules(".font-ui")[0]!, /font-family:\s*var\(--font-inter\), ui-sans-serif, system-ui, sans-serif;/);
+	assert.match(rules(".font-mono")[0]!, /font-family:\s*var\(--font-jetbrains\), ui-monospace, SFMono-Regular, monospace;/);
 	assert.match(rules("body")[0]!, /font-family:\s*var\(--font-ui\);/);
 	assert.match(rules(".font-title").join("\n"), /font-family:\s*var\(--font-title\);/);
-	assert.match(css, /--font-title:\s*"lh-cmu", serif;/);
+	// HarnessAcademico: títulos en Inter, sin serifa.
+	assert.match(css, /--font-title:\s*var\(--font-inter\), ui-sans-serif, system-ui, sans-serif;/);
 });
 
 it("reading-family repair does not change reading/input size, leading, or title weight", () => {
@@ -57,7 +59,7 @@ it("reading-family repair does not change reading/input size, leading, or title 
 	assert.match(rules(".lh-input")[0]!, /font-family:\s*var\(--font-prose\);/);
 	assert.match(rules(".lh-input")[0]!, /font-size:\s*var\(--lh-prose-size\);/);
 	assert.match(rules(".lh-input")[0]!, /line-height:\s*1\.25;/);
-	assert.match(rules(".font-title").join("\n"), /font-weight:\s*900;/);
+	assert.match(rules(".font-title").join("\n"), /font-weight:\s*700;/); // HarnessAcademico: negrita, no Black
 	for (const selector of [".font-prose", ".font-sans"]) {
 		assert.doesNotMatch(rules(selector).join("\n"), /font-size:|line-height:/);
 	}

@@ -50,13 +50,13 @@ describe("resolveSettings", () => {
 		assert.equal(eff.models.strong, null);
 		assert.equal(eff.models.cheap, null);
 		assert.equal(eff.models.vision, null);
-		assert.equal(eff.appearance.theme, "default");
+		assert.equal(eff.appearance.theme, "limpio"); // HarnessAcademico
 		assert.equal(eff.appearance.background, null);
 		assert.deepEqual(eff.appearance.colors, {});
 		assert.equal(eff.appearance.fontFamily, null);
-		assert.equal(eff.appearance.proseFontSize, 16);
+		assert.equal(eff.appearance.proseFontSize, 17); // HarnessAcademico
 		assert.equal(eff.appearance.sessionNameSerif, true);
-		assert.equal(eff.appearance.mdRendering.headingWeight, 900);
+		assert.equal(eff.appearance.mdRendering.headingWeight, 700); // HarnessAcademico
 		// wave 7 collapse: the master switch ONLY + the redesign's chunk
 		// budget — absent record resolves the factory 4096 (halved back
 		// from the digest-era 8192, owner, 2026-10-13)

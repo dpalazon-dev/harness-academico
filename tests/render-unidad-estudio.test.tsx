@@ -12,12 +12,12 @@ import { PaginaUnidadEstudio } from "../components/estudio/unidad.tsx";
 import type { LecturaUnidad } from "../components/estudio/tipos.ts";
 
 const nada = () => {};
-const acciones = { ajustar: nada, confirmar: nada, archivar: nada, cambiarPlan: nada, moverAEspacio: nada, estudiar: nada, discutir: nada, guardarVolcado: nada, paso: nada, nuevoCuaderno: nada, navegar: nada };
+const acciones = { ajustar: nada, confirmar: nada, archivar: nada, aceptarSugerencia: nada, descartarSugerencia: nada, moverAEspacio: nada, estudiar: nada, discutir: nada, guardarVolcado: nada, paso: nada, nuevoCuaderno: nada, navegar: nada };
 const AHORA = new Date("2026-11-13T10:00:00");
 
 const BASE: LecturaUnidad = {
-	id: "u1", revision: 3, titulo: "Caminos mínimos", estado: "activa", areaId: "a1", planId: "p1",
-	lugarEnPlan: { posicion: 2, total: 4, subir: 0, bajar: 2 },
+	id: "u1", revision: 3, titulo: "Caminos mínimos", estado: "activa", areaId: "a1",
+	plan: { id: "p1", objetivo: "Dominar grafos" }, sugerencia: null,
 	capacidad: "Explicar por qué Dijkstra encuentra el camino más corto",
 	criterio: "Lo demuestro sin mirar sobre un grafo nuevo",
 	tipo: "procedimiento", practica: null, practicaEfectiva: "ejecutar",
@@ -216,26 +216,19 @@ describe("PaginaUnidadEstudio", () => {
 		assert.match(html, /<q[^>]*>Dijkstra relaja cada arista una vez\.<\/q>/);
 		assert.match(html, /\(p\. 4\)/);
 	});
-	it("dice su lugar en el plan y ofrece subir, bajar y quitar (ticket 11)", () => {
-		const html = pagina();
-		assert.match(html, /En el plan: 2 de 4/);
-		for (const b of ["Subir", "Bajar", "Quitar del plan"]) assert.match(html, new RegExp(`<button[^>]*>(?:(?!</button>).)*${b}</button>`), b);
-		assert.doesNotMatch(html, /Añadir al plan/);
+	it("dice de qué plan es tema, con enlace a su página; sin plan, lo dice", () => {
+		assert.match(pagina(), /Tema del plan <button[^>]*>«Dominar grafos»<\/button>/);
+		assert.match(pagina({ plan: null }), /data-testid="plan-de-unidad"[^>]*>Sin plan</);
+		assert.doesNotMatch(pagina(), /Subir|Bajar|Añadir al plan|Quitar del plan/);
 	});
 
-	it("en un extremo del plan, el botón hacia fuera queda desactivado", () => {
-		const html = pagina({ lugarEnPlan: { posicion: 1, total: 4, subir: null, bajar: 1 } });
-		assert.match(html, /<button[^>]*disabled=""[^>]*>(?:(?!<\/button>).)*Subir<\/button>/);
-		assert.doesNotMatch(html, /<button[^>]*disabled=""[^>]*>(?:(?!<\/button>).)*Bajar<\/button>/);
+	it("enseña la capacidad y el criterio que sugirió el tutor, para aceptarlos o descartarlos", () => {
+		const html = pagina({ sugerencia: { capacidad: "Relajar aristas", criterio: "Sin mirar" } });
+		assert.match(html, /data-testid="sugerencia"[\s\S]*El tutor sugiere[\s\S]*Relajar aristas[\s\S]*Sabrás que puedes cuando: Sin mirar[\s\S]*>Aceptar<[\s\S]*>Descartar</);
+		assert.doesNotMatch(pagina(), /data-testid="sugerencia"/);
+		assert.doesNotMatch(pagina({ estado: "archivada", sugerencia: { capacidad: "x", criterio: "y" } }), /data-testid="sugerencia"/);
 	});
 
-	it("una unidad activa fuera del plan se puede añadir; sin plan en el espacio, nada", () => {
-		const fuera = pagina({ lugarEnPlan: null });
-		assert.match(fuera, /Fuera del plan/);
-		assert.match(fuera, /Añadir al plan/);
-		assert.doesNotMatch(pagina({ lugarEnPlan: null, planId: null }), /data-testid="lugar-en-plan"/);
-		assert.doesNotMatch(pagina({ estado: "propuesta", lugarEnPlan: null }), /Añadir al plan/, "una propuesta se confirma en su recuadro");
-	});
 	it("elige el espacio de la unidad entre los vivos o «Sin espacio» (ticket 11)", () => {
 		const html = pagina({}, { espacios: [{ id: "a1", name: "Grafos" }, { id: "a2", name: "Doctorado" }] });
 		assert.match(html, /aria-label="Espacio de la unidad"/);
