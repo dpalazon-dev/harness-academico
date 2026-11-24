@@ -13,7 +13,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { SidebarProvider } from "../components/ui/sidebar.tsx";
 import { BarraLateralEstudio, RUTA_PROGRESO, type DatosBarraLateral } from "../components/estudio/barra-lateral.tsx";
 import { recordarPlegadas, seccionesPlegadas } from "../components/estudio/secciones.ts";
-import { InicioEstudio } from "../components/estudio/inicio.tsx";
+import { fechaDeHoy, InicioEstudio, progresoDelMes } from "../components/estudio/inicio.tsx";
 import { agruparPorFecha } from "../components/estudio/conversaciones.ts";
 import { ActivitySection } from "../components/activity-dock.tsx";
 import type { LecturaInicio } from "../components/estudio/tipos.ts";
@@ -380,21 +380,36 @@ describe("InicioEstudio", () => {
 
 	// Panel B fiel a la maqueta: «Esta semana» es una tira de siete días con «Ver el mes»; el ritmo y el calendario del
 	// mes solo aparecen al desplegar, para que todo quepa sin desplazarse.
-	it("«Esta semana» es una tira de siete días con hoy marcado y «Ver el mes»; ritmo y mes, plegados", () => {
+	// Referencia 1 elegida por David (24-nov-2026): el calendario del mes siempre abierto a la derecha, sin «Ver el mes», y
+	// la lista del día en «Actividad reciente»; el ritmo, en «Progreso del mes».
+	it("el calendario del mes está siempre abierto, con la actividad del día aparte y el progreso del mes", () => {
 		const html = inicio({ ritmo: RITMO });
-		assert.match(html, /<section aria-label="Esta semana"[\s\S]*data-tira-semana[\s\S]*Ver el mes/);
-		assert.equal([...html.matchAll(/data-dia="/g)].length, 7);
-		assert.match(html, /data-dia="2026-11-12"[^>]*data-hoy="true"/);
-		assert.doesNotMatch(html, /data-ritmo|<section aria-label="Agenda"/, "el ritmo y el mes, al desplegar");
-		assert.doesNotMatch(inicio({ lectura: null, ritmo: RITMO }), /data-tira-semana/, "mientras se lee el inicio, no hay semana");
+		assert.match(html, /<section aria-label="Agenda"[^>]*data-agenda="mes"/);
+		assert.doesNotMatch(html, /Ver el mes|Ver solo esta semana/);
+		assert.match(html, /<section aria-label="Actividad reciente"[\s\S]*data-agenda="lista"/);
+		assert.match(html, /<section aria-label="Progreso del mes"[\s\S]*de racha[\s\S]*repasos[\s\S]*intentos en 7 días/);
+		assert.doesNotMatch(inicio({ lectura: null, ritmo: RITMO }), /aria-label="Agenda"/, "mientras se lee el inicio, no hay agenda");
+	});
+
+	it("el progreso del mes cuenta los días con actividad", () => {
+		assert.deepEqual(progresoDelMes({ ...RITMO, hoy: "2026-11-12", actividad: [{ dia: "2026-11-02", n: 1 }, { dia: "2026-11-05", n: 0 }, { dia: "2026-10-30", n: 3 }] }), { dias: 1, total: 30 });
+	});
+
+	// Réplica de la referencia 1 (David, 24-nov-2026): cabecera con la fecha y ‹ Hoy ›; sin sugerencias ni próximos repasos.
+	it("la cabecera lleva la fecha y la navegación por días; no hay sugerencias ni próximos repasos", () => {
+		const html = inicio();
+		assert.match(html, /<nav aria-label="Día"[\s\S]*aria-label="Día anterior"[\s\S]*>Hoy<\/button>[\s\S]*aria-label="Día siguiente"/);
+		assert.equal(fechaDeHoy(new Date(2026, 10, 24)), "Martes, 24 de noviembre de 2026");
+		assert.doesNotMatch(html, /data-sugerencia|Próximos repasos/);
+		assert.match(html, /<section aria-label="Actividad reciente"[\s\S]*Actividad reciente/);
 	});
 
 	it("bajo las acciones, la agenda sustituye a las listas «Hoy» y «Próximos 7 días» (ticket 05 de la segunda ronda)", () => {
 		const html = inicio();
-		assert.match(html, /data-ficha="[^"]+"[\s\S]*<section aria-label="Esta semana"/, "acciones y semana, en ese orden");
+		assert.match(html, /data-ficha="[^"]+"[\s\S]*<section aria-label="Agenda"/, "acciones y agenda, en ese orden");
 		assert.doesNotMatch(html, /Repasar · |Retomar el intento · |Reconstruye sin mirar · /, "sin el formato «acción · unidad»");
-		assert.doesNotMatch(html, />Hoy<\/h2>|>Próximos 7 días<\/h2>|Mañana/, "sin las listas fijas");
-		assert.doesNotMatch(inicio({ lectura: null }), /aria-label="Esta semana"/, "mientras se lee el inicio, no hay agenda");
+		assert.doesNotMatch(html, />Hoy<\/h2>|>Próximos 7 días<\/h2>/, "sin las listas fijas (los próximos repasos, con su día, van en su tarjeta)");
+		assert.doesNotMatch(inicio({ lectura: null }), /aria-label="Agenda"/, "mientras se lee el inicio, no hay agenda");
 	});
 
 	it("«Retomar» nombra la conversación con algo abierto y lleva lo pendiente como descripción emergente; ya no hay «Quedó abierto»", () => {
@@ -441,7 +456,7 @@ describe("InicioEstudio", () => {
 
 	it("«Ponerme a prueba» se ofrece con unidades activas en el plan, como menú", () => {
 		const html = inicio({ unidades: [{ id: "u1", titulo: "Recorridos BFS y DFS" }] });
-		assert.match(html, /<button(?=[^>]*aria-haspopup="menu")[^>]*data-ficha="prueba"[^>]*>Ponerme a prueba<\/button>/);
+		assert.match(html, /<button(?=[^>]*aria-haspopup="menu")[^>]*data-ficha="prueba"[^>]*>.*Ponerme a prueba<\/button>/);
 		assert.doesNotMatch(inicio({ unidades: [] }), /data-ficha="prueba"/);
 	});
 
@@ -457,17 +472,17 @@ describe("InicioEstudio", () => {
 	it("«Añadir material» y «Añadir contexto» se nombran tal cual", () => {
 		const html = inicio({ lectura: VACIA });
 		// Panel B: enlaces discretos al pie de «Para hoy» (decisión de David).
-		assert.match(html, /data-ficha="material"[^>]*>Añadir material<\/button>/);
-		assert.match(html, /data-ficha="contexto"[^>]*>Añadir contexto<\/button>/);
+		assert.match(html, /data-ficha="material"[^>]*>.*Añadir material<\/button>/);
+		assert.match(html, /data-ficha="contexto"[^>]*>.*Añadir contexto<\/button>/);
 	});
 
 	// Decisiones de David del 24-nov-2026 sobre el panel de hoy.
 	it("sin paso propuesto, «Siguiente paso» invita a empezar: crear plan sin planes o pedir un paso al tutor", () => {
 		const sinPlan = inicio({ lectura: VACIA, sinPlanes: true });
-		assert.match(sinPlan, /<section aria-label="Siguiente paso"[\s\S]*No hay nada propuesto ahora[\s\S]*<button[^>]*data-ficha="crear-plan"[^>]*>Crear plan<\/button>/);
+		assert.match(sinPlan, /<section aria-label="Siguiente paso"[\s\S]*No hay nada propuesto ahora[\s\S]*<button[^>]*data-ficha="crear-plan"[^>]*>.*Crear plan<\/button>/);
 		assert.equal([...sinPlan.matchAll(/data-ficha="crear-plan"/g)].length, 1, "«Crear plan» una sola vez");
 		const conPlan = inicio({ lectura: VACIA });
-		assert.match(conPlan, /<section aria-label="Siguiente paso"[\s\S]*<button[^>]*data-pedir-paso[^>]*>Pedir un siguiente paso<\/button>/);
+		assert.match(conPlan, /<section aria-label="Siguiente paso"[\s\S]*<button[^>]*data-pedir-paso[^>]*>.*Pedir un siguiente paso<\/button>/);
 	});
 
 	it("con unidades y sin unidad de contexto, la caja ofrece «+ Unidad» como menú", () => {
@@ -477,7 +492,7 @@ describe("InicioEstudio", () => {
 	});
 
 	it("los títulos de las tarjetas van en seminegrita", () => {
-		assert.match(inicio(), /<h2 class="[^"]*font-semibold[^"]*">Siguiente paso<\/h2>/);
+		assert.match(inicio(), /<h2 class="[^"]*font-semibold[^"]*">.*Siguiente paso<\/h2>/);
 	});
 
 	it("enseña el error cuando lo hay", () => {
@@ -493,7 +508,7 @@ describe("InicioEstudio", () => {
 
 	it("si la agenda no se pudo leer, lo dice dentro de la agenda con «Reintentar», no arriba del inicio", () => {
 		const html = inicio({ agenda: { datos: null, error: "Estudio no respondió (500)", refrescar: () => {}, onRangos: () => {} } });
-		assert.match(html, /<section aria-label="Esta semana"[\s\S]*data-error-lectura[^>]*>No se pudo leer la agenda\.[\s\S]*>Reintentar<\/button>/);
+		assert.match(html, /<section aria-label="Actividad reciente"[\s\S]*data-error-lectura[^>]*>No se pudo leer la agenda\.[\s\S]*>Reintentar<\/button>/);
 		assert.doesNotMatch(html, /Leyendo la agenda…/);
 		assert.doesNotMatch(html, /Estudio no respondió/);
 	});

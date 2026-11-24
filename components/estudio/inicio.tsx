@@ -17,8 +17,9 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUpIcon, PlusIcon, XIcon } from "lucide-react";
+import { ArrowRightIcon, BarChart3Icon, ChevronLeftIcon, ChevronRightIcon, CircleCheckIcon, ClipboardCheckIcon, FlameIcon, InboxIcon, LayersIcon, MessagesSquareIcon, PlayIcon, PlusIcon, RotateCwIcon, RouteIcon, SparklesIcon, TargetIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SetupDialog } from "@/components/setup-dialog";
 import { openModelPicker, selectedModelUnavailable, useModelSetup } from "@/components/setup-cta";
@@ -28,10 +29,9 @@ import { useServerEvent, useServerResync } from "@/components/server-events";
 import { llamarEstudio } from "./llamar";
 import { useAbrirConversacion } from "./abrir-conversacion";
 import { rutaIntento, rutaPracticar } from "./intento";
-import { FilaHoy, ListaPorDecidirHoy, TiraSemana } from "./panel-hoy";
+import { FilaHoy, ListaPorDecidirHoy } from "./panel-hoy";
 import { usePorDecidir } from "./por-decidir";
-import { AgendaInicio, isoLocal, useDatosAgenda, type DatosAgenda, type Rango } from "./agenda";
-import { LineaRitmo } from "./ritmo";
+import { AgendaInicio, isoLocal, sumar, TARJETA_PANEL, useDatosAgenda, type DatosAgenda, type Rango } from "./agenda";
 import { destinoDelPaso, rutaVolcado } from "./paso";
 import { ANCLA_SUBIR, RUTA_BIBLIOTECA } from "./documentos";
 import type { LecturaInicio, LecturaPlanes, LecturaPorDecidir, LecturaRitmo, PasoDeUnidad } from "./tipos";
@@ -83,8 +83,6 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 	/** «Añadir contexto» sin volcado pendiente: la caja invita a contar lo que David ya sabe o busca. */
 	const [indicacion, setIndicacion] = useState(false);
 	const caja = useRef<HTMLTextAreaElement>(null);
-	/** «Ver el mes»: el calendario completo, debajo de la tira de la semana. */
-	const [verMes, setVerMes] = useState(false);
 	const paso = lectura?.paso ?? null;
 	/** La unidad elegida con «+ Unidad»; manda sobre la del paso propuesto. */
 	const [elegida, setElegida] = useState<{ unitId: string; titulo: string } | null>(null);
@@ -95,108 +93,169 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 		const t = texto.trim();
 		if (t && !ocupado) acciones.enviar(t, contexto?.unitId ?? null);
 	};
+	/** El día que enseña el calendario (‹ Hoy ›); null es hoy. */
+	const [diaSeleccionado, setDiaSeleccionado] = useState<string | null>(null);
+	const moverDia = (n: number) => setDiaSeleccionado(d => sumar(d ?? agenda.datos?.hoy ?? isoLocal(ahora), n));
 
 	return (
 		<div className="relative h-dvh overflow-y-auto font-prose">
 			{/* Franja para arrastrar la ventana en Electron; primera en el DOM (ver home del núcleo). */}
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
-			{/* HarnessAcademico (Inicio, variante B elegida por David el 24-nov-2026): el panel de hoy, caja arriba y dos columnas. */}
-			<main className="mx-auto w-full max-w-[55rem] px-6 pb-24 pt-16">
-				<h1 className="font-title text-3xl leading-tight">{espacio ? `Hoy en ${espacio}` : "Hoy"}</h1>
-				{error && <p role="alert" className="mt-6 text-sm text-destructive">{error}</p>}
-				<form
-					className="mt-6 rounded-3xl border border-border bg-[color-mix(in_oklab,var(--background),white_60%)] dark:bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.12)] transition-shadow focus-within:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.2)]"
-					onSubmit={(e) => { e.preventDefault(); enviar(); }}
-				>
-					<textarea
-						value={texto}
-						onChange={(e) => setTexto(e.target.value)}
-						onKeyDown={(e) => {
-							if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-								e.preventDefault();
-								enviar();
-							}
-						}}
-						ref={caja}
-						rows={3}
-						autoFocus
-						aria-label="Mensaje al tutor"
-						placeholder={indicacion ? "Cuéntale al tutor lo que ya sabes del tema o lo que buscas…" : "Explica lo que has entendido, reconstruye sin mirar o pregunta…"}
-						className="lh-input w-full resize-none bg-transparent px-4 pt-4 text-[15px] outline-none placeholder:text-muted-foreground/70"
-					/>
-					<div className="flex items-center gap-2 px-3 pb-3">
-						{contexto ? (
-							<span className="inline-flex max-w-[70%] items-center gap-1 rounded-full bg-secondary py-1 pl-3 pr-1.5 text-sm text-secondary-foreground" data-contexto={contexto.unitId}>
-								<span className="truncate">{contexto.titulo}</span>
-								<button type="button" aria-label="Quitar la unidad de contexto" onClick={() => { setElegida(null); setSinContexto(true); }} className="anillo-foco rounded-full p-0.5 hover:bg-background">
-									<XIcon className="size-3" />
-								</button>
-							</span>
-						) : unidades.length > 0 ? (
-							// Decisión de David (24-nov-2026): elegir la unidad de contexto desde la caja, como en la maqueta.
-							<DropdownMenu>
-								<DropdownMenuTrigger asChild disabled={ocupado}>
-									<button type="button" data-elegir-unidad="" className="anillo-foco inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-sm text-secondary-foreground hover:bg-accent">
-										<PlusIcon className="size-3.5" aria-hidden />Unidad
-									</button>
-								</DropdownMenuTrigger>
-								<DropdownMenuContent align="start" className="max-h-72 max-w-xs font-prose">
-									<DropdownMenuLabel className="text-xs text-muted-foreground">Unidad de contexto</DropdownMenuLabel>
-									{unidades.map(u => (
-										<DropdownMenuItem key={u.id} onSelect={() => setElegida({ unitId: u.id, titulo: u.titulo })}><span className="truncate">{u.titulo}</span></DropdownMenuItem>
-									))}
-								</DropdownMenuContent>
-							</DropdownMenu>
-						) : <span className="text-xs text-muted-foreground">Conversación nueva, sin unidad de contexto</span>}
-						<Button
-							type="submit"
-							size="icon"
-							className="ml-auto size-8 rounded-full disabled:opacity-80"
-							disabled={!texto.trim() || ocupado}
-							aria-label="Empezar conversación"
-						>
-							<ArrowUpIcon className="size-4" />
-						</Button>
+			{/* HarnessAcademico (Inicio, referencia 1 elegida el 24-nov-2026): a la izquierda la caja, el siguiente paso, lo de
+			    hoy y el progreso del mes; a la derecha, el calendario del mes siempre abierto y lo del día. */}
+			<main className="mx-auto w-full max-w-[76rem] px-8 pb-24 pt-14">
+				<div className="flex items-start gap-4">
+					<div className="min-w-0 flex-1">
+						<h1 className="font-title text-5xl leading-tight">{espacio ? `Hoy en ${espacio}` : "Hoy"}</h1>
+						<p className="mt-1 text-xl text-muted-foreground" suppressHydrationWarning>{fechaDeHoy(diaSeleccionado ? fechaDe(diaSeleccionado) : ahora)}</p>
 					</div>
-				</form>
-
-				{lectura && (
-					<div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_1fr]">
-						<div className="flex min-w-0 flex-col gap-3">
+					{/* Referencia 1: ‹ Hoy › mueve el día que enseña el calendario. */}
+					<nav aria-label="Día" className="mt-3 flex items-center gap-1">
+						<button type="button" aria-label="Día anterior" onClick={() => moverDia(-1)} className="anillo-foco rounded-full p-2 text-muted-foreground hover:bg-accent hover:text-foreground"><ChevronLeftIcon className="size-4" /></button>
+						<button type="button" onClick={() => setDiaSeleccionado(null)} className="anillo-foco rounded-full border border-border bg-[color-mix(in_oklab,var(--background),white_60%)] px-4 py-1.5 text-sm hover:bg-accent dark:bg-card">Hoy</button>
+						<button type="button" aria-label="Día siguiente" onClick={() => moverDia(1)} className="anillo-foco rounded-full p-2 text-muted-foreground hover:bg-accent hover:text-foreground"><ChevronRightIcon className="size-4" /></button>
+					</nav>
+				</div>
+				{error && <p role="alert" className="mt-6 text-sm text-destructive">{error}</p>}
+				<div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+					<div className="flex min-w-0 flex-col gap-4">
+						<form
+							className="rounded-2xl border border-border bg-[color-mix(in_oklab,var(--background),white_60%)] shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.12)] transition-shadow focus-within:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.2)] dark:bg-card"
+							onSubmit={(e) => { e.preventDefault(); enviar(); }}
+						>
+							<div className="flex items-start gap-3 px-4 pt-4">
+								<SparklesIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
+								<textarea
+									value={texto}
+									onChange={(e) => setTexto(e.target.value)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+											e.preventDefault();
+											enviar();
+										}
+									}}
+									ref={caja}
+									rows={2}
+									autoFocus
+									aria-label="Mensaje al tutor"
+									placeholder={indicacion ? "Cuéntale al tutor lo que ya sabes del tema o lo que buscas…" : "Explica lo que has entendido, reconstruye sin mirar o pregunta…"}
+									className="lh-input min-w-0 flex-1 resize-none bg-transparent outline-none placeholder:text-muted-foreground"
+								/>
+							</div>
+							<div className="flex items-center gap-2 px-3 pb-3">
+								{contexto ? (
+									<span className="inline-flex max-w-[70%] items-center gap-1 rounded-full bg-secondary py-1 pl-3 pr-1.5 text-sm text-secondary-foreground" data-contexto={contexto.unitId}>
+										<span className="truncate">{contexto.titulo}</span>
+										<button type="button" aria-label="Quitar la unidad de contexto" onClick={() => { setElegida(null); setSinContexto(true); }} className="anillo-foco rounded-full p-0.5 hover:bg-background">
+											<XIcon className="size-3" />
+										</button>
+									</span>
+								) : unidades.length > 0 ? (
+									// Decisión de David (24-nov-2026): elegir la unidad de contexto desde la caja.
+									<DropdownMenu>
+										<DropdownMenuTrigger asChild disabled={ocupado}>
+											<button type="button" data-elegir-unidad="" className="anillo-foco inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-sm text-secondary-foreground hover:bg-accent">
+												<PlusIcon className="size-3.5" aria-hidden />Unidad
+											</button>
+										</DropdownMenuTrigger>
+										<DropdownMenuContent align="start" className="max-h-72 max-w-xs font-prose">
+											<DropdownMenuLabel className="text-xs text-muted-foreground">Unidad de contexto</DropdownMenuLabel>
+											{unidades.map(u => (
+												<DropdownMenuItem key={u.id} onSelect={() => setElegida({ unitId: u.id, titulo: u.titulo })}><span className="truncate">{u.titulo}</span></DropdownMenuItem>
+											))}
+										</DropdownMenuContent>
+									</DropdownMenu>
+								) : <span className="text-xs text-muted-foreground">Conversación nueva, sin unidad de contexto</span>}
+								<Button
+									type="submit"
+									size="icon"
+									className="ml-auto size-10 rounded-full disabled:opacity-80"
+									disabled={!texto.trim() || ocupado}
+									aria-label="Empezar conversación"
+								>
+									<ArrowRightIcon className="size-5" />
+								</Button>
+							</div>
+						</form>
+						{lectura && <>
 							<SiguientePaso lectura={lectura} sinPlanes={sinPlanes} ocupado={ocupado} acciones={acciones} />
 							<AccionesRapidas lectura={lectura} unidades={unidades} sinPlanes={sinPlanes} volcadoPendiente={volcadoPendiente} enfocarCaja={() => { setIndicacion(true); caja.current?.focus(); }} ocupado={ocupado} acciones={acciones} ahora={ahora} />
-						</div>
-						<div className="flex min-w-0 flex-col gap-3">
-							<Tarjeta titulo="Esta semana">
-								<TiraSemana datos={agenda.datos} error={agenda.error} reintentar={agenda.refrescar} ahora={ahora} onRangos={agenda.onRangos} />
-								<button type="button" aria-expanded={verMes} onClick={() => setVerMes(v => !v)} className="anillo-foco mt-2 self-start rounded-sm text-sm text-[var(--lh-accent)] underline underline-offset-[3px]">
-									{verMes ? "Ver solo la semana" : "Ver el mes"}
-								</button>
-								{verMes && (
-									<div className="mt-2">
-										<LineaRitmo ritmo={ritmo} />
-										<AgendaInicio
-											datos={agenda.datos}
-											error={agenda.error}
-											reintentar={agenda.refrescar}
-											ahora={ahora}
-											ocupado={ocupado}
-											inicial={{ vista: "mes" }}
-											onRangos={agenda.onRangos}
-											acciones={{ repasar: acciones.repasar, paso: acciones.paso, abrirUnidad: acciones.abrirUnidad, abrirConversacion: acciones.retomar }}
-										/>
-									</div>
-								)}
-							</Tarjeta>
+							<ProgresoMes ritmo={ritmo} />
+						</>}
+					</div>
+					{lectura && (
+						<div className="flex min-w-0 flex-col gap-4">
+							<AgendaInicio
+								panel
+								key={diaSeleccionado ?? "hoy"}
+								inicial={diaSeleccionado ? { seleccion: { desde: diaSeleccionado, hasta: diaSeleccionado }, mes: `${diaSeleccionado.slice(0, 8)}01` } : undefined}
+								datos={agenda.datos}
+								error={agenda.error}
+								reintentar={agenda.refrescar}
+								ahora={ahora}
+								ocupado={ocupado}
+								onRangos={agenda.onRangos}
+								acciones={{ repasar: acciones.repasar, paso: acciones.paso, abrirUnidad: acciones.abrirUnidad, abrirConversacion: acciones.retomar }}
+							/>
 							{porDecidir && porDecidir.total > 0 && (
-								<Tarjeta titulo={`Por decidir (${porDecidir.total})`}>
+								<Tarjeta titulo={`Por decidir (${porDecidir.total})`} Icono={InboxIcon}>
 									<ListaPorDecidirHoy lectura={porDecidir.lectura} abrir={porDecidir.abrir} />
 								</Tarjeta>
 							)}
 						</div>
-					</div>
-				)}
+					)}
+				</div>
 			</main>
+		</div>
+	);
+}
+
+const FECHA_LARGA = new Intl.DateTimeFormat("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+/** «Martes, 24 de noviembre de 2026». */
+export const fechaDe = (dia: string) => { const [a, m, d] = dia.split("-").map(Number); return new Date(a!, m! - 1, d!); };
+export function fechaDeHoy(ahora: Date): string {
+	const t = FECHA_LARGA.format(ahora);
+	return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/** Días con actividad en el mes de hoy y días que tiene el mes. */
+export function progresoDelMes(ritmo: LecturaRitmo): { dias: number; total: number } {
+	const mes = ritmo.hoy.slice(0, 7);
+	const [a, m] = mes.split("-").map(Number);
+	return { dias: ritmo.actividad.filter(x => x.dia.startsWith(mes) && x.n > 0).length, total: new Date(a!, m!, 0).getDate() };
+}
+
+/** «Progreso del mes» (referencia 1): la barra del mes y, al lado, racha, repasos e intentos de la semana. */
+function ProgresoMes({ ritmo }: { ritmo: LecturaRitmo | null }) {
+	const p = ritmo ? progresoDelMes(ritmo) : null;
+	const porcentaje = p ? Math.round((p.dias / p.total) * 100) : 0;
+	const intentos = ritmo?.intentosPorSemana.at(-1) ?? 0;
+	return (
+		<section aria-label="Progreso del mes" className={cn(TARJETA_PANEL, "grid grid-cols-2 gap-4 sm:grid-cols-[1.6fr_repeat(3,1fr)] sm:gap-0 sm:divide-x sm:divide-border")} data-ritmo="">
+			<div className="sm:pr-5">
+				<h2 className="flex items-center gap-2 text-lg font-bold"><BarChart3Icon className="size-5" aria-hidden />Progreso del mes</h2>
+				<div className="mt-1 flex items-baseline justify-between text-sm text-muted-foreground">
+					<span>{p ? `${p.dias} de ${p.total} días` : "—"}</span>
+					<b className="text-base font-semibold text-foreground">{p ? `${porcentaje} %` : ""}</b>
+				</div>
+				<div className="mt-3 h-2.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={porcentaje} aria-label="Días con actividad este mes">
+					<div className="h-full rounded-full bg-success" style={{ width: `${Math.max(porcentaje, p && p.dias > 0 ? 4 : 0)}%` }} />
+				</div>
+			</div>
+			<Cifra Icono={FlameIcon} color="text-warning" valor={ritmo ? `${ritmo.racha} ${ritmo.racha === 1 ? "día" : "días"}` : "—"} etiqueta="de racha" />
+			<Cifra Icono={RotateCwIcon} valor={ritmo ? String(ritmo.repasos.total) : "—"} etiqueta="repasos" />
+			<Cifra Icono={TargetIcon} valor={ritmo ? String(intentos) : "—"} etiqueta="intentos en 7 días" />
+		</section>
+	);
+}
+
+function Cifra({ Icono, color, valor, etiqueta, nota }: { Icono: React.ComponentType<{ className?: string }>; color?: string; valor: string; etiqueta: string; nota?: string }) {
+	return (
+		<div className="flex flex-col sm:px-5">
+			<Icono className={cn("size-5", color ?? "text-muted-foreground")} aria-hidden />
+			<b className="mt-1 text-lg font-semibold leading-tight">{valor}</b>
+			<span className="text-sm text-muted-foreground">{etiqueta}</span>
+			{nota && <span className="text-xs text-muted-foreground">{nota}</span>}
 		</div>
 	);
 }
@@ -221,7 +280,9 @@ function AccionesRapidas({ lectura, unidades, sinPlanes, volcadoPendiente, enfoc
 	const vacia = !(sinPlanes && lectura.paso) && repasos.length === 0 && !abierto;
 	// «Para hoy» (variante B, como la maqueta): una fila por cosa que toca hoy, con su estado a la derecha.
 	return (
-		<Tarjeta titulo="Para hoy">
+		<section aria-label="Para hoy" className={cn(TARJETA_PANEL, "flex min-w-0 items-center gap-6 px-6 py-5")}>
+			<div className="min-w-0 flex-1">
+			<h2 className="mb-2 flex items-center gap-2.5 text-xl font-bold"><CircleCheckIcon className="size-5" aria-hidden />Para hoy</h2>
 			<div className="flex flex-col" role="group" aria-label="Acciones rápidas">
 				{sinPlanes && lectura.paso && (
 					<FilaHoy data-ficha="crear-plan" color="neutro" texto="Crear plan" onClick={() => setCreandoPlan(v => !v)} disabled={ocupado} />
@@ -240,14 +301,14 @@ function AccionesRapidas({ lectura, unidades, sinPlanes, volcadoPendiente, enfoc
 						disabled={ocupado}
 					/>
 				)}
-				{vacia && <p className="px-2 py-1.5 text-sm text-muted-foreground">Nada pendiente para hoy.</p>}
+				{vacia && <p className="px-2 py-1 text-lg">Nada pendiente para hoy.</p>}
 			</div>
-			{/* Decisión de David: las acciones que no son «de hoy», como enlaces discretos al pie. */}
-			<p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 px-2 text-sm text-muted-foreground">
+			{/* Decisión de David: las acciones que no son «de hoy», al pie, como botones redondeados (referencia 1). */}
+			<div className="mt-3 flex flex-wrap items-center gap-2">
 				{unidades.length > 0 && <>
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild disabled={ocupado}>
-							<button type="button" data-ficha="prueba" className="anillo-foco rounded-sm underline underline-offset-2 hover:text-foreground">Ponerme a prueba</button>
+							<button type="button" data-ficha="prueba" className="anillo-foco inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm hover:bg-accent"><TargetIcon className="size-3.5" aria-hidden />Ponerme a prueba</button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="start" className="max-h-72 max-w-xs font-prose">
 							<DropdownMenuLabel className="text-xs text-muted-foreground">Practicar una unidad</DropdownMenuLabel>
@@ -256,23 +317,23 @@ function AccionesRapidas({ lectura, unidades, sinPlanes, volcadoPendiente, enfoc
 							))}
 						</DropdownMenuContent>
 					</DropdownMenu>
-					<span aria-hidden>·</span>
 				</>}
-				<button type="button" data-ficha="material" onClick={acciones.anadirMaterial} disabled={ocupado} className="anillo-foco rounded-sm underline underline-offset-2 hover:text-foreground">Añadir material</button>
-				<span aria-hidden>·</span>
-				<button type="button" data-ficha="contexto" onClick={() => volcadoPendiente ? acciones.abrirVolcado(volcadoPendiente) : enfocarCaja()} disabled={ocupado} className="anillo-foco rounded-sm underline underline-offset-2 hover:text-foreground">Añadir contexto</button>
-			</p>
+				<button type="button" data-ficha="material" onClick={acciones.anadirMaterial} disabled={ocupado} className="anillo-foco inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm hover:bg-accent"><PlusIcon className="size-3.5" aria-hidden />Añadir material</button>
+				<button type="button" data-ficha="contexto" onClick={() => volcadoPendiente ? acciones.abrirVolcado(volcadoPendiente) : enfocarCaja()} disabled={ocupado} className="anillo-foco inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm hover:bg-accent"><LayersIcon className="size-3.5" aria-hidden />Añadir contexto</button>
+			</div>
 			{creandoPlan && sinPlanes && lectura.paso && <NuevoPlan ocupado={ocupado} crear={acciones.crearPlan} />}
-		</Tarjeta>
+			</div>
+			<span className="hidden size-24 shrink-0 place-items-center rounded-full bg-success/10 text-success sm:grid" aria-hidden><ClipboardCheckIcon className="size-10" /></span>
+		</section>
 	);
 }
 
 /** Una tarjeta del panel de hoy: título pequeño y su contenido. Como en la maqueta, más clara que el papel en los
  * temas claros; en los oscuros, la superficie del tema. */
-function Tarjeta({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+function Tarjeta({ titulo, Icono, children }: { titulo: string; Icono?: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
 	return (
-		<section aria-label={titulo} className="flex min-w-0 flex-col rounded-2xl bg-[color-mix(in_oklab,var(--background),white_60%)] dark:bg-card px-4 py-3.5">
-			<h2 className="mb-2 text-sm font-semibold text-muted-foreground">{titulo}</h2>
+		<section aria-label={titulo} className={cn(TARJETA_PANEL, "flex min-w-0 flex-col")}>
+			<h2 className="mb-2 flex items-center gap-2 text-base font-semibold">{Icono && <Icono className="size-4" aria-hidden />}{titulo}</h2>
 			{children}
 		</section>
 	);
@@ -287,52 +348,70 @@ function SiguientePaso({ lectura, sinPlanes, ocupado, acciones }: { lectura: Lec
 	const [otros, setOtros] = useState(false);
 	const [creandoPlan, setCreandoPlan] = useState(false);
 	const paso = lectura.paso;
-	// Sin paso (decisión de David del 24-nov-2026): la tarjeta invita a empezar; sin planes, crear uno, y si no,
-	// pedirle al tutor qué hacer.
-	if (!paso) {
-		return (
-			<Tarjeta titulo="Siguiente paso">
-				<p className="text-[length:var(--lh-prose-size)] font-bold leading-snug">No hay nada propuesto ahora</p>
-				<p className="mt-1 text-sm text-muted-foreground">
-					{sinPlanes ? "Crea un plan con tu objetivo y el tutor te propondrá por dónde empezar." : "Pídele al tutor que te proponga qué hacer, o escribe arriba lo que quieras."}
-				</p>
-				<div className="mt-3 flex flex-wrap gap-2">
-					{sinPlanes ? (
-						<Button size="sm" data-ficha="crear-plan" aria-expanded={creandoPlan} onClick={() => setCreandoPlan(v => !v)} disabled={ocupado}>Crear plan</Button>
-					) : (
-						<Button size="sm" data-pedir-paso="" onClick={() => acciones.enviar(PEDIR_PASO, null)} disabled={ocupado}>Pedir un siguiente paso</Button>
-					)}
-				</div>
-				{creandoPlan && sinPlanes && <NuevoPlan ocupado={ocupado} crear={acciones.crearPlan} />}
-			</Tarjeta>
-		);
-	}
-	const demas = lectura.pasos.filter(p => !(p.unitId === paso.unitId && p.tipo === paso.tipo));
+	const demas = paso ? lectura.pasos.filter(p => !(p.unitId === paso.unitId && p.tipo === paso.tipo)) : [];
 	return (
-		<Tarjeta titulo="Siguiente paso">
-			<p className="text-[length:var(--lh-prose-size)] font-bold leading-snug">{paso.accion} · {paso.titulo}</p>
-			<p className="mt-1 text-sm text-muted-foreground">{paso.motivo}</p>
-			<div className="mt-3 flex flex-wrap gap-2">
-				<Button size="sm" data-ficha="continuar" data-destacada="true" title={paso.motivo} onClick={() => acciones.paso(paso)} disabled={ocupado}>
-					Empezar
-				</Button>
-				{demas.length > 0 && (
-					<Button size="sm" variant="outline" aria-expanded={otros} onClick={() => setOtros(v => !v)}>Otra cosa</Button>
-				)}
+		<section aria-label="Siguiente paso" className={cn(TARJETA_PANEL, "relative flex min-w-0 items-center gap-6 overflow-hidden px-6 py-5")}>
+			<div className="min-w-0 flex-1">
+				<h2 className="flex items-center gap-2 text-sm font-semibold"><RouteIcon className="size-4" aria-hidden />Siguiente paso</h2>
+				{paso ? <>
+					<p className="mt-2 text-2xl font-bold leading-tight">{paso.accion} · {paso.titulo}</p>
+					<p className="mt-1.5 text-muted-foreground">{paso.motivo}</p>
+					<div className="mt-4 flex flex-wrap gap-2">
+						<Button className="h-10 rounded-xl px-5" data-ficha="continuar" data-destacada="true" title={paso.motivo} onClick={() => acciones.paso(paso)} disabled={ocupado}>
+							<PlayIcon className="size-4" aria-hidden />Empezar
+						</Button>
+						{demas.length > 0 && (
+							<Button variant="outline" className="h-10 rounded-xl px-5" aria-expanded={otros} onClick={() => setOtros(v => !v)}>Otra cosa</Button>
+						)}
+					</div>
+					{otros && (
+						<ul className="mt-3 flex flex-col" aria-label="Otros pasos propuestos">
+							{demas.map(p => (
+								<li key={`${p.unitId}-${p.tipo}`}>
+									<button type="button" onClick={() => acciones.paso(p)} disabled={ocupado} className="anillo-foco flex w-full min-w-0 flex-col items-start rounded-lg px-2 py-1.5 text-left hover:bg-accent">
+										<span className="truncate font-medium">{p.accion} · {p.titulo}</span>
+										<span className="line-clamp-1 text-sm text-muted-foreground">{p.motivo}</span>
+									</button>
+								</li>
+							))}
+						</ul>
+					)}
+				</> : <>
+					{/* Sin paso (decisión de David del 24-nov-2026): invita a empezar. */}
+					<p className="mt-2 text-2xl font-bold leading-tight">No hay nada propuesto ahora</p>
+					<p className="mt-1.5 text-muted-foreground">
+						{sinPlanes ? "Crea un plan con tu objetivo y el tutor te propondrá por dónde empezar." : "Pídele al tutor que te proponga qué hacer, o escribe arriba lo que quieras."}
+					</p>
+					<div className="mt-4 flex flex-wrap gap-2">
+						{sinPlanes ? (
+							<Button className="h-10 rounded-xl px-5" data-ficha="crear-plan" aria-expanded={creandoPlan} onClick={() => setCreandoPlan(v => !v)} disabled={ocupado}>
+								<PlusIcon className="size-4" aria-hidden />Crear plan
+							</Button>
+						) : (
+							<Button className="h-10 rounded-xl px-5" data-pedir-paso="" onClick={() => acciones.enviar(PEDIR_PASO, null)} disabled={ocupado}>
+								<MessagesSquareIcon className="size-4" aria-hidden />Pedir un siguiente paso
+							</Button>
+						)}
+					</div>
+					{creandoPlan && sinPlanes && <NuevoPlan ocupado={ocupado} crear={acciones.crearPlan} />}
+				</>}
 			</div>
-			{otros && (
-				<ul className="mt-3 flex flex-col" aria-label="Otros pasos propuestos">
-					{demas.map(p => (
-						<li key={`${p.unitId}-${p.tipo}`}>
-							<button type="button" onClick={() => acciones.paso(p)} disabled={ocupado} className="flex w-full min-w-0 flex-col items-start rounded-lg px-2 py-1.5 text-left outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50">
-								<span className="truncate font-medium">{p.accion} · {p.titulo}</span>
-								<span className="line-clamp-1 text-sm text-muted-foreground">{p.motivo}</span>
-							</button>
-						</li>
-					))}
-				</ul>
-			)}
-		</Tarjeta>
+			<IlustracionPaso />
+		</section>
+	);
+}
+
+/** La ilustración de «Siguiente paso» (referencia 1): capas verdes con un visto. Decorativa. */
+function IlustracionPaso() {
+	return (
+		<svg viewBox="0 0 160 140" className="hidden h-32 w-36 shrink-0 text-success sm:block" aria-hidden="true">
+			<g fill="currentColor">
+				<path d="M80 96 L140 66 L80 36 L20 66 Z" opacity="0.18" transform="translate(0 22)" />
+				<path d="M80 96 L140 66 L80 36 L20 66 Z" opacity="0.28" transform="translate(0 8)" />
+				<path d="M80 96 L140 66 L80 36 L20 66 Z" opacity="0.12" />
+			</g>
+			<path d="M60 52 L76 68 L112 30" fill="none" stroke="currentColor" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+		</svg>
 	);
 }
 

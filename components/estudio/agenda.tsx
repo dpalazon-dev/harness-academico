@@ -12,7 +12,7 @@
  * `useDatosAgenda` los lee con la operación `agenda` de Estudio.
  */
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ComponentType } from "react";
-import { BookOpenIcon, ChevronDownIcon, ChevronUpIcon, NotebookPenIcon, PenLineIcon, RotateCwIcon } from "lucide-react";
+import { ActivityIcon, BookOpenIcon, CalendarDaysIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, ClipboardCheckIcon, NotebookPenIcon, PenLineIcon, RotateCwIcon } from "lucide-react";
 import { Week, getDefaultClassNames, type DayButtonProps, type WeekProps } from "react-day-picker";
 import { es } from "react-day-picker/locale";
 import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
@@ -42,6 +42,11 @@ export interface EstadoAgenda {
 	/** «Elegir rango»: falta el primer día o el último. */
 	eligiendo: "inicio" | "fin" | null;
 }
+
+/** Las tarjetas del panel de hoy: más claras que el papel en los temas claros; en los oscuros, la superficie. */
+const MES_LARGO = new Intl.DateTimeFormat("es-ES", { month: "long" });
+const DIA_LETRAS = new Intl.DateTimeFormat("es-ES", { weekday: "short" });
+export const TARJETA_PANEL = "rounded-2xl border border-border bg-[color-mix(in_oklab,var(--background),white_60%)] p-4 dark:bg-card";
 
 /** Como la operación: un rango elegido a mano no pasa de un año. */
 const MAX_DIAS = 366;
@@ -108,7 +113,7 @@ function FilaSemana(props: WeekProps) {
 }
 const COMPONENTES = { DayButton: BotonDia, Week: FilaSemana };
 
-export function AgendaInicio({ datos, error, reintentar, ahora = new Date(), ocupado, acciones, inicial, onRangos }: {
+export function AgendaInicio({ datos, error, reintentar, ahora = new Date(), ocupado, acciones, inicial, onRangos, panel = false }: {
 	/** null mientras se lee por primera vez. */
 	datos: DatosAgenda | null;
 	/** La última lectura falló: la lista lo dice en lugar de quedarse leyendo. */
@@ -121,9 +126,12 @@ export function AgendaInicio({ datos, error, reintentar, ahora = new Date(), ocu
 	inicial?: Partial<EstadoAgenda>;
 	/** Lo que hay que leer: lo visible en el calendario y la selección. */
 	onRangos(r: { visible: Rango; seleccion: Rango }): void;
+	/** Panel del inicio (decisión de David del 24-nov-2026): el mes siempre abierto en su tarjeta, sin «Ver el mes», y
+	 * la lista del día en una tarjeta aparte, «Actividad reciente». */
+	panel?: boolean;
 }) {
 	const hoy = datos?.hoy ?? isoLocal(ahora);
-	const [estado, setEstado] = useState<EstadoAgenda>(() => ({ ...estadoInicial(hoy), ...inicial }));
+	const [estado, setEstado] = useState<EstadoAgenda>(() => ({ ...estadoInicial(hoy), ...(panel ? { vista: "mes" as const } : {}), ...inicial }));
 	const visible = rangoVisible(estado, hoy);
 	const { seleccion } = estado;
 
@@ -153,7 +161,16 @@ export function AgendaInicio({ datos, error, reintentar, ahora = new Date(), ocu
 
 	return (
 		<SemanaPlegada.Provider value={semana ? lunes : null}>
-			<section aria-label="Agenda" className="mt-4 rounded-2xl border border-border bg-card p-3" data-agenda={estado.vista}>
+			<section aria-label="Agenda" className={panel ? TARJETA_PANEL : "mt-4 rounded-2xl border border-border bg-card p-3"} data-agenda={estado.vista}>
+				{panel && (
+					// Referencia 1: el mes a la izquierda con su icono y las flechas a la derecha.
+					<div className="mb-3 flex items-center gap-2.5">
+						<CalendarDaysIcon className="size-5" aria-hidden />
+						<h2 className="flex-1 text-lg font-bold first-letter:uppercase">{MES_LARGO.format(fechaLocal(estado.mes))} {estado.mes.slice(0, 4)}</h2>
+						<button type="button" aria-label="Mes anterior" onClick={() => setEstado(e => ({ ...e, mes: primeroDeMes(sumar(e.mes, -1)) }))} className="anillo-foco rounded-md p-1 hover:bg-accent"><ChevronLeftIcon className="size-4" /></button>
+						<button type="button" aria-label="Mes siguiente" onClick={() => setEstado(e => ({ ...e, mes: sumar(ultimoDeMes(e.mes), 1) }))} className="anillo-foco rounded-md p-1 hover:bg-accent"><ChevronRightIcon className="size-4" /></button>
+					</div>
+				)}
 				<Calendar
 					mode="range"
 					selected={{ from: fechaLocal(seleccion.desde), to: fechaLocal(seleccion.hasta) }}
@@ -162,7 +179,8 @@ export function AgendaInicio({ datos, error, reintentar, ahora = new Date(), ocu
 					month={fechaLocal(semana ? primeroDeMes(hoy) : estado.mes)}
 					onMonthChange={m => setEstado(e => ({ ...e, mes: isoLocal(new Date(m.getFullYear(), m.getMonth(), 1)) }))}
 					today={fechaLocal(hoy)}
-					hideNavigation={semana}
+					hideNavigation={semana || panel}
+					formatters={panel ? { formatWeekdayName: d => { const t = DIA_LETRAS.format(d).replace(".", "").slice(0, 2); return t.charAt(0).toUpperCase() + t.slice(1); } } : undefined}
 				// Plegada, los días de otras semanas no se pintan; ocultos, el foco de las flechas no va a ellos.
 				hidden={semana ? [{ before: fechaLocal(lunes) }, { after: fechaLocal(sumar(lunes, 6)) }] : undefined}
 					locale={es}
@@ -173,6 +191,7 @@ export function AgendaInicio({ datos, error, reintentar, ahora = new Date(), ocu
 						day: cn("relative w-full p-0 text-center select-none group/day", pordefecto.day),
 						today: cn("rounded-md", pordefecto.today),
 						caption_label: cn("select-none text-sm font-medium first-letter:uppercase", pordefecto.caption_label),
+						...(panel ? { month_caption: "hidden" } : {}),
 					}}
 					modifiers={{
 						act1: fechas((d, x) => pasado(d) && nivel(x) === 1),
@@ -186,19 +205,24 @@ export function AgendaInicio({ datos, error, reintentar, ahora = new Date(), ocu
 					<Atajo activo={esHoy} onClick={() => seleccionar({ desde: hoy, hasta: hoy })}>Hoy</Atajo>
 					<Atajo activo={esSiete} onClick={() => seleccionar({ desde: hoy, hasta: sumar(hoy, 6) })}>Próximos 7 días</Atajo>
 					<Atajo activo={estado.eligiendo !== null} onClick={() => setEstado(e => ({ ...e, vista: "mes", eligiendo: "inicio" }))}>
-						{estado.eligiendo === "inicio" ? "Elige el primer día…" : estado.eligiendo === "fin" ? "Elige el último día…" : "Elegir rango"}
+						{panel && <CalendarDaysIcon className="mr-1 inline size-3.5 align-[-2px]" aria-hidden />}{estado.eligiendo === "inicio" ? "Elige el primer día…" : estado.eligiendo === "fin" ? "Elige el último día…" : "Elegir rango"}
 					</Atajo>
-					<button
+					{!panel && <button
 						type="button"
 						onClick={() => setEstado(e => ({ ...e, vista: e.vista === "semana" ? "mes" : "semana", mes: primeroDeMes(hoy), eligiendo: null }))}
 						className="anillo-foco ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
 					>
 						{semana ? <><ChevronDownIcon className="size-3.5" />Ver el mes</> : <><ChevronUpIcon className="size-3.5" />Ver solo esta semana</>}
-					</button>
+					</button>}
 				</div>
 				<Leyenda />
-				<ListaAgenda datos={datos} error={error ?? null} reintentar={reintentar} hoy={hoy} seleccion={seleccion} ocupado={ocupado} acciones={acciones} />
+				{!panel && <ListaAgenda datos={datos} error={error ?? null} reintentar={reintentar} hoy={hoy} seleccion={seleccion} ocupado={ocupado} acciones={acciones} />}
 			</section>
+			{panel && (
+				<section aria-label="Actividad reciente" className={cn(TARJETA_PANEL, "mt-4")} data-agenda="actividad">
+					<ListaAgenda datos={datos} error={error ?? null} reintentar={reintentar} hoy={hoy} seleccion={seleccion} ocupado={ocupado} acciones={acciones} panel />
+				</section>
+			)}
 		</SemanaPlegada.Provider>
 	);
 }
@@ -280,8 +304,10 @@ const sinPunto = (t: string) => t.replace(".", "");
 const mayuscula = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 
-function ListaAgenda({ datos, error, reintentar, hoy, seleccion, ocupado, acciones }: {
+function ListaAgenda({ datos, error, reintentar, hoy, seleccion, ocupado, acciones, panel = false }: {
 	datos: DatosAgenda | null; error: string | null; reintentar?: () => void; hoy: string; seleccion: Rango; ocupado: boolean; acciones: AccionesAgenda;
+	/** «Actividad reciente» del panel de hoy (referencia 1): cabecera con icono y recuento, y el vacío con ilustración. */
+	panel?: boolean;
 }) {
 	const unDia = seleccion.desde === seleccion.hasta;
 	// Cada día dice lo suyo: lo hecho si pasó; hoy, lo pendiente (en un rango, solo sus repasos); después, sus repasos.
@@ -301,8 +327,15 @@ function ListaAgenda({ datos, error, reintentar, hoy, seleccion, ocupado, accion
 		: seleccion.hasta < hoy ? "No estudiaste en estas fechas." : "Nada planificado en estas fechas.";
 
 	return (
-		<div data-agenda="lista" aria-busy={datos === null && !error} className="mt-3 border-t border-border pt-2">
-			<div className="flex items-baseline justify-between gap-3 px-2 pb-1.5 pt-1">
+		<div data-agenda="lista" aria-busy={datos === null && !error} className={panel ? "" : "mt-3 border-t border-border pt-2"}>
+			{panel && (
+				<div className="flex items-center gap-2.5 pb-2">
+					<ActivityIcon className="size-5" aria-hidden />
+					<h2 className="flex-1 text-lg font-bold">Actividad reciente</h2>
+					<small className="shrink-0 text-sm text-muted-foreground">{resumen || plural(0, "pendiente", "pendientes")}</small>
+				</div>
+			)}
+			<div className={cn("flex items-baseline justify-between gap-3 px-2 pb-1.5 pt-1", panel && unDia && seleccion.desde === hoy && "hidden")}>
 				<h2 className="text-sm font-semibold">
 					{unDia ? mayuscula(sinPunto(fechaLarga.format(fechaLocal(seleccion.desde)))) : `${sinPunto(fechaCorta.format(fechaLocal(seleccion.desde)))} – ${sinPunto(fechaCorta.format(fechaLocal(seleccion.hasta)))}`}
 				</h2>
@@ -311,7 +344,15 @@ function ListaAgenda({ datos, error, reintentar, hoy, seleccion, ocupado, accion
 			{/* Con datos de antes, la lista se queda y el aviso va encima: puede que ya no esté al día. */}
 			{error && <ErrorDeLectura que="la agenda" reintentar={reintentar} className="px-2 py-1.5" />}
 			{datos === null ? (!error && <p className="px-2 py-1.5 text-sm text-muted-foreground">Leyendo la agenda…</p>)
-				: filas.length === 0 ? <p className="px-2 py-1.5 text-sm text-muted-foreground">{vacio}</p>
+				: filas.length === 0 ? (panel ? (
+					<div className="flex items-center gap-4 py-3" data-agenda="vacio">
+						<span className="grid size-14 shrink-0 place-items-center rounded-full bg-success/10 text-success"><ClipboardCheckIcon className="size-6" aria-hidden /></span>
+						<div>
+							<p className="font-semibold">{vacio}</p>
+							{seleccion.hasta >= hoy && <p className="text-sm text-muted-foreground">Buen momento para avanzar en tus objetivos.</p>}
+						</div>
+					</div>
+				) : <p className="px-2 py-1.5 text-sm text-muted-foreground">{vacio}</p>)
 				: (
 					<ol>
 						{filas.map(f => (
