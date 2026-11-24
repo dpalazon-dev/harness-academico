@@ -31,7 +31,7 @@ const mocha = BUILTIN_THEMES.find((t) => t.id === "catppuccin-mocha")!;
 describe("resolveAppearance — delta over factory", () => {
 	it("absent everything = the factory view", () => {
 		const a = resolveAppearance(undefined);
-		assert.equal(a.theme, "papel"); // HarnessAcademico
+		assert.equal(a.theme, "limpio"); // HarnessAcademico
 		assert.equal(a.background, null);
 		assert.deepEqual(a.colors, {});
 		assert.equal(a.fontFamily, null);
@@ -65,7 +65,7 @@ describe("appearanceVars — the mapping the provider applies", () => {
 		const vars = appearanceVars(resolveAppearance({ fontFamily: "JetBrains Mono" }), mocha);
 		assert.equal(
 			vars["--font-prose"],
-			`"JetBrains Mono", var(--font-jetbrains), var(--font-atkinson), ui-sans-serif, system-ui, sans-serif`,
+			`"JetBrains Mono", var(--font-jetbrains), var(--font-inter), ui-sans-serif, system-ui, sans-serif`,
 		);
 	});
 
@@ -84,7 +84,7 @@ describe("appearanceVars — the mapping the provider applies", () => {
 		assert.equal(vars["--background"], "#101820");
 		assert.equal(vars["--card"], mocha.colors.surface, "un-overridden colors stay the theme's");
 		assert.equal(vars["--lh-warning"], "#fab387");
-		assert.equal(vars["--font-prose"], `"Georgia", var(--font-atkinson), ui-sans-serif, system-ui, sans-serif`);
+		assert.equal(vars["--font-prose"], `"Georgia", var(--font-inter), ui-sans-serif, system-ui, sans-serif`);
 		assert.equal(vars["--lh-prose-size"], "18px");
 		assert.equal(vars["--font-title"], "var(--font-prose)", "serif off → titles follow the prose font");
 		assert.equal(vars["--lh-heading-weight"], "700");

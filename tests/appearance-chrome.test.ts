@@ -36,7 +36,7 @@ it("selected custom files resolve before a renderer; missing or malformed files 
 	}
 	fs.unlinkSync(path.join(data, "themes", "custom-paper.json"));
 	record({ theme: "custom-paper", background: "#abc" });
-	// HarnessAcademico: sin archivo, el tema de fábrica (Papel, claro).
+	// HarnessAcademico: sin archivo, el tema de fábrica (Limpio, claro).
 	assert.deepEqual(readAppearance(data), { mode: FACTORY_THEME.mode, background: "#abc" });
 	for (const theme of ["../outside", "__proto__", "constructor", "unknown"]) {
 		record({ theme });
@@ -45,13 +45,13 @@ it("selected custom files resolve before a renderer; missing or malformed files 
 });
 
 it("absent and corrupt records fall back; renderer reports are normalized", () => {
-	// HarnessAcademico: la vuelta atrás es el tema de fábrica, Papel.
-	assert.deepEqual(readAppearance(data), { mode: "light", background: "#f7f3ea" });
+	// HarnessAcademico: la vuelta atrás es el tema de fábrica, Limpio.
+	assert.deepEqual(readAppearance(data), { mode: "light", background: "#f7f7f9" });
 	fs.writeFileSync(path.join(data, "settings.json"), "{");
-	assert.deepEqual(readAppearance(data), { mode: "light", background: "#f7f3ea" });
+	assert.deepEqual(readAppearance(data), { mode: "light", background: "#f7f7f9" });
 	for (const theme of [null, [], {}, { toString: null }, 123, true]) {
 		record({ theme });
-		assert.deepEqual(readAppearance(data), { mode: "light", background: "#f7f3ea" });
+		assert.deepEqual(readAppearance(data), { mode: "light", background: "#f7f7f9" });
 	}
 	assert.deepEqual(normalizeAppearance({ mode: "light", background: "#fff" }), { mode: "light", background: "#fff" });
 	assert.deepEqual(normalizeAppearance({ mode: "system", background: "white" }), { mode: "dark", background: null });

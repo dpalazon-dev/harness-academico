@@ -48,10 +48,10 @@ describe("the «Letra de títulos» row", () => {
 		assert.ok(html.includes('data-testid="font-trigger"'), "the reading picker stays");
 	});
 
-	// HarnessAcademico: el título por defecto es Atkinson Hyperlegible Next.
-	it("shows the default (Atkinson) for a record without the toggle or with it on", () => {
-		assert.match(triggerText(undefined), /Atkinson Hyperlegible Next/);
-		assert.match(triggerText({ sessionNameSerif: true }), /Atkinson Hyperlegible Next/);
+	// HarnessAcademico: el título por defecto es Inter.
+	it("shows the default (Inter) for a record without the toggle or with it on", () => {
+		assert.match(triggerText(undefined), /Inter/);
+		assert.match(triggerText({ sessionNameSerif: true }), /Inter/);
 	});
 
 	it("shows «Igual que la lectura» for an old record with the toggle off", () => {

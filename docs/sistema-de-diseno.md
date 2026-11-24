@@ -6,6 +6,8 @@ Decisiones de David del 23-nov-2026, elegidas sobre maquetas con variantes (`maq
 
 ## Referente
 
+**Actualización del 24-nov-2026 (decisión de David):** aspecto «limpio». Tema de fábrica «Limpio» (fondo casi blanco, tarjetas blancas con sombra suave, bordes muy claros, acento violeta) y letra **Inter** en toda la app, con iconos de trazo 1,75. Papel y Atkinson siguen elegibles en Ajustes. Donde lo de abajo diga Papel o Atkinson como valor por defecto, manda esta actualización.
+
 **Papel tranquilo**, del tipo de Notion: claro y cálido por defecto (tema «Papel»), sin líneas entre zonas (la barra lateral, la cabecera y el contenido se separan por un fondo apenas distinto), mucho aire y una columna de lectura estrecha con letra grande. Superficies planas, un color de texto fuerte y uno apagado, sin sombras salvo en lo que flota (menús, diálogos), movimiento corto y solo cuando explica un cambio. La página es del contenido (la prosa del tutor, las notas de David); los controles se retiran a la periferia y aparecen cuando hacen falta, como las acciones de un mensaje al pasar el ratón.
 
 **Ningún borde a la izquierda.** Ni en citas, ni en mensajes, ni en comentarios del margen, ni para marcar la fila activa. Lo que antes se marcaba con una raya lateral se marca con un fondo suave (`bg-card` o `bg-muted`) y esquinas redondeadas. Las únicas líneas verticales permitidas son estructurales: separadores de columnas de una tabla y el borde de un panel lateral (`Sheet`, el hilo al margen).

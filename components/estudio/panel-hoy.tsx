@@ -18,14 +18,14 @@ export function elementosPorDecidir(l: LecturaPorDecidir | null): string[] {
 	];
 }
 
-export function ListaPorDecidirHoy({ lectura, abrir }: { lectura: LecturaPorDecidir | null; abrir(): void }) {
+export function ListaPorDecidirHoy({ lectura, abrir, compacta = false }: { lectura: LecturaPorDecidir | null; abrir(): void; compacta?: boolean }) {
 	const todos = elementosPorDecidir(lectura);
 	const vistos = todos.slice(0, 4);
 	return (
 		<ul className="flex flex-col" data-por-decidir-hoy="">
 			{vistos.map((t, i) => (
 				<li key={i}>
-					<button type="button" onClick={abrir} className="anillo-foco w-full min-w-0 truncate rounded-lg px-2 py-1.5 text-left hover:bg-accent">{t}</button>
+					<button type="button" onClick={abrir} className={`anillo-foco w-full min-w-0 truncate rounded-lg px-2 py-1.5 text-left hover:bg-accent${compacta ? " text-sm" : ""}`}>{t}</button>
 				</li>
 			))}
 			{todos.length > vistos.length && (

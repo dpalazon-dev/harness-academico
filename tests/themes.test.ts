@@ -70,15 +70,15 @@ describe("presets", () => {
 		}
 		assert.deepEqual([...ids], [
 			"default", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha",
-			"rose-pine", "rose-pine-dawn", "gruvbox-dark", "ivory", "pastel", "papel", "nvchad-onedark",
+			"rose-pine", "rose-pine-dawn", "gruvbox-dark", "ivory", "pastel", "limpio", "papel", "nvchad-onedark",
 		]);
 	});
 
-	// HarnessAcademico: el tema de fábrica es «Papel»; Default sigue siendo la paleta oscura original.
-	it("an unknown or removed id resolves to the factory theme (Papel)", () => {
+	// HarnessAcademico: el tema de fábrica es «Limpio»; Default sigue siendo la paleta oscura original.
+	it("an unknown or removed id resolves to the factory theme (Limpio)", () => {
 		assert.equal(resolveTheme(undefined), FACTORY_THEME);
 		assert.equal(resolveTheme("gone"), FACTORY_THEME);
-		assert.equal(FACTORY_THEME.id, "papel");
+		assert.equal(FACTORY_THEME.id, "limpio");
 		assert.equal(DEFAULT_THEME.mode, "dark");
 		const custom: Theme = { ...validFile, mode: "dark", id: "my-ayu", builtin: false };
 		assert.equal(resolveTheme("my-ayu", [custom]), custom);

@@ -61,7 +61,7 @@ export interface AccionesInicio {
 	abrirNotas?(): void;
 }
 
-export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, agenda, ritmo, ahora = new Date(), ocupado, error, acciones, porDecidir, enfoque = null }: {
+export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, agenda, ritmo, ahora = new Date(), ocupado, error, acciones, porDecidir, enfoque = [] }: {
 	/** Nombre del espacio activo; null con «Todos». */
 	espacio: string | null;
 	/** null mientras se lee. */
@@ -80,8 +80,8 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 	acciones: AccionesInicio;
 	/** Lo que espera una decisión de David y cómo abrir su panel; sin ello no se enseña la tarjeta. */
 	porDecidir?: { total: number; abrir(): void; lectura: LecturaPorDecidir | null };
-	/** «Enfoque de la semana»: el objetivo del plan del espacio; null o ausente, sin tarjeta. */
-	enfoque?: string | null;
+	/** «Enfoque de la semana»: los objetivos de los planes del espacio; vacío o ausente, sin tarjeta. */
+	enfoque?: string[];
 }) {
 	const [texto, setTexto] = useState("");
 	const [sinContexto, setSinContexto] = useState(false);
@@ -122,17 +122,17 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 					<div className="flex items-start gap-4">
 						<div className="min-w-0 flex-1">
 							<p className="text-base text-muted-foreground">{espacio ?? "Centro de aprendizaje"}</p>
-							<h1 className="mt-1 font-title text-4xl leading-tight" suppressHydrationWarning>{saludo(ahora)}</h1>
+							<h1 className="mt-1 font-title text-4xl leading-tight tracking-tight" suppressHydrationWarning>{saludo(ahora)}</h1>
 							<p className="mt-2 text-lg text-muted-foreground">Tu cabina de estudio. Enfócate, aprende y avanza.</p>
 						</div>
-						<p className="mt-6 inline-flex shrink-0 items-center gap-2 rounded-xl border border-border bg-[color-mix(in_oklab,var(--background),white_60%)] px-4 py-2 text-sm dark:bg-card" suppressHydrationWarning>
+						<p className="mt-6 inline-flex shrink-0 items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm" suppressHydrationWarning>
 							<CalendarDaysIcon className="size-4" aria-hidden />{fechaCorta(ahora)}
 						</p>
 					</div>
 					{error && <p role="alert" className="mt-6 text-sm text-destructive">{error}</p>}
 
 					<form
-						className="mt-8 rounded-2xl border border-[color-mix(in_oklab,var(--lh-accent)_45%,var(--border))] bg-[color-mix(in_oklab,var(--background),white_60%)] shadow-[0_0_0_4px_color-mix(in_oklab,var(--lh-accent)_10%,transparent),0_8px_24px_-12px_rgba(0,0,0,0.12)] dark:bg-card"
+						className="mt-8 rounded-2xl border border-[color-mix(in_oklab,var(--lh-accent)_45%,var(--border))] bg-card shadow-[0_0_0_4px_color-mix(in_oklab,var(--lh-accent)_10%,transparent),0_8px_24px_-12px_rgba(0,0,0,0.12)]"
 						onSubmit={(e) => { e.preventDefault(); enviar(); }}
 					>
 						<div className="flex items-start gap-3 px-5 pt-5">
@@ -185,14 +185,14 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 					</form>
 					<div className="mt-4 flex flex-wrap justify-center gap-2.5" role="group" aria-label="Sugerencias">
 						{SUGERENCIAS.map(({ etiqueta, comienzo, Icono, color }) => (
-							<button key={etiqueta} type="button" data-sugerencia="" onClick={() => sugerir(comienzo)} disabled={ocupado} className="anillo-foco inline-flex items-center gap-2 rounded-full border border-border bg-[color-mix(in_oklab,var(--background),white_60%)] px-4 py-2 text-sm hover:bg-accent dark:bg-card">
+							<button key={etiqueta} type="button" data-sugerencia="" onClick={() => sugerir(comienzo)} disabled={ocupado} className="anillo-foco inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm hover:bg-accent">
 								<Icono className={cn("size-4", color)} aria-hidden />{etiqueta}
 							</button>
 						))}
 					</div>
 
 					{lectura && (
-						<div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)]">
+						<div className="mt-8 grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)]">
 							<div className="flex min-w-0 flex-col gap-6">
 								<SiguientePaso lectura={lectura} sinPlanes={sinPlanes} ocupado={ocupado} acciones={acciones} />
 								<SesionDeHoy lectura={lectura} unidades={unidades} hecho={diaHoy?.hecho.length ?? 0} volcadoPendiente={volcadoPendiente} enfocarCaja={() => { setIndicacion(true); caja.current?.focus(); }} ocupado={ocupado} acciones={acciones} hoy={hoy} />
@@ -203,7 +203,7 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 				</div>
 			</main>
 			{lectura && (
-				<aside aria-label="Tu progreso" className="hidden w-[24rem] shrink-0 overflow-y-auto border-l border-border bg-[color-mix(in_oklab,var(--background),white_45%)] px-6 pb-10 pt-14 lg:block dark:bg-card">
+				<aside aria-label="Tu progreso" className="hidden w-[24rem] shrink-0 overflow-y-auto border-l border-border bg-[color-mix(in_oklab,var(--card),var(--background)_40%)] px-6 pb-10 pt-14 lg:block">
 					<h2 className="text-xl font-bold">Tu progreso</h2>
 					<div className="mt-5 flex flex-col gap-4">
 						<ProgresoSemanal agenda={agenda.datos} lunes={lunes} hoy={hoy} />
@@ -224,13 +224,16 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 						{porDecidir && porDecidir.total > 0 && (
 							<section aria-label="Por decidir" className={TARJETA_PANEL}>
 								<h3 className="mb-2 flex items-center gap-2 text-base font-semibold"><InboxIcon className="size-4" aria-hidden />Por decidir ({porDecidir.total})</h3>
-								<ListaPorDecidirHoy lectura={porDecidir.lectura} abrir={porDecidir.abrir} />
+								<ListaPorDecidirHoy compacta lectura={porDecidir.lectura} abrir={porDecidir.abrir} />
 							</section>
 						)}
-						{enfoque && (
+						{enfoque.length > 0 && (
 							<section aria-label="Enfoque de la semana" className="rounded-2xl border border-[color-mix(in_oklab,var(--lh-success)_30%,var(--border))] bg-success/10 p-4">
 								<h3 className="flex items-center gap-2 text-base font-semibold"><SproutIcon className="size-4 text-success" aria-hidden />Enfoque de la semana</h3>
-								<p className="mt-2 text-sm">{enfoque}</p>
+								<ul className="mt-2 flex flex-col gap-1 text-sm">
+									{enfoque.slice(0, 3).map(o => <li key={o} className="truncate" title={o}>{o}</li>)}
+									{enfoque.length > 3 && <li className="text-muted-foreground">y {enfoque.length - 3} planes más</li>}
+								</ul>
 							</section>
 						)}
 					</div>
@@ -240,7 +243,7 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 	);
 }
 
-const BOTON_CAJA = "anillo-foco inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 text-sm hover:bg-accent";
+const BOTON_CAJA = "anillo-foco inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border px-3 py-1.5 text-sm hover:bg-accent";
 
 /** Las sugerencias bajo la caja: cada una deja en la caja el comienzo de la petición; no envían nada. */
 const SUGERENCIAS = [
@@ -395,7 +398,7 @@ function SesionDeHoy({ lectura, unidades, hecho, volcadoPendiente, enfocarCaja, 
 						disabled={ocupado}
 					/>
 				)}
-				{pendientes === 0 && <p className="px-2 py-2 text-muted-foreground">Nada pendiente para hoy.</p>}
+				{pendientes === 0 && <p className="px-2 py-2 text-[15px] text-muted-foreground">Nada pendiente para hoy.</p>}
 			</div>
 			<div className="mt-4 flex flex-wrap items-center gap-2">
 				{unidades.length > 0 && (
@@ -424,7 +427,7 @@ function FilaSesion({ Icono, texto, estado, onClick, disabled, ...datos }: {
 	return (
 		<button type="button" onClick={onClick} disabled={disabled} {...datos} className="anillo-foco flex w-full min-w-0 items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-accent disabled:opacity-60">
 			<span className="grid size-5 shrink-0 place-items-center rounded-[5px] border border-border text-muted-foreground"><Icono className="size-3" aria-hidden /></span>
-			<span className="min-w-0 flex-1 truncate">{texto}</span>
+			<span className="min-w-0 flex-1 truncate text-[15px]">{texto}</span>
 			<span className="shrink-0 rounded-md bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">{estado}</span>
 		</button>
 	);
@@ -442,7 +445,9 @@ const HECHO: Record<HechoAgenda["tipo"], { nombre: string; Icono: React.Componen
  * no las guarda). */
 function ActividadDeHoy({ dia, error, reintentar, acciones }: { dia: DiaAgenda | undefined; error?: string | null; reintentar?(): void; acciones: AccionesInicio }) {
 	const hecho = dia?.hecho ?? [];
-	const pendientes = dia?.pendientes ?? [];
+	const todos = dia?.pendientes ?? [];
+	// Como mucho cuatro por delante: la tarjeta no debe crecer sin fin (comprobado en la app real con datos).
+	const pendientes = todos.slice(0, 4);
 	return (
 		<section aria-label="Actividad de hoy" className={cn(TARJETA_PANEL, "px-6 py-5")}>
 			<h2 className="flex items-center gap-2.5 text-lg font-bold"><ActivityIcon className="size-5" aria-hidden />Actividad de hoy</h2>
@@ -474,6 +479,7 @@ function ActividadDeHoy({ dia, error, reintentar, acciones }: { dia: DiaAgenda |
 							</button>
 						</li>
 					))}
+					{todos.length > pendientes.length && <li className="pl-9 text-sm text-muted-foreground">y {todos.length - pendientes.length} más</li>}
 				</ol>
 			)}
 		</section>
@@ -596,7 +602,7 @@ export function Inicio({ initialConfigured }: { initialConfigured: boolean }) {
 	const [lectura, setLectura] = useState<LecturaInicio | null>(null);
 	const [unidades, setUnidades] = useState<UnidadActiva[]>([]);
 	const [sinPlanes, setSinPlanes] = useState(false);
-	const [enfoque, setEnfoque] = useState<string | null>(null);
+	const [enfoque, setEnfoque] = useState<string[]>([]);
 	const [ritmo, setRitmo] = useState<LecturaRitmo | null>(null);
 	const [ocupado, setOcupado] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -620,9 +626,9 @@ export function Inicio({ initialConfigured }: { initialConfigured: boolean }) {
 				if (esta !== ultima.current) return;
 				setUnidades(unidadesEnOrden(p).filter(u => !u.propuesta && u.enPlan).map(u => ({ id: u.id, titulo: u.titulo })));
 				setSinPlanes(p.planes.length === 0);
-				setEnfoque(p.planes.length === 1 ? p.planes[0]!.objetivo : p.planes.length > 1 ? p.planes.map(x => x.objetivo).join(" · ") : null);
+				setEnfoque(p.planes.map(x => x.objetivo));
 			})
-			.catch(() => { if (esta === ultima.current) { setUnidades([]); setSinPlanes(false); setEnfoque(null); } });
+			.catch(() => { if (esta === ultima.current) { setUnidades([]); setSinPlanes(false); setEnfoque([]); } });
 		// Si el ritmo no se puede leer, la línea queda vacía: no tapa el inicio con un error.
 		llamarEstudio<LecturaRitmo>("ritmo")
 			.then(r => { if (esta === ultima.current) setRitmo(r); })

@@ -23,7 +23,7 @@
  * it). In a plain dev browser the API is absent → a small curated list
  * + a footer that says exactly that — never a fabricated system list.
  * The custom-family input inside the menu is the manual escape path.
- * Empty/unset keeps meaning the factory family (Atkinson Hyperlegible Next in HarnessAcademico).
+ * Empty/unset keeps meaning the factory family (Inter in HarnessAcademico).
  *
  * Overrides live in two homes by design: `background` and
  * `mdRendering.boldColor/italicColor` keep their pre-theme keys (existing
@@ -51,7 +51,7 @@ import { CommitInput, SettingsMenuTrigger, SettingsRow, Toggle } from "./control
 
 /** The factory reading family — the DEFAULT row's identity (unset =
  *  this). Exported for tests. */
-export const DEFAULT_READING_FONT = "Atkinson Hyperlegible Next";
+export const DEFAULT_READING_FONT = "Inter";
 
 /** The dev-browser fallback list (queryLocalFonts is absent there):
  *  the app's own knowns plus a handful of ubiquitous macOS families,
@@ -97,7 +97,7 @@ export function composeFontFamily(
 
 /** The title default (the bundled "lh-cmu" face) and the pick that
  *  follows the reading font (HarnessAcademico, ux2 ticket 08). */
-export const DEFAULT_TITLE_FONT = "Atkinson Hyperlegible Next"; // HarnessAcademico: títulos sin serifa
+export const DEFAULT_TITLE_FONT = "Inter"; // HarnessAcademico: títulos sin serifa
 /** Its installed name (the curated list has it): left out of the title
  *  menu, where the default row already is that face. */
 const CMU_FAMILY = "CMU Serif";

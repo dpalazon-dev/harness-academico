@@ -201,6 +201,13 @@ export const BUILTIN_THEMES: readonly Theme[] = [
 	// HarnessAcademico (guía de diseño, estilo «papel tranquilo» elegido por David
 	// el 23-nov-2026): el tema por defecto de la app. Venía como archivo
 	// importable en docs/sistema-comun/temas/papel.json.
+	// HarnessAcademico (24-nov-2026): «Limpio», el tema de fábrica: fondo casi blanco, tarjetas blancas, bordes muy
+	// suaves y acento violeta, como la referencia que eligió David.
+	builtin("Limpio", "light", {
+		background: "#f7f7f9", surface: "#ffffff", border: "#ebebef", text: "#18181b", textMuted: "#6b6b76",
+		accent: "#7c5cff", bold: "#18181b", italic: "#18181b", code: "#c2410c",
+		error: "#dc2626", success: "#16a34a", warning: "#ea7a1a",
+	}),
 	builtin("Papel", "light", {
 		background: "#f7f3ea", surface: "#efe9dc", border: "#dcd3c1", text: "#2e2923", textMuted: "#6f665a",
 		accent: "#4a6a8c", bold: "#2c4a66", italic: "#5f5470", code: "#8a5536",
@@ -218,7 +225,7 @@ export const DEFAULT_THEME: Theme = BUILTIN_THEMES[0]!;
 
 /** HarnessAcademico (guía de diseño): el tema de fábrica es «Papel»; Default
  *  sigue siendo la paleta oscura original (y la de los literales de globals.css). */
-export const FACTORY_THEME_ID = "papel";
+export const FACTORY_THEME_ID = "limpio";
 export const FACTORY_THEME: Theme = BUILTIN_THEMES.find((t) => t.id === FACTORY_THEME_ID)!;
 
 /** Preset ids are reserved: imports never take them, DELETE refuses them. */

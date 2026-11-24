@@ -392,7 +392,7 @@ describe("InicioEstudio", () => {
 	});
 
 	it("«Sesión de hoy», «Actividad de hoy» y, a la derecha, «Tu progreso»", () => {
-		const html = inicio({ ritmo: RITMO, enfoque: "Dominar grafos" });
+		const html = inicio({ ritmo: RITMO, enfoque: ["Dominar grafos"] });
 		assert.match(html, /<section aria-label="Sesión de hoy"[\s\S]*hechas/);
 		assert.match(html, /<section aria-label="Actividad de hoy"/);
 		assert.match(html, /<aside aria-label="Tu progreso"[\s\S]*Progreso semanal[\s\S]*Racha[\s\S]*Repasos pendientes[\s\S]*Esta semana[\s\S]*Pendientes clave[\s\S]*Enfoque de la semana[\s\S]*Dominar grafos/);

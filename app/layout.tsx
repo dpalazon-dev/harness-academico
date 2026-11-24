@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Atkinson_Hyperlegible_Next, JetBrains_Mono, Source_Sans_3 } from "next/font/google";
+import { Atkinson_Hyperlegible_Next, Inter, JetBrains_Mono, Source_Sans_3 } from "next/font/google";
 import { connection } from "next/server";
 import "katex/dist/katex.min.css";
 import "./globals.css";
@@ -15,6 +15,9 @@ import { readThemeBoot } from "@/src/server";
 // interfaz y prosa = Atkinson Hyperlegible Next; JetBrains Mono solo para
 // código; Source Sans 3 queda como fuente elegible. Titles = CMU Serif (the
 // bundled lh-cmu @font-face in globals.css — no CDN).
+// HarnessAcademico (24-nov-2026): Inter pasa a ser la letra de la app (aspecto «limpio» elegido por David);
+// Atkinson y Source Sans 3 quedan como fuentes elegibles en Ajustes.
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const atkinson = Atkinson_Hyperlegible_Next({ subsets: ["latin"], variable: "--font-atkinson" });
 const ui = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains" });
 const prose = Source_Sans_3({ subsets: ["latin"], variable: "--font-sans3" });
@@ -35,7 +38,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 	return (
 		<html
 			lang="es"
-			className={`${theme.mode} ${atkinson.variable} ${ui.variable} ${prose.variable}`}
+			className={`${theme.mode} ${inter.variable} ${atkinson.variable} ${ui.variable} ${prose.variable}`}
 			style={vars as React.CSSProperties}
 			suppressHydrationWarning
 		>

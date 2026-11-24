@@ -15,17 +15,17 @@ const titleVar = (delta: Parameters<typeof resolveAppearance>[0]) =>
 	appearanceVars(resolveAppearance(delta), DEFAULT_THEME)["--font-title"];
 
 describe("--font-title from the title-font pick", () => {
-	it("an installed family: that family first, Atkinson as fallback (HarnessAcademico)", () => {
-		assert.equal(titleVar({ titleFont: "Georgia" }), `"Georgia", var(--font-atkinson), ui-sans-serif, system-ui, sans-serif`);
+	it("an installed family: that family first, Inter as fallback (HarnessAcademico)", () => {
+		assert.equal(titleVar({ titleFont: "Georgia" }), `"Georgia", var(--font-inter), ui-sans-serif, system-ui, sans-serif`);
 	});
 
 	it("a bundled family renders from its shipped face", () => {
-		assert.equal(titleVar({ titleFont: "Source Sans 3" }), `"Source Sans 3", var(--font-sans3), var(--font-atkinson), ui-sans-serif, system-ui, sans-serif`);
-		assert.equal(titleVar({ titleFont: "JetBrains Mono" }), `"JetBrains Mono", var(--font-jetbrains), var(--font-atkinson), ui-sans-serif, system-ui, sans-serif`);
+		assert.equal(titleVar({ titleFont: "Source Sans 3" }), `"Source Sans 3", var(--font-sans3), var(--font-inter), ui-sans-serif, system-ui, sans-serif`);
+		assert.equal(titleVar({ titleFont: "JetBrains Mono" }), `"JetBrains Mono", var(--font-jetbrains), var(--font-inter), ui-sans-serif, system-ui, sans-serif`);
 	});
 
 	it("a picked family wins over the old toggle", () => {
-		assert.equal(titleVar({ titleFont: "Georgia", sessionNameSerif: false }), `"Georgia", var(--font-atkinson), ui-sans-serif, system-ui, sans-serif`);
+		assert.equal(titleVar({ titleFont: "Georgia", sessionNameSerif: false }), `"Georgia", var(--font-inter), ui-sans-serif, system-ui, sans-serif`);
 	});
 });
 
@@ -35,7 +35,7 @@ describe("old records (toggle only) read without rewriting", () => {
 		assert.equal(titleVar({ sessionNameSerif: false, titleFont: null }), "var(--font-prose)");
 	});
 
-	it("toggle on → the stylesheet default (Atkinson in HarnessAcademico), no override", () => {
+	it("toggle on → the stylesheet default (Inter in HarnessAcademico), no override", () => {
 		assert.equal(titleVar({ sessionNameSerif: true }), undefined);
 	});
 

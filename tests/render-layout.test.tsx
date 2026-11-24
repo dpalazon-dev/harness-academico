@@ -59,12 +59,12 @@ describe("first paint follows the theme", () => {
 		assert.match(out, /--lh-warning:#123456/);
 	});
 
-	// HarnessAcademico: el tema de fábrica es Papel (claro).
-	it("no record = the Papel light theme", () => {
+	// HarnessAcademico: el tema de fábrica es Limpio (claro).
+	it("no record = the Limpio light theme", () => {
 		fs.rmSync(path.join(TMP_DATA, "settings.json"), { force: true });
 		const out = html();
 		assert.match(out, /<html class="light/);
-		assert.match(out, /--background:#f7f3ea/);
+		assert.match(out, /--background:#f7f7f9/);
 	});
 });
 

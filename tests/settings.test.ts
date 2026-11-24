@@ -28,10 +28,10 @@ describe("FACTORY_SETTINGS (the compiled factory layer)", () => {
 		// with the message anchors (owner, 2026-10-13)
 		assert.deepEqual(FACTORY_SETTINGS.graph, { enabled: true, rendering: true, extractionChunkTokens: 4096 });
 		const a = FACTORY_SETTINGS.appearance;
-		assert.equal(a.theme, "papel"); // HarnessAcademico: estilo «papel tranquilo»
+		assert.equal(a.theme, "limpio"); // HarnessAcademico: aspecto «limpio»
 		assert.equal(a.background, null); // the theme's own background, not a factory hex
 		assert.deepEqual(a.colors, {});
-		assert.equal(a.fontFamily, null); // Atkinson Hyperlegible Next (HarnessAcademico)
+		assert.equal(a.fontFamily, null); // Inter (HarnessAcademico)
 		assert.equal(a.proseFontSize, 17); // HarnessAcademico
 		assert.equal(a.sessionNameSerif, true);
 		assert.equal(a.mdRendering.headingWeight, 700); // HarnessAcademico

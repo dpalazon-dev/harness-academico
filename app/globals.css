@@ -113,7 +113,7 @@
 	   app/layout.tsx. Keep the sans alias pointed at the RUNTIME prose token,
 	   not the loading face, so font-sans also honors Appearance changes. */
 	/* HarnessAcademico: la interfaz en Atkinson Hyperlegible Next (guía de diseño); la monoespaciada, solo para código. */
-	--font-ui: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
+	--font-ui: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 	--font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
 	--font-sans: var(--font-prose);
 	/* The modular type ladder — each size carries its own line-height.
@@ -209,6 +209,8 @@ body {
    the 900 match, a single-weight family draws as designed. */
 .font-title {
 	font-weight: 700;
+	/* HarnessAcademico (aspecto «limpio»): títulos con el interletrado ajustado de Inter. */
+	letter-spacing: -0.02em;
 	font-synthesis-weight: none;
 }
 
@@ -613,9 +615,9 @@ body {
    independently, whether titles use serif or the reading family. Non-inline
    utilities read these vars; Source Sans 3 remains the default/loading face. */
 @theme {
-	--font-prose: var(--font-atkinson), var(--font-sans3), ui-sans-serif, system-ui, sans-serif;
+	--font-prose: var(--font-inter), var(--font-sans3), ui-sans-serif, system-ui, sans-serif;
 	/* HarnessAcademico (decisión de David del 23-nov-2026): títulos en Atkinson negrita, sin serifa; CMU sigue elegible. */
-	--font-title: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
+	--font-title: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Card enter (owner round, 2026-10-05): the transcript cards' one-shot
@@ -663,4 +665,9 @@ body {
 	--sidebar-accent-foreground: var(--accent-foreground);
 	--sidebar-border: var(--border);
 	--sidebar-ring: var(--ring);
+}
+
+/* HarnessAcademico (aspecto «limpio», 24-nov-2026): iconos de trazo fino, como en la referencia elegida por David. */
+svg.lucide {
+	stroke-width: 1.75;
 }

@@ -68,8 +68,9 @@ export function resolveAppearance(delta: AppearanceSettings | undefined) {
  *  one fills in otherwise. Exported for the font menu and tests. */
 export const BUNDLED_READING_FONTS: Readonly<Record<string, string>> = {
 	"JetBrains Mono": "var(--font-jetbrains)",
-	// HarnessAcademico: la lectura por defecto pasó a Atkinson; Source Sans 3 sigue elegible.
+	// HarnessAcademico: la letra por defecto es Inter; Atkinson y Source Sans 3 siguen elegibles.
 	"Source Sans 3": "var(--font-sans3)",
+	"Atkinson Hyperlegible Next": "var(--font-atkinson)",
 };
 
 /** Title fonts the app ships (HarnessAcademico): the reading ones plus
@@ -92,7 +93,7 @@ export function appearanceVars(
 	const vars: Record<string, string> = themeVars(effectiveColors(theme, a), theme.mode);
 	if (a.fontFamily !== null) {
 		const bundled = BUNDLED_READING_FONTS[a.fontFamily];
-		vars["--font-prose"] = `"${a.fontFamily}", ${bundled ? `${bundled}, ` : ""}var(--font-atkinson), ui-sans-serif, system-ui, sans-serif`;
+		vars["--font-prose"] = `"${a.fontFamily}", ${bundled ? `${bundled}, ` : ""}var(--font-inter), ui-sans-serif, system-ui, sans-serif`;
 	}
 	// The ONE documented reading-size variable (typography round 4): prose,
 	// inputs, and session titles all read it, so one setProperty moves them.
@@ -105,7 +106,7 @@ export function appearanceVars(
 	// prose family. Old records are read as they are, never rewritten.
 	if (a.titleFont !== null) {
 		const bundled = BUNDLED_TITLE_FONTS[a.titleFont];
-		vars["--font-title"] = `"${a.titleFont}", ${bundled ? `${bundled}, ` : ""}var(--font-atkinson), ui-sans-serif, system-ui, sans-serif`;
+		vars["--font-title"] = `"${a.titleFont}", ${bundled ? `${bundled}, ` : ""}var(--font-inter), ui-sans-serif, system-ui, sans-serif`;
 	} else if (!a.sessionNameSerif) {
 		vars["--font-title"] = "var(--font-prose)";
 	}

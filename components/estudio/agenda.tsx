@@ -46,7 +46,7 @@ export interface EstadoAgenda {
 /** Las tarjetas del panel de hoy: más claras que el papel en los temas claros; en los oscuros, la superficie. */
 const MES_LARGO = new Intl.DateTimeFormat("es-ES", { month: "long" });
 const DIA_LETRAS = new Intl.DateTimeFormat("es-ES", { weekday: "short" });
-export const TARJETA_PANEL = "rounded-2xl border border-border bg-[color-mix(in_oklab,var(--background),white_60%)] p-4 dark:bg-card";
+export const TARJETA_PANEL = "rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_16px_rgba(16,24,40,0.04)]";
 
 /** Como la operación: un rango elegido a mano no pasa de un año. */
 const MAX_DIAS = 366;
