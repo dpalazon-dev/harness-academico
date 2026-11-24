@@ -346,10 +346,10 @@ describe("InicioEstudio", () => {
 	const inicio = (props: Partial<React.ComponentProps<typeof InicioEstudio>> = {}) =>
 		renderToStaticMarkup(<InicioEstudio espacio="Grafos" lectura={COMPLETA} unidades={[]} agenda={AGENDA} ritmo={null} ahora={AHORA} ocupado={false} error={null} acciones={accionesInicio} {...props} />);
 
-	// HarnessAcademico (Inicio, variante A): saludo según la hora, en la letra de títulos.
-	it("saluda según la hora y ofrece el cuadro de mensaje", () => {
+	// HarnessAcademico (Inicio, variante B): «Hoy en <espacio>», en la letra de títulos.
+	it("titula el panel de hoy con el espacio y ofrece el cuadro de mensaje", () => {
 		const html = inicio();
-		assert.match(html, /<h1[^>]*font-title[^>]*>(Buenos días|Buenas tardes|Buenas noches)<\/h1>/);
+		assert.match(html, /<h1[^>]*font-title[^>]*>Hoy( en [^<]+)?<\/h1>/);
 		assert.match(html, /<textarea/);
 		assert.match(html, /aria-label="Empezar conversación"/);
 		assert.match(html, /Dominar los algoritmos de grafos/);
@@ -360,9 +360,10 @@ describe("InicioEstudio", () => {
 		assert.match(inicio({ lectura: VACIA }), /sin unidad de contexto/);
 	});
 
-	it("«Continuar» lleva la acción y la unidad del paso propuesto, destacada, con el motivo como descripción emergente", () => {
+	// Variante B: el paso propuesto tiene su tarjeta «Siguiente paso», con el motivo a la vista y un botón principal.
+	it("«Siguiente paso» lleva la acción y la unidad del paso propuesto, su motivo y el botón destacado", () => {
 		const html = inicio();
-		assert.match(html, /<button[^>]*title="Sin volcado inicial no podrás ver después qué cambió\."[^>]*data-ficha="continuar"[^>]*data-destacada="true"[^>]*>.*Continuar.*Escribe lo que ya sabes · Árboles de expansión.*<\/button>/);
+		assert.match(html, /<section aria-label="Siguiente paso"[\s\S]*Escribe lo que ya sabes · Árboles de expansión[\s\S]*Sin volcado inicial no podrás ver después qué cambió\.[\s\S]*<button[^>]*data-ficha="continuar"[^>]*data-destacada="true"/);
 		assert.doesNotMatch(html, /data-paso=/, "el paso ya no se pinta como botón aparte");
 		assert.doesNotMatch(inicio({ lectura: VACIA }), /data-ficha="continuar"/, "sin paso, no se ofrece");
 	});
@@ -434,7 +435,8 @@ describe("InicioEstudio", () => {
 		assert.deepEqual(fichas(inicio({ unidades: [] })), ["continuar", "repasar", "retomar", "material", "contexto"]);
 		assert.deepEqual(fichas(inicio({ unidades: [{ id: "u1", titulo: "Recorridos BFS y DFS" }] })), ["continuar", "repasar", "retomar", "prueba", "material"]);
 		const todas = inicio({ lectura: { ...COMPLETA, plan: null }, unidades: [{ id: "u1", titulo: "Recorridos BFS y DFS" }] });
-		assert.deepEqual(fichas(todas), ["crear-plan", "continuar", "repasar", "retomar", "prueba"]);
+		// Variante B: «continuar» va primero, en su tarjeta; el resto, en «Para hoy».
+		assert.deepEqual(fichas(todas), ["continuar", "crear-plan", "repasar", "retomar", "prueba"]);
 	});
 
 	it("«Añadir material» y «Añadir contexto» se nombran tal cual", () => {

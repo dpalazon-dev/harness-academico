@@ -553,7 +553,7 @@ export const FACTORY_SETTINGS: FactorySettings = {
 		background: null, // null = the active theme's background
 		colors: {}, // no overrides: every color is the theme's
 		fontFamily: null, // Atkinson Hyperlegible Next (HarnessAcademico)
-		proseFontSize: 16, // HarnessAcademico: 16 px, como el chat de assistant-ui (decisión de David)
+		proseFontSize: 17, // HarnessAcademico: 17 px (chat estilo assistant-ui, variante B de David)
 		codeLigatures: false,
 		sessionNameSerif: true,
 		titleFont: null, // Computer Modern (or the reading font, toggle off)

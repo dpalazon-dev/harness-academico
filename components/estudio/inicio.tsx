@@ -17,7 +17,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRightIcon, ArrowUpIcon, CalendarDaysIcon, ChevronDownIcon, PlusIcon, MessageSquarePlusIcon, RotateCwIcon, TargetIcon, Undo2Icon, UploadIcon, XIcon } from "lucide-react";
+import { ArrowRightIcon, ArrowUpIcon, PlusIcon, MessageSquarePlusIcon, RotateCwIcon, TargetIcon, Undo2Icon, UploadIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SetupDialog } from "@/components/setup-dialog";
@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { llamarEstudio } from "./llamar";
 import { useAbrirConversacion } from "./abrir-conversacion";
 import { rutaIntento, rutaPracticar } from "./intento";
+import { usePorDecidir } from "./por-decidir";
 import { AgendaInicio, useDatosAgenda, type DatosAgenda, type Rango } from "./agenda";
 import { LineaRitmo } from "./ritmo";
 import { destinoDelPaso, rutaVolcado } from "./paso";
@@ -55,7 +56,7 @@ export interface AccionesInicio {
 	abrirVolcado(unitId: string): void;
 }
 
-export function InicioEstudio({ espacio, lectura, unidades, agenda, ritmo, ahora = new Date(), ocupado, error, acciones }: {
+export function InicioEstudio({ espacio, lectura, unidades, agenda, ritmo, ahora = new Date(), ocupado, error, acciones, porDecidir }: {
 	/** Nombre del espacio activo; null con «Todos». */
 	espacio: string | null;
 	/** null mientras se lee. */
@@ -70,6 +71,8 @@ export function InicioEstudio({ espacio, lectura, unidades, agenda, ritmo, ahora
 	ocupado: boolean;
 	error: string | null;
 	acciones: AccionesInicio;
+	/** Lo que espera una decisión de David y cómo abrir su panel; sin ello no se enseña la tarjeta. */
+	porDecidir?: { total: number; abrir(): void };
 }) {
 	const [texto, setTexto] = useState("");
 	const [sinContexto, setSinContexto] = useState(false);
@@ -89,16 +92,13 @@ export function InicioEstudio({ espacio, lectura, unidades, agenda, ritmo, ahora
 		<div className="relative h-dvh overflow-y-auto font-prose">
 			{/* Franja para arrastrar la ventana en Electron; primera en el DOM (ver home del núcleo). */}
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
-			<main className="mx-auto w-full max-w-2xl px-6 pb-24 pt-[12vh]">
-				{/* HarnessAcademico (Inicio, variante A elegida el 23-nov-2026): bienvenida al estilo assistant-ui. */}
-				<h1 className="text-center font-title text-3xl leading-tight" suppressHydrationWarning>{saludo(ahora)}</h1>
-				<p className="mt-2 text-center text-muted-foreground">
-					{lectura?.plan?.objetivo ?? espacio ?? "Todos los espacios"}
-					{lectura && repasosFijados(lectura).length > 0 && ` · ${repasosFijados(lectura).length === 1 ? "1 repaso pendiente" : `${repasosFijados(lectura).length} repasos pendientes`}`}
-				</p>
+			{/* HarnessAcademico (Inicio, variante B elegida por David el 24-nov-2026): el panel de hoy, caja arriba y dos columnas. */}
+			<main className="mx-auto w-full max-w-[55rem] px-6 pb-24 pt-16">
+				<h1 className="font-title text-3xl leading-tight">{espacio ? `Hoy en ${espacio}` : "Hoy"}</h1>
+				{lectura?.plan?.objetivo && <p className="mt-1 text-muted-foreground">{lectura.plan.objetivo}</p>}
 				{error && <p role="alert" className="mt-6 text-sm text-destructive">{error}</p>}
 				<form
-					className="mt-8 rounded-3xl border border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.12)] transition-shadow focus-within:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.2)]"
+					className="mt-6 rounded-3xl border border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.12)] transition-shadow focus-within:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.2)]"
 					onSubmit={(e) => { e.preventDefault(); enviar(); }}
 				>
 					<textarea
@@ -138,26 +138,31 @@ export function InicioEstudio({ espacio, lectura, unidades, agenda, ritmo, ahora
 					</div>
 				</form>
 
-				{lectura && <AccionesRapidas lectura={lectura} unidades={unidades} volcadoPendiente={volcadoPendiente} enfocarCaja={() => { setIndicacion(true); caja.current?.focus(); }} ocupado={ocupado} acciones={acciones} />}
-
 				{lectura && (
-					// La agenda, plegada: lo primero es escribir o elegir una sugerencia (variante A).
-					<details className="group mt-10" data-agenda-plegable="">
-						<summary className="mx-auto flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
-							<CalendarDaysIcon className="size-4" aria-hidden />Agenda de la semana
-							<ChevronDownIcon className="size-3.5 transition-transform group-open:rotate-180" aria-hidden />
-						</summary>
-						<div className="mt-4">
-							<div className="mb-3"><LineaRitmo ritmo={ritmo} /></div>
-							<AgendaInicio
-								datos={agenda.datos}
-								ahora={ahora}
-								ocupado={ocupado}
-								onRangos={agenda.onRangos}
-								acciones={{ repasar: acciones.repasar, paso: acciones.paso, abrirUnidad: acciones.abrirUnidad, abrirConversacion: acciones.retomar }}
-							/>
+					<div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_1fr]">
+						<div className="flex min-w-0 flex-col gap-3">
+							<SiguientePaso lectura={lectura} ocupado={ocupado} acciones={acciones} />
+							<AccionesRapidas lectura={lectura} unidades={unidades} volcadoPendiente={volcadoPendiente} enfocarCaja={() => { setIndicacion(true); caja.current?.focus(); }} ocupado={ocupado} acciones={acciones} />
 						</div>
-					</details>
+						<div className="flex min-w-0 flex-col gap-3">
+							<Tarjeta titulo="Esta semana">
+								<div className="mb-2"><LineaRitmo ritmo={ritmo} /></div>
+								<AgendaInicio
+									datos={agenda.datos}
+									ahora={ahora}
+									ocupado={ocupado}
+									onRangos={agenda.onRangos}
+									acciones={{ repasar: acciones.repasar, paso: acciones.paso, abrirUnidad: acciones.abrirUnidad, abrirConversacion: acciones.retomar }}
+								/>
+							</Tarjeta>
+							{porDecidir && porDecidir.total > 0 && (
+								<Tarjeta titulo={`Por decidir (${porDecidir.total})`}>
+									<p className="text-sm text-muted-foreground">{porDecidir.total === 1 ? "Una propuesta del tutor espera tu decisión." : `${porDecidir.total} propuestas del tutor esperan tu decisión.`}</p>
+									<Button variant="outline" size="sm" className="mt-2 self-start" onClick={porDecidir.abrir}>Revisar</Button>
+								</Tarjeta>
+							)}
+						</div>
+					</div>
 				)}
 			</main>
 		</div>
@@ -192,10 +197,11 @@ function AccionesRapidas({ lectura, unidades, volcadoPendiente, enfocarCaja, ocu
 	enfocarCaja(): void;
 }) {
 	const [creandoPlan, setCreandoPlan] = useState(false);
-	const fichas = fichasDe(lectura, unidades);
+	// El paso propuesto tiene su propia tarjeta (SiguientePaso); aquí, lo demás que toca hoy.
+	const fichas = fichasDe(lectura, unidades).filter(f => f !== "continuar");
 	return (
-		<div className="mt-4">
-			<div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2" role="group" aria-label="Acciones rápidas">
+		<Tarjeta titulo="Para hoy">
+			<div className="flex flex-col" role="group" aria-label="Acciones rápidas">
 				{fichas.map(f => {
 					switch (f) {
 						case "crear-plan": return (
@@ -203,15 +209,6 @@ function AccionesRapidas({ lectura, unidades, volcadoPendiente, enfocarCaja, ocu
 								<PlusIcon className="size-3.5" />Crear plan
 							</FichaBoton>
 						);
-						case "continuar": {
-							const paso = lectura.paso!;
-							return (
-								<FichaBoton key={f} ficha={f} destacada title={paso.motivo} detalle={paso.motivo} onClick={() => acciones.paso(paso)} disabled={ocupado}>
-									<ArrowRightIcon className="size-3.5 shrink-0" />Continuar
-									<small className="min-w-0 truncate text-xs text-muted-foreground">{paso.accion} · {paso.titulo}</small>
-								</FichaBoton>
-							);
-						}
 						case "repasar": {
 							const repasos = repasosFijados(lectura);
 							return (
@@ -257,11 +254,56 @@ function AccionesRapidas({ lectura, unidades, volcadoPendiente, enfocarCaja, ocu
 				})}
 			</div>
 			{creandoPlan && !lectura.plan && <NuevoPlan ocupado={ocupado} crear={acciones.crearPlan} />}
-		</div>
+		</Tarjeta>
 	);
 }
 
-/** Una sugerencia (Inicio, variante A): tarjeta con la acción y su motivo a la vista; la destacada lleva el acento. */
+/** Una tarjeta del panel de hoy: título pequeño y su contenido. */
+function Tarjeta({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+	return (
+		<section aria-label={titulo} className="flex min-w-0 flex-col rounded-2xl bg-card px-4 py-3.5">
+			<h2 className="mb-2 text-sm font-medium text-muted-foreground">{titulo}</h2>
+			{children}
+		</section>
+	);
+}
+
+/** «Siguiente paso» (variante B): qué toca ahora, su porqué y un solo botón principal; «Otra cosa» despliega los demás
+ * pasos propuestos del plan. Sin paso, la tarjeta no aparece. */
+function SiguientePaso({ lectura, ocupado, acciones }: { lectura: LecturaInicio; ocupado: boolean; acciones: AccionesInicio }) {
+	const [otros, setOtros] = useState(false);
+	const paso = lectura.paso;
+	if (!paso) return null;
+	const demas = lectura.pasos.filter(p => !(p.unitId === paso.unitId && p.tipo === paso.tipo));
+	return (
+		<Tarjeta titulo="Siguiente paso">
+			<p className="text-lg font-semibold leading-snug">{paso.accion} · {paso.titulo}</p>
+			<p className="mt-1 text-sm text-muted-foreground">{paso.motivo}</p>
+			<div className="mt-3 flex flex-wrap gap-2">
+				<Button size="sm" data-ficha="continuar" data-destacada="true" title={paso.motivo} onClick={() => acciones.paso(paso)} disabled={ocupado}>
+					<ArrowRightIcon />{paso.boton || "Empezar"}
+				</Button>
+				{demas.length > 0 && (
+					<Button size="sm" variant="outline" aria-expanded={otros} onClick={() => setOtros(v => !v)}>Otra cosa</Button>
+				)}
+			</div>
+			{otros && (
+				<ul className="mt-3 flex flex-col" aria-label="Otros pasos propuestos">
+					{demas.map(p => (
+						<li key={`${p.unitId}-${p.tipo}`}>
+							<button type="button" onClick={() => acciones.paso(p)} disabled={ocupado} className="flex w-full min-w-0 flex-col items-start rounded-lg px-2 py-1.5 text-left outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50">
+								<span className="truncate font-medium">{p.accion} · {p.titulo}</span>
+								<span className="line-clamp-1 text-sm text-muted-foreground">{p.motivo}</span>
+							</button>
+						</li>
+					))}
+				</ul>
+			)}
+		</Tarjeta>
+	);
+}
+
+/** Una acción de «Para hoy» (variante B): fila con la acción y su motivo a la vista. */
 function FichaBoton({ ficha, destacada, detalle, children, className, ...props }: React.ComponentProps<"button"> & { ficha: Ficha; destacada?: boolean; detalle?: string }) {
 	return (
 		<button
@@ -270,8 +312,7 @@ function FichaBoton({ ficha, destacada, detalle, children, className, ...props }
 			data-ficha={ficha}
 			data-destacada={destacada || undefined}
 			className={cn(
-				"flex min-w-0 flex-col items-start gap-0.5 rounded-2xl border border-border bg-card px-4 py-3 text-left transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60",
-				destacada && "border-[var(--lh-accent)]",
+				"flex w-full min-w-0 flex-col items-start rounded-lg px-2 py-1.5 text-left transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60",
 				className,
 			)}
 		>
@@ -281,11 +322,6 @@ function FichaBoton({ ficha, destacada, detalle, children, className, ...props }
 	);
 }
 
-/** El saludo de la bienvenida según la hora. */
-export function saludo(ahora: Date): string {
-	const h = ahora.getHours();
-	return h >= 6 && h < 14 ? "Buenos días" : h >= 14 && h < 21 ? "Buenas tardes" : "Buenas noches";
-}
 
 /** Crear el plan del espacio a mano, como en la Ruta de la vista antigua (ticket 11): solo el objetivo; las unidades
  * llegan después, propuestas por el tutor o creadas con ⌘K. Se despliega con la ficha «Crear plan». */
@@ -324,6 +360,7 @@ export function Inicio({ initialConfigured }: { initialConfigured: boolean }) {
 	const [configurar, setConfigurar] = useState(false);
 	const starter = useRef(new SessionStarter());
 	const agenda = useDatosAgenda();
+	const porDecidir = usePorDecidir();
 	const refrescarAgenda = agenda.refrescar;
 	const { catalog, configured, zeroKeys } = useModelSetup(initialConfigured);
 
@@ -388,6 +425,7 @@ export function Inicio({ initialConfigured }: { initialConfigured: boolean }) {
 				ritmo={ritmo}
 				ocupado={ocupado || conversacion.abriendo}
 				error={error ?? conversacion.error ?? agenda.error}
+				porDecidir={{ total: porDecidir.total, abrir: porDecidir.abrir }}
 				acciones={{
 					enviar: (t, u) => void enviar(t, u),
 					paso: (p) => {
@@ -404,6 +442,7 @@ export function Inicio({ initialConfigured }: { initialConfigured: boolean }) {
 					abrirVolcado: (unitId) => router.push(rutaVolcado(unitId)),
 				}}
 			/>
+			{porDecidir.panel}
 			<SetupDialog open={configurar} onClose={() => setConfigurar(false)} onDone={() => setConfigurar(false)} />
 			{conversacion.dialogo}
 		</>

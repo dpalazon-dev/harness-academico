@@ -54,7 +54,7 @@ describe("resolveSettings", () => {
 		assert.equal(eff.appearance.background, null);
 		assert.deepEqual(eff.appearance.colors, {});
 		assert.equal(eff.appearance.fontFamily, null);
-		assert.equal(eff.appearance.proseFontSize, 16);
+		assert.equal(eff.appearance.proseFontSize, 17); // HarnessAcademico
 		assert.equal(eff.appearance.sessionNameSerif, true);
 		assert.equal(eff.appearance.mdRendering.headingWeight, 700); // HarnessAcademico
 		// wave 7 collapse: the master switch ONLY + the redesign's chunk

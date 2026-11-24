@@ -139,9 +139,9 @@ import { currentUserThinkingOpen, setAllUserThinkingOpen } from "@/components/th
  * same place — width polish only.
  */
 // HarnessAcademico (estilo «papel tranquilo»): columna de lectura del ancho de la caja de texto.
-const COLUMN = "mx-auto w-full max-w-[42rem] px-6";
-// HarnessAcademico (chat estilo assistant-ui, decisión de David): columna y caja de 42 rem.
-const DOCK = "mx-auto w-full max-w-[42rem] px-4";
+const COLUMN = "mx-auto w-full max-w-[47rem] px-6";
+// HarnessAcademico (chat estilo assistant-ui, variante B de David): columna y caja de 47 rem.
+const DOCK = "mx-auto w-full max-w-[47rem] px-4";
 // The DOCK container's fixed width (46rem) and the plan marginalia's
 // geometry (owner, plan-placement round): the bare diagram sits in the
 // dock band's RIGHT flank — MARGIN_GAP from the DOCK container's edge and
@@ -150,7 +150,7 @@ const DOCK = "mx-auto w-full max-w-[42rem] px-4";
 // the fade floor (owner, resize round) — below it the marginalia fades
 // out over the normal transition instead of popping away, and it stays
 // mounted while the question owns the band so widening fades it back.
-const DOCK_W = 42 * 16;
+const DOCK_W = 47 * 16;
 const MARGIN_GAP = 16;
 const MARGIN_MIN_W = 220;
 // The dock overlay's gradient band (h-24) — part of the reserved tail.
