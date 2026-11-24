@@ -7,31 +7,6 @@
 import { cn } from "@/lib/utils";
 import type { LecturaPorDecidir } from "./tipos";
 
-/** Una fila de «Para hoy»: punto de color, la acción y, a la derecha, su estado. */
-export function FilaHoy({ color, texto, estado, onClick, disabled, ...datos }: {
-	color: "aviso" | "acento" | "neutro";
-	texto: string;
-	estado?: string;
-	onClick(): void;
-	disabled?: boolean;
-	title?: string;
-	"data-ficha"?: string;
-}) {
-	return (
-		<button
-			type="button"
-			onClick={onClick}
-			disabled={disabled}
-			{...datos}
-			className="anillo-foco flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-accent disabled:opacity-60"
-		>
-			<span aria-hidden className={cn("size-2 shrink-0 rounded-full", color === "aviso" ? "bg-warning" : color === "acento" ? "bg-[var(--lh-accent)]" : "bg-muted-foreground")} />
-			<span className="min-w-0 flex-1 truncate">{texto}</span>
-			{estado && <span className="shrink-0 text-xs text-muted-foreground">{estado}</span>}
-		</button>
-	);
-}
-
 /** Las propuestas que esperan decisión, una por fila; como mucho cuatro y «y N más». */
 export function elementosPorDecidir(l: LecturaPorDecidir | null): string[] {
 	if (!l) return [];

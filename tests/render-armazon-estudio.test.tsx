@@ -13,7 +13,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { SidebarProvider } from "../components/ui/sidebar.tsx";
 import { BarraLateralEstudio, RUTA_PROGRESO, type DatosBarraLateral } from "../components/estudio/barra-lateral.tsx";
 import { recordarPlegadas, seccionesPlegadas } from "../components/estudio/secciones.ts";
-import { fechaDeHoy, InicioEstudio, progresoDelMes } from "../components/estudio/inicio.tsx";
+import { fechaCorta, fechaDeHoy, InicioEstudio, mejorRacha } from "../components/estudio/inicio.tsx";
 import { agruparPorFecha } from "../components/estudio/conversaciones.ts";
 import { ActivitySection } from "../components/activity-dock.tsx";
 import type { LecturaInicio } from "../components/estudio/tipos.ts";
@@ -360,7 +360,7 @@ describe("InicioEstudio", () => {
 	// HarnessAcademico (Inicio, variante B): «Hoy en <espacio>», en la letra de títulos.
 	it("titula el panel de hoy con el espacio y ofrece el cuadro de mensaje", () => {
 		const html = inicio();
-		assert.match(html, /<h1[^>]*font-title[^>]*>Hoy( en [^<]+)?<\/h1>/);
+		assert.match(html, /<h1[^>]*font-title[^>]*>(Buenos días|Buenas tardes|Buenas noches)<\/h1>/);
 		assert.match(html, /<textarea/);
 		assert.match(html, /aria-label="Empezar conversación"/);
 	});
@@ -380,33 +380,34 @@ describe("InicioEstudio", () => {
 
 	// Panel B fiel a la maqueta: «Esta semana» es una tira de siete días con «Ver el mes»; el ritmo y el calendario del
 	// mes solo aparecen al desplegar, para que todo quepa sin desplazarse.
-	// Referencia 1 elegida por David (24-nov-2026): el calendario del mes siempre abierto a la derecha, sin «Ver el mes», y
-	// la lista del día en «Actividad reciente»; el ritmo, en «Progreso del mes».
-	it("el calendario del mes está siempre abierto, con la actividad del día aparte y el progreso del mes", () => {
-		const html = inicio({ ritmo: RITMO });
-		assert.match(html, /<section aria-label="Agenda"[^>]*data-agenda="mes"/);
-		assert.doesNotMatch(html, /Ver el mes|Ver solo esta semana/);
-		assert.match(html, /<section aria-label="Actividad reciente"[\s\S]*data-agenda="lista"/);
-		assert.match(html, /<section aria-label="Progreso del mes"[\s\S]*de racha[\s\S]*repasos[\s\S]*intentos en 7 días/);
-		assert.doesNotMatch(inicio({ lectura: null, ritmo: RITMO }), /aria-label="Agenda"/, "mientras se lee el inicio, no hay agenda");
-	});
-
-	it("el progreso del mes cuenta los días con actividad", () => {
-		assert.deepEqual(progresoDelMes({ ...RITMO, hoy: "2026-11-12", actividad: [{ dia: "2026-11-02", n: 1 }, { dia: "2026-11-05", n: 0 }, { dia: "2026-10-30", n: 3 }] }), { dias: 1, total: 30 });
-	});
-
-	// Réplica de la referencia 1 (David, 24-nov-2026): cabecera con la fecha y ‹ Hoy ›; sin sugerencias ni próximos repasos.
-	it("la cabecera lleva la fecha y la navegación por días; no hay sugerencias ni próximos repasos", () => {
+	// Referencia 2 «Centro de aprendizaje» (David, 24-nov-2026), con los datos que la app tiene.
+	it("cabecera con saludo y fecha; caja con Notas y Material; cuatro sugerencias", () => {
 		const html = inicio();
-		assert.match(html, /<nav aria-label="Día"[\s\S]*aria-label="Día anterior"[\s\S]*>Hoy<\/button>[\s\S]*aria-label="Día siguiente"/);
+		assert.match(html, /<h1[^>]*font-title[^>]*>(Buenos días|Buenas tardes|Buenas noches)<\/h1>/);
+		assert.match(html, /Tu cabina de estudio/);
+		assert.match(html, />Material<\/button>/);
+		assert.equal([...html.matchAll(/data-sugerencia/g)].length, 4);
 		assert.equal(fechaDeHoy(new Date(2026, 10, 24)), "Martes, 24 de noviembre de 2026");
-		assert.doesNotMatch(html, /data-sugerencia|Próximos repasos/);
-		assert.match(html, /<section aria-label="Actividad reciente"[\s\S]*Actividad reciente/);
+		assert.equal(fechaCorta(new Date(2026, 10, 24)), "Mar, 24 de noviembre de 2026");
+	});
+
+	it("«Sesión de hoy», «Actividad de hoy» y, a la derecha, «Tu progreso»", () => {
+		const html = inicio({ ritmo: RITMO, enfoque: "Dominar grafos" });
+		assert.match(html, /<section aria-label="Sesión de hoy"[\s\S]*hechas/);
+		assert.match(html, /<section aria-label="Actividad de hoy"/);
+		assert.match(html, /<aside aria-label="Tu progreso"[\s\S]*Progreso semanal[\s\S]*Racha[\s\S]*Repasos pendientes[\s\S]*Esta semana[\s\S]*Pendientes clave[\s\S]*Enfoque de la semana[\s\S]*Dominar grafos/);
+		assert.equal([...html.matchAll(/data-dia="/g)].length, 7);
+		assert.doesNotMatch(inicio({ lectura: null }), /Tu progreso/, "mientras se lee el inicio, no hay panel");
+	});
+
+	it("la mejor racha sale de la actividad del año", () => {
+		assert.equal(mejorRacha([{ dia: "2026-11-01", n: 1 }, { dia: "2026-11-02", n: 2 }, { dia: "2026-11-03", n: 0 }, { dia: "2026-11-04", n: 1 }]), 2);
+		assert.equal(mejorRacha([{ dia: "2026-11-01", n: 1 }, { dia: "2026-11-03", n: 1 }]), 1, "un hueco corta la racha");
 	});
 
 	it("bajo las acciones, la agenda sustituye a las listas «Hoy» y «Próximos 7 días» (ticket 05 de la segunda ronda)", () => {
 		const html = inicio();
-		assert.match(html, /data-ficha="[^"]+"[\s\S]*<section aria-label="Agenda"/, "acciones y agenda, en ese orden");
+		assert.match(html, /data-ficha="[^"]+"[\s\S]*<section aria-label="Actividad de hoy"/, "acciones y actividad, en ese orden");
 		assert.doesNotMatch(html, /Repasar · |Retomar el intento · |Reconstruye sin mirar · /, "sin el formato «acción · unidad»");
 		assert.doesNotMatch(html, />Hoy<\/h2>|>Próximos 7 días<\/h2>/, "sin las listas fijas (los próximos repasos, con su día, van en su tarjeta)");
 		assert.doesNotMatch(inicio({ lectura: null }), /aria-label="Agenda"/, "mientras se lee el inicio, no hay agenda");
@@ -466,7 +467,8 @@ describe("InicioEstudio", () => {
 		assert.deepEqual(fichas(inicio({ unidades: [] })), ["continuar", "repasar", "retomar", "material", "contexto"]);
 		assert.deepEqual(fichas(inicio({ unidades: [{ id: "u1", titulo: "Recorridos BFS y DFS" }] })), ["continuar", "repasar", "retomar", "prueba", "material", "contexto"]);
 		const todas = inicio({ sinPlanes: true, unidades: [{ id: "u1", titulo: "Recorridos BFS y DFS" }] });
-		assert.deepEqual(fichas(todas), ["continuar", "crear-plan", "repasar", "retomar", "prueba", "material", "contexto"]);
+		// Con paso propuesto, «Crear plan» se hace desde la barra; sin paso, va en «Siguiente paso».
+		assert.deepEqual(fichas(todas), ["continuar", "repasar", "retomar", "prueba", "material", "contexto"]);
 	});
 
 	it("«Añadir material» y «Añadir contexto» se nombran tal cual", () => {
@@ -492,7 +494,7 @@ describe("InicioEstudio", () => {
 	});
 
 	it("los títulos de las tarjetas van en seminegrita", () => {
-		assert.match(inicio(), /<h2 class="[^"]*font-semibold[^"]*">.*Siguiente paso<\/h2>/);
+		assert.match(inicio(), /<h2 class="[^"]*font-(semibold|bold)[^"]*">Siguiente paso<\/h2>/);
 	});
 
 	it("enseña el error cuando lo hay", () => {
@@ -508,7 +510,7 @@ describe("InicioEstudio", () => {
 
 	it("si la agenda no se pudo leer, lo dice dentro de la agenda con «Reintentar», no arriba del inicio", () => {
 		const html = inicio({ agenda: { datos: null, error: "Estudio no respondió (500)", refrescar: () => {}, onRangos: () => {} } });
-		assert.match(html, /<section aria-label="Actividad reciente"[\s\S]*data-error-lectura[^>]*>No se pudo leer la agenda\.[\s\S]*>Reintentar<\/button>/);
+		assert.match(html, /<section aria-label="Actividad de hoy"[\s\S]*data-error-lectura[^>]*>No se pudo leer la agenda\.[\s\S]*>Reintentar<\/button>/);
 		assert.doesNotMatch(html, /Leyendo la agenda…/);
 		assert.doesNotMatch(html, /Estudio no respondió/);
 	});
