@@ -373,7 +373,7 @@ describe("InicioEstudio", () => {
 	// Variante B: el paso propuesto tiene su tarjeta «Siguiente paso», con el motivo a la vista y un botón principal.
 	it("«Siguiente paso» lleva la acción y la unidad del paso propuesto, su motivo y el botón destacado", () => {
 		const html = inicio();
-		assert.match(html, /<section aria-label="Siguiente paso"[\s\S]*Escribe lo que ya sabes · Árboles de expansión[\s\S]*Sin volcado inicial no podrás ver después qué cambió\.[\s\S]*<button[^>]*data-ficha="continuar"[^>]*data-destacada="true"/);
+		assert.match(html, /<section aria-label="Siguiente paso"[\s\S]*Árboles de expansión[\s\S]*Escribe lo que ya sabes[\s\S]*Sin volcado inicial no podrás ver después qué cambió\.[\s\S]*<button[^>]*data-ficha="continuar"[^>]*data-destacada="true"/);
 		assert.doesNotMatch(html, /data-paso=/, "el paso ya no se pinta como botón aparte");
 		assert.doesNotMatch(inicio({ lectura: VACIA }), /data-ficha="continuar"/, "sin paso, no se ofrece");
 	});
@@ -384,18 +384,18 @@ describe("InicioEstudio", () => {
 	it("cabecera con saludo y fecha; caja con Notas y Material; cuatro sugerencias", () => {
 		const html = inicio();
 		assert.match(html, /<h1[^>]*font-title[^>]*>(Buenos días|Buenas tardes|Buenas noches)<\/h1>/);
-		assert.match(html, /Tu cabina de estudio/);
+		assert.doesNotMatch(html, /Tu cabina de estudio|Centro de aprendizaje/, "sin frase de folleto ni rótulo genérico");
 		assert.match(html, />Material<\/button>/);
 		assert.equal([...html.matchAll(/data-sugerencia/g)].length, 4);
 		assert.equal(fechaDeHoy(new Date(2026, 10, 24)), "Martes, 24 de noviembre de 2026");
-		assert.equal(fechaCorta(new Date(2026, 10, 24)), "Mar, 24 de noviembre de 2026");
+		assert.equal(fechaCorta(new Date(2026, 10, 24)), "Martes 24 de noviembre");
 	});
 
 	it("«Sesión de hoy», «Actividad de hoy» y, a la derecha, «Tu progreso»", () => {
 		const html = inicio({ ritmo: RITMO, enfoque: ["Dominar grafos"] });
 		assert.match(html, /<section aria-label="Sesión de hoy"[\s\S]*hechas/);
 		assert.match(html, /<section aria-label="Actividad de hoy"/);
-		assert.match(html, /<aside aria-label="Tu progreso"[\s\S]*Progreso semanal[\s\S]*Racha[\s\S]*Repasos pendientes[\s\S]*Esta semana[\s\S]*Pendientes clave[\s\S]*Enfoque de la semana[\s\S]*Dominar grafos/);
+		assert.match(html, /<aside aria-label="Tu progreso"[\s\S]*Progreso semanal[\s\S]*Racha[\s\S]*Repasos[\s\S]*Esta semana[\s\S]*Próximos repasos[\s\S]*Enfoque de la semana[\s\S]*Dominar grafos/);
 		assert.equal([...html.matchAll(/data-dia="/g)].length, 7);
 		assert.doesNotMatch(inicio({ lectura: null }), /Tu progreso/, "mientras se lee el inicio, no hay panel");
 	});
@@ -416,7 +416,7 @@ describe("InicioEstudio", () => {
 	it("«Retomar» nombra la conversación con algo abierto y lleva lo pendiente como descripción emergente; ya no hay «Quedó abierto»", () => {
 		const html = inicio();
 		// Panel B: fila compacta con el estado «abierta» a la derecha.
-		assert.match(html, /<button(?=[^>]*title="¿Por qué falla con pesos negativos\?\nSiguiente: Probar Bellman-Ford")[^>]*data-ficha="retomar"[^>]*>.*Retomar «Dudas de Dijkstra».*abierta.*<\/button>/s);
+		assert.match(html, /<button(?=[^>]*title="¿Por qué falla con pesos negativos\?\nProbar Bellman-Ford")[^>]*data-ficha="retomar"[^>]*>.*Retomar «Dudas de Dijkstra».*abierta.*<\/button>/s);
 		assert.doesNotMatch(html, /Quedó abierto/);
 		assert.doesNotMatch(inicio({ lectura: VACIA }), /data-ficha="retomar"/);
 	});

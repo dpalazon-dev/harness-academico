@@ -121,9 +121,8 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 				<div className="mx-auto max-w-[76rem]">
 					<div className="flex items-start gap-4">
 						<div className="min-w-0 flex-1">
-							<p className="text-base text-muted-foreground">{espacio ?? "Centro de aprendizaje"}</p>
+							{espacio && <p className="text-base text-muted-foreground">{espacio}</p>}
 							<h1 className="mt-1 font-title text-4xl leading-tight tracking-tight" suppressHydrationWarning>{saludo(ahora)}</h1>
-							<p className="mt-2 text-lg text-muted-foreground">Tu cabina de estudio. Enfócate, aprende y avanza.</p>
 						</div>
 						<p className="mt-6 inline-flex shrink-0 items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm" suppressHydrationWarning>
 							<CalendarDaysIcon className="size-4" aria-hidden />{fechaCorta(ahora)}
@@ -211,12 +210,12 @@ export function InicioEstudio({ espacio, lectura, unidades, sinPlanes = false, a
 							<section aria-label="Racha" className={TARJETA_PANEL}>
 								<h3 className="flex items-center gap-2 text-sm font-semibold"><FlameIcon className="size-4 text-warning" aria-hidden />Racha</h3>
 								<p className="mt-2 text-2xl font-bold">{ritmo ? `${ritmo.racha} ${ritmo.racha === 1 ? "día" : "días"}` : "—"}</p>
-								{ritmo && <p className="mt-1 text-sm text-muted-foreground">Mejor: {mejorRacha(ritmo.actividad)} {mejorRacha(ritmo.actividad) === 1 ? "día" : "días"}</p>}
+								{ritmo && <p className="mt-1 text-sm text-muted-foreground">Récord de {mejorRacha(ritmo.actividad)} {mejorRacha(ritmo.actividad) === 1 ? "día" : "días"}</p>}
 							</section>
-							<section aria-label="Repasos pendientes" className={TARJETA_PANEL}>
-								<h3 className="flex items-center gap-2 text-sm font-semibold"><RotateCwIcon className="size-4 text-warning" aria-hidden />Repasos pendientes</h3>
+							<section aria-label="Repasos" className={TARJETA_PANEL}>
+								<h3 className="flex items-center gap-2 text-sm font-semibold"><RotateCwIcon className="size-4 text-warning" aria-hidden />Repasos</h3>
 								<p className="mt-2 text-2xl font-bold">{repasosFijados(lectura).length}</p>
-								<p className="mt-1 text-sm text-muted-foreground">Programados para hoy</p>
+								<p className="mt-1 text-sm text-muted-foreground">para hoy</p>
 							</section>
 						</div>
 						<EstaSemana agenda={agenda.datos} lunes={lunes} hoy={hoy} />
@@ -254,17 +253,18 @@ const SUGERENCIAS = [
 ] as const;
 
 const FECHA_LARGA = new Intl.DateTimeFormat("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-const FECHA_CORTA = new Intl.DateTimeFormat("es-ES", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+const DIA_SEMANA = new Intl.DateTimeFormat("es-ES", { weekday: "long" });
+const MES = new Intl.DateTimeFormat("es-ES", { month: "long" });
 export const fechaDe = (dia: string) => { const [a, m, d] = dia.split("-").map(Number); return new Date(a!, m! - 1, d!); };
 /** «Martes, 24 de noviembre de 2026». */
 export function fechaDeHoy(ahora: Date): string {
 	const t = FECHA_LARGA.format(ahora);
 	return t.charAt(0).toUpperCase() + t.slice(1);
 }
-/** «Mar, 24 de noviembre de 2026», la píldora de la cabecera. */
+/** «Martes 24 de noviembre», la píldora de la cabecera. */
 export function fechaCorta(ahora: Date): string {
-	const t = FECHA_CORTA.format(ahora).replace(".", "");
-	return t.charAt(0).toUpperCase() + t.slice(1);
+	const dia = DIA_SEMANA.format(ahora);
+	return `${dia.charAt(0).toUpperCase() + dia.slice(1)} ${ahora.getDate()} de ${MES.format(ahora)}`;
 }
 /** El saludo según la hora. */
 export function saludo(ahora: Date): string {
@@ -309,7 +309,8 @@ function SiguientePaso({ lectura, sinPlanes, ocupado, acciones }: { lectura: Lec
 			<div className="mt-3 flex items-center gap-4">
 				<div className="min-w-0 flex-1 pl-1">
 					{paso ? <>
-						<p className="text-xl font-bold leading-snug">{paso.accion} · {paso.titulo}</p>
+						<p className="text-sm text-muted-foreground">{paso.titulo}</p>
+						<p className="text-xl font-bold leading-snug">{paso.accion}</p>
 						<p className="mt-1 text-muted-foreground">{paso.motivo}</p>
 						<div className="mt-4 flex flex-wrap gap-2">
 							<Button className="h-10 rounded-xl px-5" data-ficha="continuar" data-destacada="true" title={paso.motivo} onClick={() => acciones.paso(paso)} disabled={ocupado}>
@@ -322,8 +323,8 @@ function SiguientePaso({ lectura, sinPlanes, ocupado, acciones }: { lectura: Lec
 								{demas.map(p => (
 									<li key={`${p.unitId}-${p.tipo}`}>
 										<button type="button" onClick={() => acciones.paso(p)} disabled={ocupado} className="anillo-foco flex w-full min-w-0 flex-col items-start rounded-lg px-2 py-1.5 text-left hover:bg-accent">
-											<span className="truncate font-medium">{p.accion} · {p.titulo}</span>
-											<span className="line-clamp-1 text-sm text-muted-foreground">{p.motivo}</span>
+											<span className="truncate font-medium">{p.accion}</span>
+											<span className="truncate text-sm text-muted-foreground">{p.titulo}</span>
 										</button>
 									</li>
 								))}
@@ -393,7 +394,7 @@ function SesionDeHoy({ lectura, unidades, hecho, volcadoPendiente, enfocarCaja, 
 						Icono={Undo2Icon}
 						texto={`Retomar «${abierto.titulo}»`}
 						estado="abierta"
-						title={[...abierto.abierto, ...(abierto.siguiente ? [`Siguiente: ${abierto.siguiente}`] : [])].join("\n") || undefined}
+						title={[...abierto.abierto, ...(abierto.siguiente ? [abierto.siguiente] : [])].join("\n") || undefined}
 						onClick={() => acciones.retomar(abierto.chatId)}
 						disabled={ocupado}
 					/>
@@ -475,7 +476,7 @@ function ActividadDeHoy({ dia, error, reintentar, acciones }: { dia: DiaAgenda |
 							<span className="z-10 size-6 shrink-0 rounded-full border-2 border-border bg-background" aria-hidden />
 							<button type="button" onClick={() => p.tipo === "paso" ? acciones.paso(p.paso) : acciones.repasar(p)} className={cn("anillo-foco flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-border px-3 py-2.5 text-left hover:bg-accent", i === 0 && "bg-[color-mix(in_oklab,var(--lh-accent)_10%,transparent)]")}>
 								<PlayIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-								<span className="min-w-0"><b className="block text-sm font-semibold">{i === 0 ? "Lo siguiente" : p.tipo === "repaso" ? "Repaso" : "Paso"}</b><span className="block truncate text-sm text-muted-foreground">{p.titulo}</span></span>
+								<span className="min-w-0"><b className="block truncate text-sm font-semibold">{p.titulo}</b><span className="block truncate text-sm text-muted-foreground">{p.tipo === "repaso" ? "Repaso pendiente" : p.paso.accion}</span></span>
 							</button>
 						</li>
 					))}
@@ -523,9 +524,9 @@ function EstaSemana({ agenda, lunes, hoy }: { agenda: DatosAgenda | null; lunes:
 					const hecho = (agenda?.dias[dia]?.hecho.length ?? 0) > 0;
 					const esHoy = dia === hoy;
 					return (
-						<li key={dia} data-dia={dia} data-hoy={esHoy || undefined} aria-current={esHoy ? "date" : undefined} className={cn("flex w-10 flex-col items-center gap-0.5 rounded-xl py-1.5 text-sm", esHoy && "bg-[color-mix(in_oklab,var(--lh-accent)_10%,transparent)] shadow-[inset_0_0_0_1.5px_var(--lh-accent)]")}>
+						<li key={dia} data-dia={dia} data-hoy={esHoy || undefined} aria-current={esHoy ? "date" : undefined} className="flex w-10 flex-col items-center gap-0.5 py-1.5 text-sm">
 							<span className="text-xs text-muted-foreground">{letra}</span>
-							<b className="font-semibold">{Number(dia.slice(8))}</b>
+							<b className={cn("font-semibold", esHoy && "text-[var(--lh-accent)]")}>{Number(dia.slice(8))}</b>
 							{hecho ? <span className="mt-1 grid size-4 place-items-center rounded-full bg-success text-background"><CheckIcon className="size-2.5" aria-label="Estudiado" /></span>
 								: esHoy ? <span className="mt-1 size-4 rounded-full bg-[var(--lh-accent)]" aria-hidden />
 								: <span className="mt-1 size-4 rounded-full border-2 border-border" aria-hidden />}
@@ -553,14 +554,14 @@ function PendientesClave({ lectura, hoy, abrirUnidad }: { lectura: LecturaInicio
 	];
 	if (filas.length === 0) return null;
 	return (
-		<section aria-label="Pendientes clave" className={TARJETA_PANEL}>
-			<h3 className="mb-2 flex items-center gap-2 text-base font-semibold"><LayersIcon className="size-4" aria-hidden />Pendientes clave</h3>
+		<section aria-label="Próximos repasos" className={TARJETA_PANEL}>
+			<h3 className="mb-2 flex items-center gap-2 text-base font-semibold"><LayersIcon className="size-4" aria-hidden />Próximos repasos</h3>
 			<ul className="flex flex-col">
 				{filas.slice(0, 5).map(f => (
 					<li key={`${f.dia}-${f.unitId}`}>
 						<button type="button" onClick={() => abrirUnidad(f.unitId)} className="anillo-foco flex w-full min-w-0 items-center gap-3 rounded-lg px-1 py-1.5 text-left hover:bg-accent">
 							<span className="size-4 shrink-0 rounded-full border-2 border-border" aria-hidden />
-							<span className="min-w-0 flex-1 truncate text-sm">Repaso: {f.titulo}</span>
+							<span className="min-w-0 flex-1 truncate text-sm">{f.titulo}</span>
 							<span className={cn("shrink-0 rounded-md px-2 py-0.5 text-xs", f.dia <= hoy ? "bg-warning/15 text-warning" : "bg-secondary text-secondary-foreground")}>{etiquetaDia(f.dia, hoy)}</span>
 						</button>
 					</li>

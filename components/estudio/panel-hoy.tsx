@@ -7,14 +7,15 @@
 import { cn } from "@/lib/utils";
 import type { LecturaPorDecidir } from "./tipos";
 
-/** Las propuestas que esperan decisión, una por fila; como mucho cuatro y «y N más». */
-export function elementosPorDecidir(l: LecturaPorDecidir | null): string[] {
+/** Las propuestas que esperan decisión: qué es y, debajo, de qué tipo. */
+export function elementosPorDecidir(l: LecturaPorDecidir | null): { titulo: string; tipo: string }[] {
 	if (!l) return [];
+	const borrador = { hecho: "Hecho", pregunta: "Pregunta", sintesis: "Síntesis" } as const;
 	return [
-		...l.sugerencias.map(s => `Unidad propuesta: «${s.titulo}»`),
-		...l.planes.map(p => `Plan propuesto: «${p.objetivo}»`),
-		...l.cambios.map(c => c.descripcion[0] ? `Cambio en «${c.objetivo}»: ${c.descripcion[0]}` : `Cambio en «${c.objetivo}»`),
-		...l.borradores.map(b => `${b.tipo === "hecho" ? "Hecho" : b.tipo === "pregunta" ? "Pregunta" : "Síntesis"} sin confirmar${b.origen === "tutor" ? " del tutor" : ""}: ${b.resumen}`),
+		...l.sugerencias.map(s => ({ titulo: s.titulo, tipo: "Unidad que propone el tutor" })),
+		...l.planes.map(p => ({ titulo: p.objetivo, tipo: "Plan que propone el tutor" })),
+		...l.cambios.map(c => ({ titulo: c.descripcion[0] ?? "Cambio en el plan", tipo: `Cambio propuesto en «${c.objetivo}»` })),
+		...l.borradores.map(b => ({ titulo: b.resumen, tipo: `${borrador[b.tipo]} sin confirmar${b.origen === "tutor" ? ", del tutor" : ""}` })),
 	];
 }
 
@@ -25,7 +26,10 @@ export function ListaPorDecidirHoy({ lectura, abrir, compacta = false }: { lectu
 		<ul className="flex flex-col" data-por-decidir-hoy="">
 			{vistos.map((t, i) => (
 				<li key={i}>
-					<button type="button" onClick={abrir} className={`anillo-foco w-full min-w-0 truncate rounded-lg px-2 py-1.5 text-left hover:bg-accent${compacta ? " text-sm" : ""}`}>{t}</button>
+					<button type="button" onClick={abrir} className="anillo-foco flex w-full min-w-0 flex-col items-start rounded-lg px-2 py-1.5 text-left hover:bg-accent">
+						<span className={`w-full truncate${compacta ? " text-sm" : ""}`}>{t.titulo}</span>
+						<span className="w-full truncate text-xs text-muted-foreground">{t.tipo}</span>
+					</button>
 				</li>
 			))}
 			{todos.length > vistos.length && (
