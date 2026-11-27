@@ -2,7 +2,11 @@
 
 **Una aplicación de escritorio para estudiar en la que el tutor de IA critica lo que produces, en lugar de producirlo por ti.**
 
-[English](README.md) · [Descargar](https://github.com/dpalazon-dev/harness-academico/releases/latest) · [Primer uso](docs/first-run.md) · [Contribuir](CONTRIBUTING.md) · [Discussions](https://github.com/dpalazon-dev/harness-academico/discussions)
+[English](README.md) · [Descargar](https://github.com/dpalazon-dev/harness-academico/releases/latest) · [Primeros pasos](docs/primeros-pasos.md) · [Primer uso](docs/first-run.md) · [Contribuir](CONTRIBUTING.md) · [Discussions](https://github.com/dpalazon-dev/harness-academico/discussions)
+
+![Un cuaderno en HarnessAcademico: seleccionas tu frase, el tutor responde al margen con una pregunta y su pregunta de recuperación solo entra en la página si la aceptas](docs/assets/primeros-pasos/4-cuaderno.gif)
+
+¿Primera vez? [Primeros pasos](docs/primeros-pasos.md) recorre el primer uso en cinco pasos animados, del instalador a tu primera práctica ([vídeo completo](docs/assets/primeros-pasos/primeros-pasos.mp4), 86 s).
 
 HarnessAcademico organiza el estudio alrededor de lo que quieres poder *hacer*. Cada materia es un plan de unidades; cada unidad nombra una capacidad y el criterio observable que demuestra que la tienes. Tú escribes primero (lo que ya sabes, tus notas de una fuente, tu reconstrucción sin mirar) y el tutor contrasta, pregunta y señala huecos. La práctica y los repasos espaciados salen de esa evidencia, no de tarjetas que no has escrito.
 

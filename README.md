@@ -2,7 +2,11 @@
 
 **A desktop study app where the AI tutor critiques what you produce instead of producing it for you.**
 
-[Español](README.es.md) · [Download](https://github.com/dpalazon-dev/harness-academico/releases/latest) · [First run](docs/first-run.md) · [Contributing](CONTRIBUTING.md) · [Discussions](https://github.com/dpalazon-dev/harness-academico/discussions)
+[Español](README.es.md) · [Download](https://github.com/dpalazon-dev/harness-academico/releases/latest) · [First steps](docs/first-steps.md) · [First run](docs/first-run.md) · [Contributing](CONTRIBUTING.md) · [Discussions](https://github.com/dpalazon-dev/harness-academico/discussions)
+
+![A notebook in HarnessAcademico: you select your own sentence, the tutor answers in the margin with a question, and its retrieval question enters the page only when you accept it](docs/assets/primeros-pasos/4-cuaderno.gif)
+
+New here? [First steps](docs/first-steps.md) walks through the first use in five animated steps, from the installer to your first practice attempt ([full video](docs/assets/primeros-pasos/primeros-pasos.mp4), 86 s).
 
 HarnessAcademico organises study around what you want to be able to *do*. Each subject becomes a plan of units; each unit names a capability and the observable criterion that shows you have it. You write first (what you already know, your notes from a source, your reconstruction without looking) and the tutor contrasts, questions and points out gaps. Practice attempts and spaced reviews come from that evidence, not from flashcards you did not write.
 
