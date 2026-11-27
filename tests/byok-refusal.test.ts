@@ -121,7 +121,13 @@ describe("providerKeyMissing — the envelope factory (provider-key interlude, 2
 		assert.equal(envelope.code, "provider_key_missing");
 	});
 
-	it("an unknown provider falls back to its raw id as the label", () => {
+	it("ChatGPT and the subscriptions are connected, not keyed: the refusal points to Providers, in Spanish", () => {
+	const r = providerKeyMissing("chatgpt", ["strong"]);
+	assert.equal(r.error, "ChatGPT no está conectado. Conéctalo en Ajustes › Proveedores.");
+	assert.equal(isProviderKeyRefusal(r.error), true);
+});
+
+it("an unknown provider falls back to its raw id as the label", () => {
 		const envelope = providerKeyMissing("weird", ["cheap"]);
 		assert.equal(envelope.error, "No weird key is set — add one in Settings → Keys");
 	});

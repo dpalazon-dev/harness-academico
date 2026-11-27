@@ -166,10 +166,17 @@ export interface ProviderKeyMissing {
  * (the label prefix varies by provider). */
 const PROVIDER_KEY_MISSING_TAIL = "key is set — add one in Settings → Keys";
 const CLAUDE_CODE_UNAVAILABLE = "Claude Code is unavailable. Enable and set it up in Settings → Providers.";
+/** HarnessAcademico: los proveedores sin clave (ChatGPT y las suscripciones) se conectan con una cuenta; decirles «añade una
+ * clave» mandaba a David a un sitio equivocado. Cola fija para el comparador, como la de arriba. */
+const SIN_CONEXION_TAIL = "no está conectado. Conéctalo en Ajustes › Proveedores.";
+const NOMBRE_CONEXION: Record<string, string> = { chatgpt: "ChatGPT", "github-copilot": "GitHub Copilot", xai: "Grok" };
 export function providerKeyMissing(provider: string, slots: ModelSlotName[]): ProviderKeyMissing {
 	const label = AUTH_PROVIDER_KEYS.find((p) => p.id === provider)?.label ?? provider;
+	const error = provider === CLAUDE_CODE_PROVIDER ? CLAUDE_CODE_UNAVAILABLE
+		: Object.hasOwn(NOMBRE_CONEXION, provider) ? `${NOMBRE_CONEXION[provider]} ${SIN_CONEXION_TAIL}`
+		: `No ${label} ${PROVIDER_KEY_MISSING_TAIL}`;
 	return {
-		error: provider === CLAUDE_CODE_PROVIDER ? CLAUDE_CODE_UNAVAILABLE : `No ${label} ${PROVIDER_KEY_MISSING_TAIL}`,
+		error,
 		code: PROVIDER_KEY_MISSING_CODE,
 		provider,
 		slots,
@@ -180,7 +187,7 @@ export function providerKeyMissing(provider: string, slots: ModelSlotName[]): Pr
  * scary-error) — the envelope's home module owns the string so the
  * writer and the matcher can never drift. */
 export function isProviderKeyRefusal(error: string | undefined): boolean {
-	return !!error && (error.endsWith(PROVIDER_KEY_MISSING_TAIL) || error === CLAUDE_CODE_UNAVAILABLE);
+	return !!error && (error.endsWith(PROVIDER_KEY_MISSING_TAIL) || error.endsWith(SIN_CONEXION_TAIL) || error === CLAUDE_CODE_UNAVAILABLE);
 }
 /** The typed throw for in-process seams (extraction pipeline) — the
  * ProviderKeyMissing sibling of ModelsNotConfiguredError: callers catch
