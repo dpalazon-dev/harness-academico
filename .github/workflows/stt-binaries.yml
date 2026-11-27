@@ -62,7 +62,8 @@ jobs:
 
       - name: Configure and build
         run: |
-          cmake -S whisper-src -B whisper-build -G "Visual Studio 17 2022" -A x64 `
+          # Default generator: the newest Visual Studio on the runner.
+          cmake -S whisper-src -B whisper-build -A x64 `
             -DBUILD_SHARED_LIBS=ON -DGGML_BACKEND_DL=ON -DGGML_NATIVE=OFF -DGGML_CPU_ALL_VARIANTS=ON `
             -DGGML_VULKAN=ON -DWHISPER_BUILD_TESTS=OFF
           cmake --build whisper-build --config Release -j 4
@@ -76,8 +77,11 @@ jobs:
           if (-not (Test-Path (Join-Path $out 'ggml-vulkan.dll'))) { throw 'ggml-vulkan.dll was not built' }
           $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
           $redist = Get-ChildItem -Directory (Join-Path $vs 'VC\Redist\MSVC') | Where-Object { $_.Name -match '^\d' } | Sort-Object Name -Descending | Select-Object -First 1
-          foreach ($pack in 'Microsoft.VC143.CRT', 'Microsoft.VC143.OpenMP') {
-            Copy-Item (Join-Path $redist.FullName "x64\$pack\*.dll") -Destination $out
+          # Microsoft.VC14x.CRT and .OpenMP: the toolset number follows the Visual Studio version.
+          foreach ($pack in 'CRT', 'OpenMP') {
+            $dir = Get-ChildItem -Directory (Join-Path $redist.FullName 'x64') | Where-Object { $_.Name -match "^Microsoft\.VC\d+\.$pack$" } | Select-Object -First 1
+            if (-not $dir) { throw "VC++ redist $pack not found under $($redist.FullName)" }
+            Copy-Item (Join-Path $dir.FullName '*.dll') -Destination $out
           }
           Get-ChildItem $out | Format-Table Name, Length | Out-Host
 
