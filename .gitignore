@@ -33,3 +33,6 @@ xai-credentials.json*
 # local issue tracker and design scratch: kept out of the public repository
 .scratch/
 docs/superpowers/
+
+# Local dictation engine and model (scripts/stt-fetch.mjs): downloaded, never committed
+/vendor/

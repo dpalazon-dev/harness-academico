@@ -188,19 +188,17 @@ export async function verifyPluginBrowser(url, options = {}) {
 		await page.screenshot({ path: destination, fullPage: true });
 		evidence.screenshots.push(destination);
 	};
-	// This fixture intentionally has no Deepgram credential; the existing app
-	// probes dictation readiness at startup. Its missing-key 503 and the app's
-	// absent favicon are unrelated baseline responses, not plugin failures.
-	// Keep both in evidence and match only exact paths/statuses/resource errors.
+	// The app's absent favicon is an unrelated baseline response, not a plugin
+	// failure. Keep it in evidence and match only exact paths/statuses/resource errors.
 	const expectedFixtureResponse = entry => {
 		const target = new URL(entry.url);
 		return target.origin === base && entry.method === "GET" &&
-			((target.pathname === "/api/stt/token" && entry.status === 503) || (target.pathname === "/favicon.ico" && entry.status === 404));
+			target.pathname === "/favicon.ico" && entry.status === 404;
 	};
 	const expectedFixtureConsole = entry => {
 		if (entry.type !== "error" || !entry.location?.url) return false;
 		return evidence.responses.some(response => response.url === entry.location.url && expectedFixtureResponse(response)
-			&& entry.text === `Failed to load resource: the server responded with a status of ${response.status} (${response.status === 503 ? "Service Unavailable" : "Not Found"})`);
+			&& entry.text === `Failed to load resource: the server responded with a status of ${response.status} (Not Found)`);
 	};
 	// Next can cancel an already-200 RSC prefetch when focus/navigation changes.
 	// This exception never covers /api/plugins, module assets, or failed status.

@@ -89,9 +89,8 @@ test("Providers has five ordered sections including External CLI; unknown variab
  };
  fixture(); await mount(<KeysSection />);
  const headings = [...document.querySelectorAll('[data-testid^="group-"] > p')].map((el) => el.textContent);
- assert.deepEqual(headings, ["Claves de API de modelos", "Suscripciones", "CLI externa", "Dictado", "Búsqueda"]);
+ assert.deepEqual(headings, ["Claves de API de modelos", "Suscripciones", "CLI externa", "Búsqueda"]);
  assert(byTest("claude-code-installation").closest('[data-testid="group-external-cli"]'));
- assert(byTest("key-deepgram_api_key").closest('[data-testid="group-dictation"]'));
  assert(byTest("key-tavily_api_key").closest('[data-testid="group-search"]'));
  assert(byTest("key-brave_api_key").closest('[data-testid="group-search"]'));
  assert(byTest("key-exa_api_key").closest('[data-testid="group-search"]'));

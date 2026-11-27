@@ -156,6 +156,14 @@ dmg:
 afterPack: scripts/after-pack.cjs
 win:
   icon: build/icon.ico
+  # Local dictation (ticket 12i): parakeet-cli + ggml libraries + the
+  # Parakeet model, fetched and SHA-256-verified by scripts/stt-fetch.mjs
+  # (desktop-dist-win runs it). The server finds them via LH_STT_DIR.
+  extraResources:
+    - from: vendor/stt
+      to: stt
+    - from: licenses/stt
+      to: licenses/stt
   target:
     - target: nsis
       arch:

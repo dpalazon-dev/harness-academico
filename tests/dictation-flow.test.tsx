@@ -2,35 +2,16 @@ import React, { act } from "react";
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { parseHTML } from "linkedom";
-import { finishDictation, useDictation, useDictationTarget, type Dictation } from "../components/dictation.tsx";
-import { notifySettingsSaved } from "../components/settings-signal.ts";
-import { useDictationLanguage } from "../components/dictation-preference.ts";
+import { finishDictation, joinPcmFrames, useDictation, useDictationTarget, type Dictation } from "../components/dictation.tsx";
 import { isDictationActive, useDictationActive } from "../components/dictation-state.ts";
-import type { UserSettings } from "../src/core/index.ts";
+
+// The local engine (ticket 12i): the recognizer is simulated at its client,
+// the POST /api/stt/transcribe request. Audio frames come from a fake worklet.
 
 function deferred<T>() {
 	let resolve!: (value: T) => void;
 	const promise = new Promise<T>((done) => { resolve = done; });
 	return { promise, resolve };
-}
-
-class Socket extends EventTarget {
-	static CONNECTING = 0;
-	static OPEN = 1;
-	static all: Socket[] = [];
-	readyState = Socket.CONNECTING;
-	sent: unknown[] = [];
-	constructor(readonly url: string, readonly protocols: string[]) { super(); Socket.all.push(this); }
-	get language() { return new URL(this.url).searchParams.get("language"); }
-	send(data: unknown) { this.sent.push(data); }
-	close() { this.readyState = 3; }
-	open() { this.readyState = Socket.OPEN; this.dispatchEvent(new Event("open")); }
-	end(code = 1000) { this.close(); this.dispatchEvent(Object.assign(new Event("close"), { code })); }
-	final(text: string) {
-		this.dispatchEvent(Object.assign(new Event("message"), {
-			data: JSON.stringify({ type: "Results", is_final: true, channel: { alternatives: [{ transcript: text }] } }),
-		}));
-	}
 }
 
 class AudioGraph {
@@ -39,28 +20,37 @@ class AudioGraph {
 	audioWorklet = { addModule: async () => {} };
 	createMediaStreamSource() { return { connect() {}, disconnect() {} }; }
 }
-class Worklet { port = {}; connect() {} disconnect() {} }
+class Worklet {
+	static all: Worklet[] = [];
+	port: { onmessage?: (e: { data: unknown }) => void } = {};
+	constructor() { Worklet.all.push(this); }
+	connect() {}
+	disconnect() {}
+	/** One 128ms linear16 frame, filled with `value`. */
+	frame(value = 1) {
+		const buffer = new Int16Array(2048).fill(value).buffer;
+		this.port.onmessage?.({ data: { type: "audio", buffer } });
+	}
+}
+
+type Request = { body: Uint8Array; signal?: AbortSignal; reply: (response: Response) => void };
 
 const globals = globalThis as Record<string, unknown>;
 let restore: (() => void) | undefined;
 let dispose: (() => Promise<void>) | undefined;
 
-async function fixture(language: "pl" | "en" = "pl", delayedRead?: Promise<Response>) {
+async function fixture() {
 	const dom = parseHTML("<html><body><div id='root'></div></body></html>");
 	const state = {
-		record: { version: 1, dictation: { language } } as UserSettings,
-		nextRead: delayedRead,
-		nextWrite: undefined as Promise<Response> | undefined,
 		nextMic: undefined as Promise<{ getTracks: () => { stop: () => void }[] }> | undefined,
-		readFails: false,
-		reads: 0,
 		active: false,
 		captures: 0,
 		stops: 0,
 		appends: [] as string[],
+		requests: [] as Request[],
 		claimed: undefined as ((text: string) => void) | undefined,
 	};
-	Socket.all = [];
+	Worklet.all = [];
 	const previous = new Map<string, PropertyDescriptor | undefined>();
 	for (const [key, value] of Object.entries({
 		React, window: dom.window, document: dom.document, CustomEvent: dom.window.CustomEvent,
@@ -69,20 +59,15 @@ async function fixture(language: "pl" | "en" = "pl", delayedRead?: Promise<Respo
 			if (state.nextMic) return state.nextMic;
 			return { getTracks: () => [{ stop() { state.stops++; } }] };
 		} } },
-		WebSocket: Socket, AudioContext: AudioGraph, AudioWorkletNode: Worklet,
+		AudioContext: AudioGraph, AudioWorkletNode: Worklet,
 		IS_REACT_ACT_ENVIRONMENT: true,
-		fetch: async (url: string, init?: RequestInit) => {
-			if (url === "/api/stt/token") return Response.json({ token: "test-token" });
-			if (url === "/api/settings") {
-				state.reads++;
-				if (state.nextRead) { const response = state.nextRead; state.nextRead = undefined; return response; }
-				return state.readFails ? Response.json({}, { status: 500 }) : Response.json({ settings: state.record });
-			}
-			assert.equal(url, "/api/settings/dictation");
-			assert.equal(init?.method, "PUT");
-			if (state.nextWrite) { const response = state.nextWrite; state.nextWrite = undefined; return response; }
-			state.record = { ...state.record, dictation: JSON.parse(init.body as string) };
-			return Response.json({ settings: state.record });
+		fetch: (url: string, init?: RequestInit) => {
+			assert.equal(url, "/api/stt/transcribe");
+			assert.equal(init?.method, "POST");
+			const response = deferred<Response>();
+			init?.signal?.addEventListener("abort", () => response.resolve(Promise.reject(new DOMException("aborted", "AbortError")) as unknown as Response));
+			state.requests.push({ body: init!.body as Uint8Array, signal: init?.signal ?? undefined, reply: response.resolve });
+			return response.promise;
 		},
 	})) {
 		previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
@@ -96,49 +81,87 @@ async function fixture(language: "pl" | "en" = "pl", delayedRead?: Promise<Respo
 	};
 	const { createRoot } = await import("react-dom/client");
 	let latest!: Dictation;
-	let setting!: ReturnType<typeof useDictationLanguage>;
 	function Harness() {
 		const claimed = state.claimed;
 		useDictationTarget(React.useCallback((text: string) => claimed?.(text), [claimed]), !!claimed);
 		latest = useDictation({ append: (text) => state.appends.push(text) });
-		setting = useDictationLanguage();
 		state.active = useDictationActive();
 		return null;
 	}
-	let root = createRoot(document.getElementById("root")!);
-	let firstMount = true;
-	const mount = async () => {
-		await act(async () => { root.render(<Harness />); });
-		// Each fixture is a new server record. Explicitly invalidate a prior
-		// fixture's window-lifetime cache, but do not refetch on remounts.
-		if (firstMount && setting.language !== undefined) {
-			await act(async () => { notifySettingsSaved("dictation"); });
-		}
-		firstMount = false;
-	};
+	const root = createRoot(document.getElementById("root")!);
 	dispose = async () => { await act(async () => { root.unmount(); }); };
 	return {
 		state,
 		get dictation() { return latest; },
-		get setting() { return setting; },
-		mount,
+		mount: async () => { await act(async () => { root.render(<Harness />); }); },
 		unmount: () => dispose!(),
-		remount: async () => {
-			await dispose!();
-			root = createRoot(document.getElementById("root")!);
-			await mount();
+		/** Answer the latest transcription request. */
+		reply: async (text: string, status = 200) => {
+			await act(async () => { state.requests.at(-1)!.reply(Response.json(status === 200 ? { text } : { message: text }, { status })); });
 		},
 	};
 }
 
 afterEach(async () => { await dispose?.(); restore?.(); dispose = undefined; restore = undefined; });
 
+test("stop sends the whole recording once and appends the engine's text", async () => {
+	const f = await fixture(); await f.mount();
+	await act(async () => { f.dictation.toggle(); });
+	assert.equal(f.dictation.phase, "recording");
+	assert.equal(f.state.active, true);
+	await act(async () => { Worklet.all[0]!.frame(1); Worklet.all[0]!.frame(2); });
+	assert.equal(f.state.requests.length, 0, "nothing is sent while recording");
+	await act(async () => { f.dictation.stop(); });
+	assert.equal(f.dictation.phase, "stopping");
+	assert.equal(f.state.stops, 1, "the microphone dies before transcription");
+	assert.equal(f.state.requests.length, 1);
+	assert.equal(f.state.requests[0]!.body.byteLength, 2 * 2048 * 2);
+	await f.reply("Hola mundo");
+	assert.deepEqual(f.state.appends, ["Hola mundo"]);
+	assert.equal(f.dictation.phase, "idle");
+	assert.equal(f.state.active, false);
+});
+
+test("a missing engine shows the server's explanation and appends nothing", async () => {
+	const f = await fixture(); await f.mount();
+	await act(async () => { f.dictation.toggle(); });
+	await act(async () => { Worklet.all[0]!.frame(); f.dictation.stop(); });
+	await f.reply("El dictado local no está instalado: faltan el motor o el modelo de voz", 503);
+	assert.equal(f.dictation.phase, "idle");
+	assert.match(f.dictation.error!, /no está instalado/);
+	assert.deepEqual(f.state.appends, []);
+	// The next click retries and clears the error.
+	await act(async () => { f.dictation.toggle(); });
+	assert.equal(f.dictation.error, null);
+	assert.equal(f.dictation.phase, "recording");
+});
+
+test("stopping with no captured audio sends no request", async () => {
+	const f = await fixture(); await f.mount();
+	await act(async () => { f.dictation.toggle(); });
+	await act(async () => { f.dictation.stop(); });
+	assert.equal(f.state.requests.length, 0);
+	assert.equal(f.dictation.phase, "idle");
+	assert.deepEqual(f.state.appends, []);
+});
+
+test("cancel during transcription aborts the request and discards its text", async () => {
+	const f = await fixture(); await f.mount();
+	await act(async () => { f.dictation.toggle(); });
+	await act(async () => { Worklet.all[0]!.frame(); f.dictation.stop(); });
+	const request = f.state.requests[0]!;
+	await act(async () => { f.dictation.cancel(); });
+	assert.equal(request.signal?.aborted, true);
+	assert.equal(f.dictation.phase, "idle");
+	await act(async () => { request.reply(Response.json({ text: "late text" })); });
+	assert.deepEqual(f.state.appends, []);
+});
+
 test("side recording has a fixed destination, and main finish never waits for or stops it", async () => {
 	const f = await fixture(); await f.mount();
 	const side: string[] = []; const other: string[] = [];
 	await act(async () => { f.dictation.toggleFor({ id: "side:first", append: (text) => { side.push(text); } }); });
-	const socket = Socket.all[0]!;
-	await act(async () => { socket.open(); socket.final("Side words"); });
+	await act(async () => { Worklet.all[0]!.frame(); });
 	assert.equal(f.dictation.destinationId, "side:first");
 	await act(async () => { await finishDictation(); await f.dictation.finishFor("side:another"); });
 	assert.equal(f.dictation.phase, "recording");
@@ -146,18 +169,19 @@ test("side recording has a fixed destination, and main finish never waits for or
 	// A shortcut at another focused input stops the current run, not a second capture.
 	await act(async () => { f.dictation.toggleFor({ id: "side:another", append: (text) => { other.push(text); } }); });
 	assert.equal(f.dictation.phase, "stopping"); assert.equal(f.state.captures, 1);
-	await act(async () => { socket.final("final tail"); socket.end(); });
-	assert.deepEqual(side, ["Side words final tail"]); assert.deepEqual(other, []); assert.deepEqual(f.state.appends, []);
+	await f.reply("Side words");
+	assert.deepEqual(side, ["Side words"]); assert.deepEqual(other, []); assert.deepEqual(f.state.appends, []);
 });
 
-test("side finish waits for final speech and flushes once into its original saved draft", async () => {
+test("side finish waits for the transcript and flushes once into its original destination", async () => {
 	const f = await fixture(); await f.mount(); const side: string[] = [];
 	await act(async () => { f.dictation.toggleFor({ id: "side:thread", append: (text) => { side.push(text); } }); });
-	const socket = Socket.all[0]!; await act(async () => { socket.open(); socket.final("Closing"); });
+	await act(async () => { Worklet.all[0]!.frame(); });
 	let finished = false; let done!: Promise<void>;
 	await act(async () => { done = f.dictation.finishFor("side:thread").then(() => { finished = true; }); });
 	assert.equal(finished, false); assert.deepEqual(side, []);
-	await act(async () => { socket.final("words"); socket.end(); await done; });
+	await f.reply("Closing words");
+	await act(async () => { await done; });
 	assert.equal(finished, true); assert.deepEqual(side, ["Closing words"]);
 	await act(async () => { await f.dictation.finishFor("side:thread"); });
 	assert.deepEqual(side, ["Closing words"]);
@@ -171,199 +195,35 @@ test("closing side recording during microphone setup cannot leave a late live ca
 	await act(async () => { await f.dictation.finishFor("side:connecting"); });
 	assert.equal(f.dictation.phase, "idle");
 	await act(async () => { mic.resolve({ getTracks: () => [{ stop() { f.state.stops++; } }] }); });
-	assert.equal(f.state.stops, 1); assert.equal(Socket.all.length, 0); assert.deepEqual(f.state.appends, []);
+	assert.equal(f.state.stops, 1); assert.equal(Worklet.all.length, 0); assert.deepEqual(f.state.appends, []);
+	assert.equal(f.state.requests.length, 0);
 });
 
 test("main recording retains its starting question field when later focus/claims change", async () => {
 	const f = await fixture(); const first: string[] = []; const later: string[] = [];
 	f.state.claimed = (text) => first.push(text); await f.mount();
-	await act(async () => { f.dictation.toggle(); }); const socket = Socket.all[0]!;
-	await act(async () => { socket.open(); socket.final("Main reasoning"); });
+	await act(async () => { f.dictation.toggle(); });
+	await act(async () => { Worklet.all[0]!.frame(); });
 	f.state.claimed = (text) => later.push(text); await f.mount();
-	await act(async () => { socket.end(); });
+	await act(async () => { f.dictation.stop(); });
+	await f.reply("Main reasoning");
 	assert.deepEqual(first, ["Main reasoning"]); assert.deepEqual(later, []); assert.deepEqual(f.state.appends, []);
 });
 
-test("waits for the saved language; reconnect preserves it and finals still flush exactly once", async () => {
-	const read = deferred<Response>();
-	const f = await fixture("pl", read.promise);
-	await f.mount();
+test("unmount during recording stops resources and never sends the departing page's audio", async () => {
+	const f = await fixture(); await f.mount();
 	await act(async () => { f.dictation.toggle(); });
-	assert.equal(f.dictation.phase, "connecting");
-	assert.equal(f.state.active, true, "the settings row locks while connecting");
-	assert.equal(f.state.captures, 0);
-	assert.equal(Socket.all.length, 0, "must not open a default-English socket before settings arrive");
-	await act(async () => { read.resolve(Response.json({ settings: f.state.record })); });
-	const first = Socket.all[0]!;
-	assert.equal(first.language, "pl");
-	await act(async () => { first.open(); first.final("Cześć"); });
-	assert.deepEqual(f.state.appends, []);
-	// A preference refresh during capture affects the next run only.
-	f.state.record.dictation = { language: "multi" };
-	await act(async () => { notifySettingsSaved("dictation"); });
-	await act(async () => { first.end(1006); });
-	const second = Socket.all[1]!;
-	assert.equal(second.language, "pl");
-	assert.deepEqual(second.protocols, ["bearer", "test-token"]);
-	await act(async () => { second.open(); second.final("świecie"); });
-	await act(async () => { f.dictation.stop(); });
-	assert.equal(f.dictation.phase, "stopping");
-	assert.equal(f.state.active, true, "the settings row remains locked while stopping");
-	assert.equal(second.sent.at(-1), JSON.stringify({ type: "CloseStream" }));
-	await act(async () => { second.end(); });
-	assert.deepEqual(f.state.appends, ["Cześć świecie"]);
-	assert.equal(f.dictation.phase, "idle");
-	assert.equal(f.state.active, false);
-	await act(async () => { f.dictation.toggle(); });
-	assert.equal(Socket.all[2]!.language, "multi");
-});
-
-test("a failed save keeps the previous language, including a shortcut pressed while saving", async () => {
-	const f = await fixture();
-	await f.mount();
-	const write = deferred<Response>();
-	f.state.nextWrite = write.promise;
-	let saved!: Promise<boolean>;
-	await act(async () => { saved = f.setting.save("multi"); });
-	assert.equal(f.setting.saving, true);
-	await act(async () => { f.dictation.toggle(); });
-	assert.equal(f.state.captures, 0);
-	await act(async () => { write.resolve(Response.json({}, { status: 500 })); await saved; });
-	assert.equal(await saved, false);
-	assert.equal(f.setting.language, "pl");
-	assert.match(f.setting.error!, /No se pudo guardar/);
-	assert.equal(Socket.all[0]!.language, "pl");
-});
-
-test("confirmed choices stay cached across navigation; failed explicit refreshes block capture", async () => {
-	const f = await fixture();
-	await f.mount();
-	await act(async () => { assert.equal(await f.setting.save("multi"), true); });
-	const reads = f.state.reads;
-	f.state.readFails = true;
-	await f.remount();
-	assert.equal(f.setting.language, "multi");
-	assert.equal(f.state.reads, reads, "navigation must not reread a confirmed preference");
-	await act(async () => { notifySettingsSaved("dictation"); });
-	await act(async () => { f.dictation.toggle(); });
-	assert.match(f.dictation.error!, /Could not load/);
-	assert.equal(f.state.captures, 0);
-	assert.equal(Socket.all.length, 0);
-	f.state.readFails = false;
-	await act(async () => { f.dictation.toggle(); });
-	assert.equal(Socket.all[0]!.language, "multi");
-});
-
-test("a shortcut waits for a language save made by the separate settings control", async () => {
-	const f = await fixture();
-	await f.mount();
-	const write = deferred<Response>();
-	f.state.nextWrite = write.promise;
-	let saved!: Promise<boolean>;
-	await act(async () => { saved = f.setting.save("multi"); });
-	await act(async () => { f.dictation.toggle(); });
-	assert.equal(f.state.captures, 0);
-	f.state.record.dictation = { language: "multi" };
-	await act(async () => { write.resolve(Response.json({ settings: f.state.record })); await saved; });
-	assert.equal(Socket.all[0]!.language, "multi");
-});
-
-test("a saved-language refresh gates capture even when an older choice is cached", async () => {
-	const f = await fixture();
-	await f.mount();
-	const read = deferred<Response>();
-	f.state.nextRead = read.promise;
-	f.state.record.dictation = { language: "multi" };
-	await act(async () => { notifySettingsSaved("dictation"); });
-	await act(async () => { f.dictation.toggle(); });
-	assert.equal(f.state.captures, 0);
-	assert.equal(Socket.all.length, 0);
-	await act(async () => { read.resolve(Response.json({ settings: f.state.record })); });
-	assert.equal(Socket.all[0]!.language, "multi");
-});
-
-test("a stale settings refresh cannot overwrite a newer confirmed choice", async () => {
-	const f = await fixture();
-	await f.mount();
-	const read = deferred<Response>();
-	f.state.nextRead = read.promise;
-	await act(async () => { notifySettingsSaved("dictation"); });
-	await act(async () => { await f.setting.save("multi"); });
-	await act(async () => { read.resolve(Response.json({ settings: { version: 1, dictation: { language: "pl" } } })); });
-	assert.equal(f.setting.language, "multi");
-	await act(async () => { f.dictation.toggle(); });
-	assert.equal(Socket.all[0]!.language, "multi");
-});
-
-test("cancel while settings load does not open a microphone or socket later", async () => {
-	const read = deferred<Response>();
-	const f = await fixture("pl", read.promise);
-	await f.mount();
-	await act(async () => { f.dictation.toggle(); });
-	await act(async () => { f.dictation.cancel(); });
-	await act(async () => { read.resolve(Response.json({ settings: f.state.record })); });
-	assert.equal(f.dictation.phase, "idle");
-	assert.equal(f.state.captures, 0);
-	assert.equal(Socket.all.length, 0);
-});
-
-test("reopening settings during a save shares its busy state and rejects a competing selection", async () => {
-	const f = await fixture();
-	await f.mount();
-	const write = deferred<Response>();
-	f.state.nextWrite = write.promise;
-	let first!: Promise<boolean>;
-	await act(async () => { first = f.setting.save("multi"); });
-	await f.remount();
-	assert.equal(f.setting.saving, true);
-	assert.equal(await f.setting.save("en"), false, "a different selection cannot inherit another write's success");
-	f.state.record.dictation = { language: "multi" };
-	await act(async () => { write.resolve(Response.json({ settings: f.state.record })); await first; });
-	assert.equal(f.setting.saving, false);
-	assert.equal(f.setting.language, "multi");
-});
-
-test("a confirmed save applies to capture even when subsequent settings GET requests would fail", async () => {
-	const f = await fixture();
-	await f.mount();
-	f.state.readFails = true;
-	await act(async () => { assert.equal(await f.setting.save("multi"), true); });
-	assert.equal(f.state.record.dictation?.language, "multi");
-	await act(async () => { f.dictation.toggle(); });
-	assert.equal(Socket.all[0]!.language, "multi");
-});
-
-test("unmount during a pending language read prevents orphaned capture", async () => {
-	const read = deferred<Response>();
-	const f = await fixture("pl", read.promise);
-	await f.mount();
-	await act(async () => { f.dictation.toggle(); });
-	await f.unmount();
-	await act(async () => { read.resolve(Response.json({ settings: f.state.record })); });
-	assert.equal(f.state.captures, 0);
-	assert.equal(Socket.all.length, 0);
-	assert.equal(isDictationActive(), false);
-});
-
-test("unmount during recording stops resources and discards the departing page's buffered text", async () => {
-	const f = await fixture();
-	await f.mount();
-	await act(async () => { f.dictation.toggle(); });
-	const socket = Socket.all[0]!;
-	await act(async () => { socket.open(); socket.final("do not append into another page"); });
+	await act(async () => { Worklet.all[0]!.frame(); });
 	await f.unmount();
 	assert.equal(f.state.stops, 1);
-	assert.equal(socket.readyState, 3);
 	assert.equal(isDictationActive(), false);
-	assert.deepEqual(f.state.appends, []);
-	await act(async () => { socket.final("late event"); socket.end(1006); });
-	assert.equal(Socket.all.length, 1);
+	await act(async () => { Worklet.all[0]!.frame(); });
+	assert.equal(f.state.requests.length, 0);
 	assert.deepEqual(f.state.appends, []);
 });
 
 test("microphone permission resolving after unmount immediately stops the late stream", async () => {
-	const f = await fixture();
-	await f.mount();
+	const f = await fixture(); await f.mount();
 	const mic = deferred<{ getTracks: () => { stop: () => void }[] }>();
 	f.state.nextMic = mic.promise;
 	await act(async () => { f.dictation.toggle(); });
@@ -371,6 +231,12 @@ test("microphone permission resolving after unmount immediately stops the late s
 	await f.unmount();
 	await act(async () => { mic.resolve({ getTracks: () => [{ stop() { f.state.stops++; } }] }); });
 	assert.equal(f.state.stops, 1);
-	assert.equal(Socket.all.length, 0);
+	assert.equal(Worklet.all.length, 0);
 	assert.equal(isDictationActive(), false);
+});
+
+test("joinPcmFrames keeps frame order and bytes", () => {
+	const a = new Int16Array([1, 2]).buffer;
+	const b = new Int16Array([3]).buffer;
+	assert.deepEqual([...new Int16Array(joinPcmFrames([a, b]).buffer)], [1, 2, 3]);
 });

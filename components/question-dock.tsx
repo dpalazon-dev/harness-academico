@@ -425,8 +425,8 @@ function QuestionDockForm({
 			return;
 		}
 		/* FINISH DICTATION FIRST (owner, 2026-10-01): Enter may arrive while
-		 * a run is live with reasoning still in Deepgram's hands. Stop the
-		 * run, let the last finals land in the target field, and only then
+		 * a run is live with reasoning not yet transcribed. Stop the
+		 * run, let the transcript land in the target field, and only then
 		 * build the answer — the spoken reasoning is never lost to a
 		 * forgotten stop. The field values below come from the REF mirrors
 		 * because the flush lands via setState after an await. */

@@ -1,0 +1,121 @@
+name: Dictation engine binaries
+
+# Builds the local dictation engine (ticket 12i) for Windows x64 from a pinned
+# whisper.cpp tag: parakeet-cli with the ggml backends loaded at run time
+# (GGML_BACKEND_DL) — every CPU variant plus Vulkan, so the app uses the GPU
+# whenever a Vulkan driver and device exist and falls back to the CPU
+# otherwise. The Visual C++ runtime ships next to the binaries (app-local
+# deployment), so a clean Windows needs nothing installed.
+#
+# Manual (workflow_dispatch, once this file is on main) or on a push of this
+# file to a dictado/** branch (defaults, never publishes). The zip and its
+# SHA-256 go to the run's artifacts; with `publish`, also to the release named
+# by `release_tag` (created if missing).
+# scripts/stt-fetch.mjs pins the published asset by SHA-256.
+
+on:
+  push:
+    branches: ["dictado/**"]
+    paths: [.github/workflows/stt-binaries.yml]
+  workflow_dispatch:
+    inputs:
+      whisper_ref:
+        description: whisper.cpp tag to build
+        required: true
+        default: b5907
+      publish:
+        description: Upload the zip to a release of this repository
+        type: boolean
+        default: false
+      release_tag:
+        description: Release that holds the engine (with publish)
+        default: stt-b5907
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (windows-x64, CPU + Vulkan)
+    runs-on: windows-2025
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      WHISPER_REF: ${{ inputs.whisper_ref || 'b5907' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install the Vulkan SDK (headers, loader library, glslc)
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'vulkan_sdk.exe'
+          Invoke-WebRequest -Uri 'https://sdk.lunarg.com/sdk/download/latest/windows/vulkan_sdk.exe' -OutFile $installer
+          & $installer --root C:\VulkanSDK --accept-licenses --default-answer --confirm-command install | Out-Host
+          "VULKAN_SDK=C:\VulkanSDK" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "C:\VulkanSDK\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Fetch whisper.cpp at the pinned tag
+        run: git clone --depth 1 --branch $env:WHISPER_REF https://github.com/ggml-org/whisper.cpp whisper-src
+
+      - name: Configure and build
+        run: |
+          cmake -S whisper-src -B whisper-build -G "Visual Studio 17 2022" -A x64 `
+            -DBUILD_SHARED_LIBS=ON -DGGML_BACKEND_DL=ON -DGGML_NATIVE=OFF -DGGML_CPU_ALL_VARIANTS=ON `
+            -DGGML_VULKAN=ON -DWHISPER_BUILD_TESTS=OFF
+          cmake --build whisper-build --config Release -j 4
+
+      - name: Collect parakeet-cli, backends and the VC++ runtime
+        run: |
+          $out = New-Item -ItemType Directory -Force -Path stt-bin
+          $release = Get-ChildItem -Recurse -Directory whisper-build -Filter Release | Where-Object { Test-Path (Join-Path $_.FullName 'parakeet-cli.exe') } | Select-Object -First 1
+          if (-not $release) { throw 'parakeet-cli.exe was not built' }
+          Get-ChildItem $release.FullName | Where-Object { $_.Name -match '^(parakeet-cli\.exe|parakeet\.dll|ggml(-[\w-]+)?\.dll)$' } | Copy-Item -Destination $out
+          if (-not (Test-Path (Join-Path $out 'ggml-vulkan.dll'))) { throw 'ggml-vulkan.dll was not built' }
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          $redist = Get-ChildItem -Directory (Join-Path $vs 'VC\Redist\MSVC') | Where-Object { $_.Name -match '^\d' } | Sort-Object Name -Descending | Select-Object -First 1
+          foreach ($pack in 'Microsoft.VC143.CRT', 'Microsoft.VC143.OpenMP') {
+            Copy-Item (Join-Path $redist.FullName "x64\$pack\*.dll") -Destination $out
+          }
+          Get-ChildItem $out | Format-Table Name, Length | Out-Host
+
+      - name: Smoke test (CPU) on one second of silence
+        run: |
+          $model = Join-Path $env:RUNNER_TEMP 'model.bin'
+          Invoke-WebRequest -Uri 'https://huggingface.co/ggml-org/parakeet-GGUF/resolve/main/ggml-parakeet-tdt-0.6b-v3-q8_0.bin' -OutFile $model
+          $hash = (Get-FileHash $model -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne '4d64e9e96c2792186d072fde0034df0ad670cf680a2f53069052ead827fd600e') { throw "model hash $hash" }
+          New-Item -ItemType Directory -Force -Path smoke/stt | Out-Null
+          Copy-Item stt-bin -Destination smoke/stt/bin -Recurse
+          New-Item -ItemType Directory -Force -Path smoke/stt/models | Out-Null
+          Move-Item $model smoke/stt/models/ggml-parakeet-tdt-0.6b-v3-q8_0.bin
+          node scripts/smoke-stt.mjs smoke/stt
+          if ($LASTEXITCODE) { throw 'smoke failed' }
+
+      - name: Zip and checksum
+        run: |
+          $zip = "parakeet-win-x64-$env:WHISPER_REF-vulkan.zip"
+          Compress-Archive -Path stt-bin/* -DestinationPath $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zip" | Out-File "$zip.sha256" -Encoding ascii
+          "ZIP=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Get-Content "$zip.sha256" | Out-Host
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: parakeet-win-x64-${{ inputs.whisper_ref || 'b5907' }}-vulkan
+          path: |
+            ${{ env.ZIP }}
+            ${{ env.ZIP }}.sha256
+
+      - name: Publish to the release
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          gh release view $env:TAG -R $env:GITHUB_REPOSITORY 2>$null
+          if ($LASTEXITCODE) { gh release create $env:TAG -R $env:GITHUB_REPOSITORY --title "Motor de dictado ($env:WHISPER_REF)" --notes "Binarios de whisper.cpp $env:WHISPER_REF (parakeet-cli, CPU y Vulkan) para el dictado local. Los fija scripts/stt-fetch.mjs por SHA-256." --prerelease }
+          gh release upload $env:TAG $env:ZIP "$env:ZIP.sha256" -R $env:GITHUB_REPOSITORY --clobber

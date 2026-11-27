@@ -29,6 +29,7 @@ import { rutaLector, type DetalleDocumento, type DocumentoEstudio } from "./docu
 import { RUTA_CUADERNOS, crearCuaderno, descargar, nuevoBloque, practicable, recuento, rutaCuaderno, type AnclaComentario, type BloqueCuaderno, type Cuaderno, type EstadoProactivo, type LecturaProactiva, type ModoCuaderno, type Tinta, type TipoComentario } from "./cuadernos";
 import { ModoProactivo, TopeDiario } from "./modo-proactivo";
 import { AvisoEscuchar, OpcionEscuchar } from "./escuchar-cuaderno";
+import { DictadoCuaderno } from "./dictado-cuaderno";
 import { useEscuchar, type VozVista } from "./escuchar";
 import { PropositoCuaderno, TintaCuaderno, type CambioProposito } from "./proposito-cuaderno";
 import { PersonajeCuaderno, type CambioPersonaje } from "./personaje-cuaderno";
@@ -247,7 +248,7 @@ export function PropiedadesCuaderno({ cuaderno: c, unidades, documentos, ocupado
 	);
 }
 
-export function EditorCuadernoEstudio({ cuaderno: c, unidades, documentos, guardado, ocupado, enfocarTitulo = false, peticiones = [], hilos = SIN_HILOS, decisiones = {}, proactivo, personajes, voz, acciones }: {
+export function EditorCuadernoEstudio({ cuaderno: c, unidades, documentos, guardado, ocupado, enfocarTitulo = false, peticiones = [], hilos = SIN_HILOS, decisiones = {}, proactivo, personajes, voz, dictar = false, acciones }: {
 	cuaderno: Cuaderno;
 	/** Las unidades activas del espacio; la vinculada se añade aunque no lo esté. */
 	unidades: Vinculable[];
@@ -269,6 +270,8 @@ export function EditorCuadernoEstudio({ cuaderno: c, unidades, documentos, guard
 	personajes?: ListaPersonajes | null;
 	/** Escuchar al tutor (ticket 12j): el interruptor de la cabecera y el botón de cada comentario; sin esto no se pintan. */
 	voz?: VozVista;
+	/** Dictar con la voz (ticket 12i): el micrófono de la cabecera y el atajo con el cursor en la página; sin esto no se pinta. */
+	dictar?: boolean;
 	acciones: AccionesEditor;
 }) {
 	const lista = useRef<HTMLOListElement>(null);
@@ -456,6 +459,7 @@ export function EditorCuadernoEstudio({ cuaderno: c, unidades, documentos, guard
 					</ModoProactivo>
 				)}
 				{voz && <AvisoEscuchar voz={voz} />}
+				{dictar && <DictadoCuaderno raiz={raiz} />}
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button size="icon-sm" variant="ghost" aria-label="Más acciones" title="Más acciones" data-mas-acciones className="text-muted-foreground"><MoreHorizontalIcon /></Button>
@@ -1212,6 +1216,7 @@ export function EditorCuaderno({ id, nuevo = false }: { id: string; nuevo?: bool
 				proactivo={{ estado: estadoProactivo, leyendo, error: errorModo }}
 				personajes={personajes}
 				voz={voz}
+				dictar
 				acciones={{
 					cambiar, comentar, descartar, atender, aceptarPropuesta, descartarPropuesta, quitarDibujo, cambiarModo, fijarTope, fijarProposito, elegirPersona, guardarPersonaje, borrarPersonaje,
 						abrirHilo: (comentarioId) => setHilos(h => ({ ...sinRespuestaNueva(h, comentarioId), abierto: comentarioId })),

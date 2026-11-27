@@ -42,7 +42,6 @@ import { useInteractionLayer, useInteractionLayers, useOptionalInteractionLayers
 import { isInteractionScopeEligible } from "@/components/plugin-input-focus";
 import { MenuShell } from "@/components/menu-shell";
 import { notifySettingsSaved } from "@/components/settings-signal";
-import { DictationLanguageSetting } from "@/components/dictation-language";
 
 /** One pi-ai provider with plain API-key auth (the Platform seam —
  *  derived from pi-ai's own env-key table; no drift possible). */
@@ -363,8 +362,7 @@ function AddProviderRow({
 }
 
 export function KeysSection({
-	/** A deep-linked row to unfold on arrival (zero-keys wave): the
-	 *  dictation error's click lands here on DEEPGRAM_API_KEY. Followed
+	/** A deep-linked row to unfold on arrival (zero-keys wave). Followed
 	 *  while mounted too — the settings dialog's while-open retarget
 	 *  pattern. undefined = nothing seeded. */
 	initialRow,
@@ -581,8 +579,8 @@ export function KeysSection({
 				<ClaudeCodeInstallationStatus />
 			</SettingsGroup>
 
-			{(["Dictado", "Búsqueda"] as const).map((label) => <SettingsGroup key={label} label={label} testid={label === "Dictado" ? "group-dictation" : "group-search"}>
-				{toolRows.filter((status) => label === "Dictado" ? status.id === "DEEPGRAM_API_KEY" : status.id !== "DEEPGRAM_API_KEY").map((status) => (
+			<SettingsGroup label="Búsqueda" testid="group-search">
+				{toolRows.map((status) => (
 					<KeyTableRow
 						key={status.id}
 						label={status.info?.label ?? status.id}
@@ -600,18 +598,7 @@ export function KeysSection({
 						testid={`key-${status.id.toLowerCase()}`}
 					/>
 				))}
-				{label === "Dictado" && <>
-					<DictationLanguageSetting />
-					<p data-testid="dictation-setup-hint" className="px-1 text-[11px] leading-relaxed text-muted-foreground/70">
-						Crea una <a
-							href="https://console.deepgram.com/"
-							target="_blank"
-							rel="noreferrer"
-							className="anillo-foco underline underline-offset-2 hover:text-foreground"
-						>clave de API de Deepgram</a> con el rol Member o superior y añádela arriba.
-					</p>
-				</>}
-			</SettingsGroup>)}
+			</SettingsGroup>
 
 		</div>
 	);

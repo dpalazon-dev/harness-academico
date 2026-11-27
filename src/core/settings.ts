@@ -35,7 +35,6 @@ import { CLAUDE_CODE_PROVIDER } from "./contracts/claude-code.ts";
 import type { ModelRole } from "../../config.ts";
 import type { ChatSettings } from "./contracts/chat.ts";
 import { isSearchEngineId, type SearchEngineId } from "./search.ts";
-import { isDictationLanguage, type DictationLanguage } from "./dictation.ts";
 import { parseFileAccessSettings, type FileAccessSettings } from "./file-access.ts";
 import { COLOR_OVERRIDE_KEYS, isThemeId, type AppearanceColorOverrides } from "./themes.ts";
 
@@ -349,11 +348,6 @@ export interface GeneralSettings {
 	autoUpdate?: boolean;
 }
 
-/** One app-wide dictation preference, shared by every composer. */
-export interface DictationSettings {
-	language?: DictationLanguage;
-}
-
 /** Agent settings — everything about the non-conversation machinery. */
 export interface AgentSettings {
 	/** Maximum simultaneous background-worker model requests (default 8).
@@ -506,7 +500,6 @@ export interface CompactionSettings {
 export interface UserSettings {
 	version: number;
 	general?: GeneralSettings;
-	dictation?: DictationSettings;
 	/** Explicit app-wide opt-in; absent/invalid is off, including older records. */
 	claudeCode?: { enabled?: boolean };
 	agent?: AgentSettings;
@@ -529,7 +522,6 @@ export interface FactorySettings {
 	version: number;
 	agent: Required<Pick<AgentSettings, "workerRequestConcurrency">>;
 	general: Required<GeneralSettings>;
-	dictation: Required<DictationSettings>;
 	appearance: {
 		theme: string;
 		background: string | null;
@@ -553,7 +545,6 @@ export const FACTORY_SETTINGS: FactorySettings = {
 	version: CURRENT_SETTINGS_VERSION,
 	agent: { workerRequestConcurrency: 8 },
 	general: { autoUpdate: true },
-	dictation: { language: "en" },
 	appearance: {
 		// HarnessAcademico (guía de diseño): «papel tranquilo» y prosa a 17 px por defecto.
 		theme: "limpio",
@@ -883,13 +874,6 @@ export function sanitizeUserSettings(raw: unknown): UserSettings | null {
 	};
 	if (r.general !== null && typeof r.general === "object" && !Array.isArray(r.general)) {
 		out.general = sanitizeGeneral(r.general as Record<string, unknown>);
-	}
-	if (r.dictation !== undefined) {
-		const raw = r.dictation;
-		out.dictation = raw !== null && typeof raw === "object" && !Array.isArray(raw) &&
-			isDictationLanguage((raw as Record<string, unknown>).language)
-			? { language: (raw as DictationSettings).language }
-			: {};
 	}
 	if (r.claudeCode !== undefined) {
 		const raw = r.claudeCode;

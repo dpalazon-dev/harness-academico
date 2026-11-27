@@ -73,6 +73,7 @@ try {
 		writeFileSync(nextTypes, devTypes);
 	}
 }
+run("Descargar y verificar el motor de dictado", node, ["scripts/stt-fetch.mjs"]);
 run("Comprobar proveedores en el trazado de Next", node, ["scripts/smoke-provider-runtime.mjs"]);
 run("Preparar servidor standalone", node, ["scripts/build-server.mjs"]);
 const standalone = join(root, ".next", "standalone");
@@ -121,5 +122,6 @@ for (const directory of shikiAliases(payload)) {
 }
 run("Comprobar proveedores del paquete con Node", node, ["scripts/smoke-provider-runtime.mjs", "--standalone", payload]);
 run("Comprobar proveedores del paquete con Electron", node, ["scripts/smoke-provider-runtime.mjs", "--standalone", payload, "--runtime", runtime]);
+run("Comprobar el motor de dictado del paquete", node, ["scripts/smoke-stt.mjs", join(resources, "stt")]);
 run("Comprobar navegador auxiliar del paquete", node, ["scripts/smoke-demo-runtime.mjs", "--standalone", payload, "--runtime", runtime, "--browser"]);
 console.log(`[desktop:dist:win] Instalador verificado: ${installer} (${commit})`);

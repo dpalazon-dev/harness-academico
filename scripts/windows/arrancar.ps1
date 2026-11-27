@@ -20,6 +20,9 @@ if ($Datos) { $env:LH_DATA_DIR = $Datos }
 if ($Conocimiento) { $env:ESTUDIO_KB_DIR = $Conocimiento }
 if ($Almacen) { $env:KBOL_ALMACEN = $Almacen }
 if (!$env:LH_DATA_DIR) { Write-Warning 'Sin LH_DATA_DIR: la app usará su carpeta de datos por defecto.' }
+if (!(Test-Path -LiteralPath (Join-Path $app 'vendor\sttin\parakeet-cli.exe') -PathType Leaf)) {
+    Write-Warning 'Sin el motor de dictado local: ejecuta "node scripts/stt-fetch.mjs" en la carpeta de la app (descarga unos 680 MB).'
+}
 $env:LH_DEV_NODE = $node
 Push-Location -LiteralPath $app
 try {

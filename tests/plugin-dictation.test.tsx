@@ -5,7 +5,6 @@ import { parseHTML } from "linkedom";
 import { appendToPrimaryInput, DICTATION_ACTIVE_ELSEWHERE, finishDictation, useDictation, useDictationTarget, type Dictation } from "../components/dictation.tsx";
 import { usePluginDictation } from "../components/plugin-dictation.tsx";
 import { claimPluginInputFocus, dispatchFocusedPluginShortcut } from "../components/plugin-input-focus.ts";
-import { notifySettingsSaved } from "../components/settings-signal.ts";
 import { isDictationActive } from "../components/dictation-state.ts";
 
 function deferred<T>() {
@@ -14,28 +13,28 @@ function deferred<T>() {
 	const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; });
 	return { promise, resolve, reject };
 }
-class Socket extends EventTarget {
-	static CONNECTING = 0;
-	static OPEN = 1;
-	static all: Socket[] = [];
-	readyState = Socket.CONNECTING;
-	sent: unknown[] = [];
-	constructor(readonly url: string, readonly protocols: string[]) { super(); Socket.all.push(this); }
-	send(data: unknown) { this.sent.push(data); }
-	close() { this.readyState = 3; }
-	open() { this.readyState = Socket.OPEN; this.dispatchEvent(new Event("open")); }
-	end() { this.close(); this.dispatchEvent(Object.assign(new Event("close"), { code: 1000 })); }
-	final(text: string) { this.dispatchEvent(Object.assign(new Event("message"), {
-		data: JSON.stringify({ type: "Results", is_final: true, channel: { alternatives: [{ transcript: text }] } }),
-	})); }
-}
 class AudioGraph {
 	state = "running";
 	destination = {};
 	audioWorklet = { addModule: async () => {} };
 	createMediaStreamSource() { return { connect() {}, disconnect() {} }; }
 }
-class Worklet { port = {}; connect() {} disconnect() {} }
+// The local engine (ticket 12i): audio frames come from this fake worklet and
+// the recognizer is simulated at its client, POST /api/stt/transcribe.
+class Worklet {
+	static all: Worklet[] = [];
+	port: { onmessage?: (e: { data: unknown }) => void } = {};
+	constructor() { Worklet.all.push(this); }
+	connect() {}
+	disconnect() {}
+	frame() { this.port.onmessage?.({ data: { type: "audio", buffer: new Int16Array(2048).fill(1).buffer } }); }
+}
+type Request = { signal?: AbortSignal; reply: (response: Response) => void };
+let requests: Request[] = [];
+/** Answer the latest transcription request with `text`. */
+async function reply(text: string) {
+	await act(async () => { requests.at(-1)!.reply(Response.json({ text })); });
+}
 let dispose: (() => Promise<void>) | undefined;
 let restore: (() => void) | undefined;
 let releaseFocus: (() => void)[] = [];
@@ -51,7 +50,8 @@ async function fixture() {
 		append: undefined as ((text: string) => void | Promise<void>) | undefined,
 		mic: undefined as Promise<{ getTracks: () => { stop: () => void }[] }> | undefined,
 	};
-	Socket.all = [];
+	Worklet.all = [];
+	requests = [];
 	const previous = new Map<string, PropertyDescriptor | undefined>();
 	for (const [key, value] of Object.entries({
 		React, window: dom.window, document: dom.document, CustomEvent: dom.window.CustomEvent,
@@ -59,12 +59,14 @@ async function fixture() {
 			state.captures++;
 			return state.mic ?? { getTracks: () => [{ stop() { state.stops++; } }] };
 		} } },
-		WebSocket: Socket, AudioContext: AudioGraph, AudioWorkletNode: Worklet,
+		AudioContext: AudioGraph, AudioWorkletNode: Worklet,
 		IS_REACT_ACT_ENVIRONMENT: true,
-		fetch: async (url: string) => {
-			if (url === "/api/stt/token") return Response.json({ token: "test-token" });
-			assert.equal(url, "/api/settings");
-			return Response.json({ settings: { version: 1, dictation: { language: "en" } } });
+		fetch: (url: string, init?: RequestInit) => {
+			assert.equal(url, "/api/stt/transcribe");
+			const response = deferred<Response>();
+			init?.signal?.addEventListener("abort", () => response.reject(new DOMException("aborted", "AbortError")));
+			requests.push({ signal: init?.signal ?? undefined, reply: response.resolve });
+			return response.promise;
 		},
 	})) {
 		previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
@@ -100,7 +102,6 @@ async function fixture() {
 	const render = async () => { await act(async () => { root.render(<Harness />); }); };
 	dispose = async () => { await act(async () => { root.unmount(); }); };
 	await render();
-	await act(async () => { notifySettingsSaved("dictation"); });
 	const registerFocus = () => {
 		releaseFocus.push(claimPluginInputFocus(document.getElementById("plugin")!, { toggleDictation: () => plugin.toggle() }));
 		releaseFocus.push(claimPluginInputFocus(document.getElementById("other")!, { toggleDictation: () => other.toggle() }));
@@ -124,14 +125,14 @@ test("mounted plugins never replace core insertion, question priority, or core f
 	await f.render();
 	appendToPrimaryInput("question file");
 	await act(async () => { f.core.toggle(); });
-	const socket = Socket.all[0]!;
-	await act(async () => { socket.open(); socket.final("spoken answer"); });
+	await act(async () => { Worklet.all[0]!.frame(); });
 	let finished = false;
 	let finish!: Promise<void>;
 	await act(async () => { finish = finishDictation().then(() => { finished = true; }); });
 	assert.equal(f.core.phase, "stopping");
 	assert.equal(finished, false);
-	await act(async () => { socket.final("tail"); socket.end(); await finish; });
+	await reply("spoken answer tail");
+	await act(async () => { await finish; });
 	assert.equal(finished, true);
 	assert.deepEqual(f.state.question, ["question file", "spoken answer tail"]);
 	assert.deepEqual(f.state.plugin, []);
@@ -143,16 +144,16 @@ test("explicit plugin capture never appends into core/question and cannot steal 
 	await f.render();
 	await act(async () => { f.plugin.toggle(); f.other.toggle(); f.core.toggle(); });
 	assert.equal(f.state.captures, 1);
-	assert.equal(Socket.all.length, 1);
+	assert.equal(Worklet.all.length, 1);
 	assert.equal(f.other.error, DICTATION_ACTIVE_ELSEWHERE);
 	assert.equal(f.core.error, DICTATION_ACTIVE_ELSEWHERE);
-	const socket = Socket.all[0]!;
-	await act(async () => { socket.open(); socket.final("plugin only"); });
+	await act(async () => { Worklet.all[0]!.frame(); });
 	await finishDictation();
 	assert.equal(f.plugin.phase, "recording", "a mounted plugin cannot replace the core finisher");
 	let finish!: Promise<void>;
 	await act(async () => { finish = f.plugin.finish(); });
-	await act(async () => { socket.end(); await finish; });
+	await reply("plugin only");
+	await act(async () => { await finish; });
 	assert.deepEqual(f.state.plugin, ["plugin only"]);
 	assert.deepEqual(f.state.core, []);
 	assert.deepEqual(f.state.question, []);
@@ -164,18 +165,18 @@ test("one shortcut activation goes to focused plugin; otherwise core fallback an
 	f.registerFocus();
 	f.focus("plugin-input");
 	await f.event("toggle-dictation");
-	assert.equal(f.plugin.phase, "connecting");
+	assert.equal(f.plugin.phase, "recording");
 	assert.equal(f.core.phase, "idle");
 	assert.equal(f.state.captures, 1);
-	const socket = Socket.all[0]!;
-	await act(async () => { socket.open(); socket.final("discard me"); });
+	await act(async () => { Worklet.all[0]!.frame(); });
 	f.focus("core");
 	await f.event("cancel-dictation");
 	assert.equal(f.plugin.phase, "idle");
 	assert.deepEqual(f.state.plugin, []);
 	await f.event("toggle-dictation");
-	assert.equal(f.core.phase, "connecting");
+	assert.equal(f.core.phase, "recording");
 	assert.equal(f.state.captures, 2);
+	assert.equal(requests.length, 0, "a cancelled capture is never transcribed");
 	await f.event("cancel-dictation");
 	assert.equal(isDictationActive(), false);
 });
@@ -208,7 +209,8 @@ test("disposal cancels only its own capture and ignores late transcript/mic even
 	assert.equal(isDictationActive(), false);
 	await act(async () => { mic.resolve({ getTracks: () => [{ stop() { f.state.stops++; } }] }); });
 	assert.equal(f.state.stops, 1);
-	assert.equal(Socket.all.length, 0);
+	assert.equal(Worklet.all.length, 0);
+	assert.equal(requests.length, 0);
 	f.state.mic = undefined;
 	await act(async () => { f.core.toggle(); });
 	assert.equal(isDictationActive(), true);
@@ -228,27 +230,30 @@ test("a standalone plugin can own shortcuts without a core composer or primary t
 	f.focus("plugin-input");
 	assert.equal(appendToPrimaryInput("must not reach plugin"), false);
 	await f.event("toggle-dictation");
-	assert.equal(f.plugin.phase, "connecting");
+	assert.equal(f.plugin.phase, "recording");
 	assert.equal(f.state.captures, 1);
-	const socket = Socket.all[0]!;
-	await act(async () => { socket.open(); socket.final("standalone words"); });
+	await act(async () => { Worklet.all[0]!.frame(); });
 	let finish!: Promise<void>;
-	await act(async () => { finish = f.plugin.finish(); socket.end(); await finish; });
+	await act(async () => { finish = f.plugin.finish(); });
+	await reply("standalone words");
+	await act(async () => { await finish; });
 	assert.deepEqual(f.state.plugin, ["standalone words"]);
 });
 
-test("disposing a recorded plugin discards buffered text and stale socket events", async () => {
+test("disposing a recorded plugin discards its audio and a late transcription reply", async () => {
 	const f = await fixture();
 	await act(async () => { f.plugin.toggle(); });
-	const socket = Socket.all[0]!;
-	await act(async () => { socket.open(); socket.final("leaving page"); });
+	await act(async () => { Worklet.all[0]!.frame(); f.plugin.stop(); });
+	assert.equal(requests.length, 1);
+	const request = requests[0]!;
 	f.state.showPlugin = false;
 	await f.render();
-	await act(async () => { socket.final("late words"); socket.end(); });
+	assert.equal(request.signal?.aborted, true);
+	await act(async () => { Worklet.all[0]!.frame(); request.reply(Response.json({ text: "late words" })); });
 	assert.deepEqual(f.state.plugin, []);
 	assert.equal(isDictationActive(), false);
 	assert.equal(f.state.stops, 1);
-	assert.equal(Socket.all.length, 1);
+	assert.equal(requests.length, 1);
 });
 
 test("disabled prevents new capture but an active control still stops and keeps text", async () => {
@@ -260,11 +265,11 @@ test("disabled prevents new capture but an active control still stops and keeps 
 	f.state.disabled = false;
 	await f.render();
 	await act(async () => { f.plugin.toggle(); });
-	const socket = Socket.all[0]!;
-	await act(async () => { socket.open(); socket.final("keep this"); });
+	await act(async () => { Worklet.all[0]!.frame(); });
 	f.state.disabled = true;
 	await f.render();
-	await act(async () => { f.plugin.toggle(); socket.end(); });
+	await act(async () => { f.plugin.toggle(); });
+	await reply("keep this");
 	assert.deepEqual(f.state.plugin, ["keep this"]);
 });
 
@@ -274,11 +279,11 @@ test("finish awaits an async transcript callback before a sender reads controlle
 	let controlled = "";
 	f.state.append = async (text) => { await delivered.promise; controlled = text; };
 	await act(async () => { f.plugin.toggle(); });
-	const socket = Socket.all[0]!;
-	await act(async () => { socket.open(); socket.final("last words"); });
+	await act(async () => { Worklet.all[0]!.frame(); });
 	let sent: string | undefined;
 	let finish!: Promise<void>;
-	await act(async () => { finish = f.plugin.finish().then(() => { sent = controlled; }); socket.end(); });
+	await act(async () => { finish = f.plugin.finish().then(() => { sent = controlled; }); });
+	await reply("last words");
 	assert.equal(sent, undefined);
 	assert.equal(f.plugin.phase, "stopping");
 	await act(async () => { delivered.resolve(); await finish; });
@@ -291,10 +296,10 @@ test("async transcript failure rejects finish, displays the error, and does not 
 	const delivered = deferred<void>();
 	f.state.append = () => delivered.promise;
 	await act(async () => { f.plugin.toggle(); });
-	const socket = Socket.all[0]!;
-	await act(async () => { socket.open(); socket.final("not delivered"); });
+	await act(async () => { Worklet.all[0]!.frame(); });
 	let failure!: Promise<unknown>;
-	await act(async () => { failure = f.plugin.finish().then(() => assert.fail("must not send"), (error) => error); socket.end(); });
+	await act(async () => { failure = f.plugin.finish().then(() => assert.fail("must not send"), (error) => error); });
+	await reply("not delivered");
 	const error = new Error("Plugin input unavailable");
 	await act(async () => { delivered.reject(error); assert.equal(await failure, error); });
 	assert.equal(f.plugin.error, error.message);
@@ -310,14 +315,13 @@ for (const action of ["cancel", "dispose"] as const) {
 			let controlled = "old draft";
 			f.state.append = async (text) => { await delivered.promise; controlled = text; };
 			await act(async () => { f.plugin.toggle(); });
-			const socket = Socket.all[0]!;
-			await act(async () => { socket.open(); socket.final("new transcript"); });
+			await act(async () => { Worklet.all[0]!.frame(); });
 			let sent: string | undefined;
 			let finish!: Promise<unknown>;
 			await act(async () => {
 				finish = f.plugin.finish().then(() => { sent = controlled; }, (error: unknown) => error);
-				socket.end();
 			});
+			await reply("new transcript");
 			assert.equal(f.plugin.phase, "stopping");
 			if (action === "cancel") await act(async () => { f.plugin.cancel(); });
 			else { f.state.showPlugin = false; await f.render(); }
@@ -341,8 +345,7 @@ for (const action of ["cancel", "dispose"] as const) {
 test("core cancel before transcript delivery still resolves finish and discards buffered speech", async () => {
 	const f = await fixture();
 	await act(async () => { f.core.toggle(); });
-	const socket = Socket.all[0]!;
-	await act(async () => { socket.open(); socket.final("discard me"); });
+	await act(async () => { Worklet.all[0]!.frame(); });
 	let finished = false;
 	await act(async () => {
 		const finish = f.core.finish().then(() => { finished = true; });
@@ -350,6 +353,8 @@ test("core cancel before transcript delivery still resolves finish and discards 
 		await finish;
 	});
 	assert.equal(finished, true);
+	assert.equal(requests[0]?.signal?.aborted, true, "the in-flight transcription is abandoned");
+	await act(async () => { requests[0]?.reply(Response.json({ text: "discard me" })); });
 	assert.deepEqual(f.state.core, []);
 	assert.equal(isDictationActive(), false);
 });
@@ -358,8 +363,8 @@ test("stop without a finish waiter safely consumes async transcript rejection", 
 	const f = await fixture();
 	f.state.append = async () => { throw new Error("delivery failed"); };
 	await act(async () => { f.plugin.toggle(); });
-	const socket = Socket.all[0]!;
-	await act(async () => { socket.open(); socket.final("text"); f.plugin.stop(); socket.end(); });
+	await act(async () => { Worklet.all[0]!.frame(); f.plugin.stop(); });
+	await reply("text");
 	assert.equal(f.plugin.error, "delivery failed");
 	assert.equal(isDictationActive(), false);
 });

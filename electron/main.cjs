@@ -245,6 +245,8 @@ function startServer(port) {
 				// (no env injection anymore: a spawn-time copy would shadow every
 				// settings-page key change until restart; env wins over file).
 				LH_AUTH_FILE: AUTH_FILE(),
+				// Local dictation engine (ticket 12i), shipped under resources/stt.
+				LH_STT_DIR: path.join(process.resourcesPath, "stt"),
 				LH_DESKTOP_SERVER: "1",
 				LH_DESKTOP_API_SECRET: desktopAPISecret,
 			},
