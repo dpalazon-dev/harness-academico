@@ -5,7 +5,7 @@ import { afterEach, test } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
-import { NativeSubscriptionConnection, NativeSubscriptionUIProvider, SubscriptionConnections, COPILOT_POLICY_NOTICE, emptySubscriptionStatus } from "../components/settings/subscription-connections.tsx";
+import { NativeSubscriptionConnection, NativeSubscriptionUIProvider, SubscriptionConnections, COPILOT_POLICY_NOTICE, AGENT_USAGE_NOTICE, emptySubscriptionStatus } from "../components/settings/subscription-connections.tsx";
 import { ChatGPTUIProvider } from "../components/settings/chatgpt-connection.tsx";
 import { InteractionLayersProvider } from "../components/interaction-layers.tsx";
 import { installModalDom } from "./modal-dom.ts";
@@ -54,6 +54,14 @@ test("three compact rows render in approved order with no browser-only sign-in o
 	assert(html.indexOf('data-testid="github-copilot-connection"') < html.indexOf('data-testid="xai-connection"'));
 	assert.equal((html.match(/>Conectar<\/button>/g) ?? []).length, 3);
 	assert(!html.includes("@")); assert(!html.includes("Añadir cuentas"));
+});
+test("the agent-usage notice sits above the rows, in setup and in Settings", () => {
+	for (const setup of [true, false]) {
+		const html = renderToStaticMarkup(<ChatGPTUIProvider><NativeSubscriptionUIProvider><SubscriptionConnections setup={setup} /></NativeSubscriptionUIProvider></ChatGPTUIProvider>);
+		assert(html.includes(AGENT_USAGE_NOTICE));
+		assert(html.indexOf('data-testid="subscription-agent-notice"') < html.indexOf('data-testid="chatgpt-connection"'));
+	}
+	assert.match(AGENT_USAGE_NOTICE, /agente/); assert.match(AGENT_USAGE_NOTICE, /Codex/); assert.match(AGENT_USAGE_NOTICE, /versión de chat/);
 });
 for (const [id, label] of [["github-copilot", "GitHub Copilot"], ["xai", "Grok"]] as const) test(`${id}: disclosure and connection are separate steps with no duplicated content or early authorization`, async () => {
 	const f = fixture(); await mount(); await click(button("Conectar", row(id)));
