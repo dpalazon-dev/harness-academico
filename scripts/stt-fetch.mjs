@@ -19,14 +19,16 @@ const root = join(import.meta.dirname, "..");
 const vendor = join(root, "vendor", "stt");
 const cache = join(root, "vendor", "stt-cache");
 
-/** The engine: whisper.cpp's Windows x64 build, which ships parakeet-cli.
- *  Pinned release b5907 (2026-11-20), CPU backends loaded at run time. */
+/** The engine: whisper.cpp b5907 built by .github/workflows/stt-binaries.yml
+ *  (run 46048933459): parakeet-cli, the ggml backends loaded at run time
+ *  (every CPU variant plus Vulkan, used when a GPU driver exists) and the
+ *  Visual C++ runtime next to them, so a clean Windows needs nothing else. */
 export const ENGINE = {
-	name: "whisper-bin-x64-b5907.zip",
-	url: "https://github.com/ggml-org/whisper.cpp/releases/download/b5907/whisper-bin-x64.zip",
-	sha256: "ecca07b277d943e9b9f4712856a144b857271a6b333104e511e1988e80db582b",
-	/** Only what parakeet-cli loads: itself, parakeet.dll and the ggml backends. */
-	keep: /^(parakeet-cli\.exe|parakeet\.dll|ggml(-[\w-]+)?\.dll)$/i,
+	name: "parakeet-win-x64-b5907-vulkan.zip",
+	url: "https://github.com/dpalazon-dev/harness-academico/releases/download/stt-b5907/parakeet-win-x64-b5907-vulkan.zip",
+	sha256: "0a4de211a6d0498840bb974da5306d0ee155b9ba083c9e2eb28bac9966123dd2",
+	/** The zip holds only what parakeet-cli needs. */
+	keep: /\.(exe|dll)$/i,
 };
 
 /** Parakeet TDT 0.6B v3, 8-bit (NVIDIA, CC-BY-4.0; GGUF conversion by ggml-org, MIT). */

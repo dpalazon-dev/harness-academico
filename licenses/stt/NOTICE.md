@@ -6,6 +6,11 @@ HarnessAcademico incluye, en `resources/stt`, un motor de reconocimiento de voz 
 
 Programa `parakeet-cli` y bibliotecas `parakeet` y `ggml`, de [whisper.cpp](https://github.com/ggml-org/whisper.cpp), versión `b5907`.
 Copyright (c) 2023-2026 The ggml authors. Licencia MIT: ver `whisper.cpp-LICENSE.txt`.
+Compilados con el workflow `.github/workflows/stt-binaries.yml` de este repositorio, con el backend Vulkan.
+
+## Runtime de Microsoft Visual C++ (`bin/`)
+
+`msvcp140*.dll`, `vcruntime140*.dll`, `vcomp140.dll`, `concrt140.dll` y `vccorlib140.dll` son archivos redistribuibles de Microsoft Visual C++, incluidos junto al programa (despliegue local de la aplicación) según los términos de licencia de Visual Studio para el código redistribuible.
 
 ## Parakeet TDT 0.6B v3 (`models/ggml-parakeet-tdt-0.6b-v3-q8_0.bin`)
 
