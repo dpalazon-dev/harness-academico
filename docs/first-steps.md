@@ -21,6 +21,8 @@ The tutor needs an AI model. The same screen offers two ways:
 - **A subscription you already pay for:** ChatGPT, GitHub Copilot or Grok. Press **Conectar** and sign in in your browser.
 - **An API key** from your provider: Anthropic, OpenAI, Google and others, or an OpenAI-compatible endpoint, including a local one.
 
+> **HarnessAcademico is an agent, not a chat.** With a subscription it does not use the chat product (chatgpt.com, claude.ai) but your plan's agent access: with ChatGPT it spends your **Codex** usage; with Claude Code, your **Claude Code** usage; with GitHub Copilot and Grok, those accounts' usage. It counts as if you were using those tools, with their limits, and background work counts too. With an API key you pay your provider per token.
+
 If you use [Claude Code](claude-code.md), turn it on in **Ajustes**. Then pick a model for each tier: main, cheap and vision. All three are needed to start a conversation.
 
 ## 3. Create a space and its plan

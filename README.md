@@ -20,7 +20,7 @@ It is a modified version of [LearnHarness](https://github.com/amosblomqvist/lear
 - **Library.** Attach PDFs and read them page by page, with notes that keep their locator.
 - **Notebooks.** Write in your own words; the tutor annotates in the margin, can draw a Mermaid diagram when you ask, and offers retrieval questions or facts that only enter your notebook when you accept them. A proactive mode decides whether it comments on its own. Comments can be read aloud with local Windows voices only.
 - **Knowledge base.** Confirmed facts, each with its citation, are stored as plain files in a git repository in KBOL format. Optional: everything else works without it. Importing PDFs and validating the base need the KBOL tools and [uv](https://docs.astral.sh/uv/); the app says what is missing when you use them.
-- **Your models, your data.** Bring an API key, a supported subscription sign-in, the Claude Code CLI or an OpenAI-compatible endpoint (including a local server). Your data lives in folders you choose, as plain JSON and Markdown.
+- **Your models, your data.** Bring an API key, a supported subscription sign-in, the Claude Code CLI or an OpenAI-compatible endpoint (including a local server). The app is an agent: a subscription spends your plan's agent usage (Codex for ChatGPT, Claude Code for Claude), not the chat product's. Your data lives in folders you choose, as plain JSON and Markdown.
 
 ## Install (Windows x64)
 
