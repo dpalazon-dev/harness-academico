@@ -2,7 +2,11 @@
 
 **Una aplicación de escritorio para estudiar en la que el tutor de IA critica lo que produces, en lugar de producirlo por ti.**
 
-[English](README.md) · [Descargar](https://github.com/dpalazon-dev/harness-academico/releases/latest) · [Primer uso](docs/first-run.md) · [Contribuir](CONTRIBUTING.md) · [Discussions](https://github.com/dpalazon-dev/harness-academico/discussions)
+[English](README.md) · [Descargar](https://github.com/dpalazon-dev/harness-academico/releases/latest) · [Primeros pasos](docs/primeros-pasos.md) · [Primer uso](docs/first-run.md) · [Contribuir](CONTRIBUTING.md) · [Discussions](https://github.com/dpalazon-dev/harness-academico/discussions)
+
+![Un cuaderno en HarnessAcademico: seleccionas tu frase, el tutor responde al margen con una pregunta y su pregunta de recuperación solo entra en la página si la aceptas](docs/assets/primeros-pasos/4-cuaderno.gif)
+
+¿Primera vez? [Primeros pasos](docs/primeros-pasos.md) recorre el primer uso en cinco pasos animados, del instalador a tu primera práctica ([vídeo completo](docs/assets/primeros-pasos/primeros-pasos.mp4), 86 s).
 
 HarnessAcademico organiza el estudio alrededor de lo que quieres poder *hacer*. Cada materia es un plan de unidades; cada unidad nombra una capacidad y el criterio observable que demuestra que la tienes. Tú escribes primero (lo que ya sabes, tus notas de una fuente, tu reconstrucción sin mirar) y el tutor contrasta, pregunta y señala huecos. La práctica y los repasos espaciados salen de esa evidencia, no de tarjetas que no has escrito.
 
@@ -16,7 +20,7 @@ Es una versión modificada de [LearnHarness](https://github.com/amosblomqvist/le
 - **Biblioteca.** Adjunta PDF y léelos por páginas, con notas que conservan su localizador.
 - **Cuadernos.** Escribes con tus palabras; el tutor anota al margen, dibuja un diagrama Mermaid si se lo pides y ofrece preguntas de recuperación o hechos que solo entran en tu cuaderno si los aceptas. Un modo proactivo decide si comenta por su cuenta. Los comentarios se pueden escuchar, solo con voces locales de Windows.
 - **Base de conocimiento.** Los hechos confirmados, cada uno con su cita, se guardan como archivos de texto en un repositorio git con formato KBOL. Es opcional: lo demás funciona sin ella. Incorporar PDF y validar la base necesitan las herramientas de KBOL y [uv](https://docs.astral.sh/uv/); la app dice qué falta al usarlos.
-- **Tus modelos, tus datos.** Usa una clave de API, una suscripción compatible, la CLI de Claude Code o un servicio compatible con OpenAI (también uno local). Tus datos viven en las carpetas que elijas, en JSON y Markdown.
+- **Tus modelos, tus datos.** Usa una clave de API, una suscripción compatible, la CLI de Claude Code o un servicio compatible con OpenAI (también uno local). La app es un agente: con una suscripción gasta el uso para agentes de tu plan (Codex con ChatGPT, Claude Code con Claude), no el de la versión de chat. Tus datos viven en las carpetas que elijas, en JSON y Markdown.
 
 ## Instalar (Windows x64)
 
