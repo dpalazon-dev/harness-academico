@@ -67,7 +67,7 @@ test("off by default; enabling persists before probing and reveals the version/a
 	assert.equal(document.querySelector('[role="status"]')?.parentElement, button().parentElement);
 	assert.match(document.body.textContent ?? "", /sin procesos en segundo plano/);
 	assert.match(document.body.textContent ?? "", /no el inicio de sesión, el acceso a modelos ni la cuota/);
-	assert.match(document.body.textContent ?? "", /El coste lo controla Claude Code/);
+	assert.match(document.body.textContent ?? "", /El coste lo controla Claude Code: gasta el uso de Claude Code de tu cuenta\./);
 	assert.match(document.body.textContent ?? "", /Comprueba por tu cuenta lo que afirme la IA: puede ser inexacto, incompleto, engañoso o estar desfasado\./);
 	assert(document.querySelector("strong")?.textContent?.includes("Instala Claude Code e inicia sesión"));
 	assert.equal(document.querySelector("a")?.getAttribute("href"), "https://code.claude.com/docs/en/setup");

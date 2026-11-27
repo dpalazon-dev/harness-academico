@@ -9,6 +9,8 @@ import { Toggle } from "./controls";
 import { useNativeSubscriptionBridge } from "./subscription-client";
 import type { CloseOutcome } from "@/components/interaction-layers";
 
+/** HarnessAcademico trabaja como un agente: una suscripción gasta el uso para agentes del plan, no el del chat. */
+export const AGENT_USAGE_NOTICE = "HarnessAcademico es un agente: con una suscripción gasta el uso para agentes de tu plan (con ChatGPT, el de Codex), no el de la versión de chat.";
 export const COPILOT_POLICY_NOTICE = "El inicio de sesión nativo de Copilot en Pi puede activar modelos adicionales cuya política aún no esté configurada. Los modelos que la política desactiva expresamente no se activan. Las restricciones de tu organización se siguen aplicando.";
 export const SUBSCRIPTION_BACKGROUND_HINT = "Permite que los agentes auxiliares de HarnessAcademico y los seguimientos automáticos usen esta conexión.";
 export function subscriptionNotice(label: string, web = false): string { return `Tus peticiones, los resultados de las herramientas y el contexto relevante de la conversación se envían a ${label} para hacer el trabajo que elijas. Las credenciales se guardan ${web ? "en el equipo donde se ejecuta HarnessAcademico" : "en este equipo"}, en un archivo de texto sin cifrar que solo puede leer tu usuario. Se aplican las condiciones, las políticas de uso de datos y los límites del plan del proveedor. Esta conexión nunca recurre a una clave de API.`; }
@@ -133,7 +135,7 @@ export function SubscriptionConnections({ setup = false }: { setup?: boolean }) 
 	// Providers uses ordinary settings-label typography. The setup surface
 	// keeps its existing compact labels; dialogs and actions are untouched.
 	const labelClassName = setup ? undefined : "font-prose text-(length:--lh-prose-size) text-foreground";
-	return <div className="space-y-3" data-testid="subscription-connections"><ChatGPTConnection setup={setup} labelClassName={labelClassName} />{NATIVE_SUBSCRIPTIONS.map((p) => <NativeSubscriptionConnection key={p.providerId} providerId={p.providerId} labelClassName={labelClassName} />)}</div>;
+	return <div className="space-y-3" data-testid="subscription-connections"><p className="text-xs leading-relaxed text-muted-foreground" data-testid="subscription-agent-notice">{AGENT_USAGE_NOTICE}</p><ChatGPTConnection setup={setup} labelClassName={labelClassName} />{NATIVE_SUBSCRIPTIONS.map((p) => <NativeSubscriptionConnection key={p.providerId} providerId={p.providerId} labelClassName={labelClassName} />)}</div>;
 }
 export function NativeSubscriptionBackgroundAccess({ provider }: { provider: string | undefined }) {
 	const ui = useContext(Context), descriptor = NATIVE_SUBSCRIPTIONS.find((p) => p.logicalId === provider);
